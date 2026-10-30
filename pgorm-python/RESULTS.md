@@ -17,10 +17,10 @@ async def visit(account_id: int):
     accounts = Table("accounts", schema="application")
     async with Pool(os.environ["DATABASE_URL"]) as pool:
         query = update(accounts).set("visits", accounts.col("visits") + 1)
-        affected = await pool.execute(query.where_(accounts.col("id") == account_id))
-        account = await pool.fetch_optional(
+        affected = await pool.execute(query.where(accounts.col("id") == account_id))
+        account = await pool.optional(
             select(accounts.star()).from_(accounts)
-            .where_(accounts.col("id") == account_id)
+            .where(accounts.col("id") == account_id)
         )
         return affected, account
 ```
@@ -32,12 +32,12 @@ available in the installed capability manifest.
 | Terminal | Result | Cardinality |
 | --- | --- | --- |
 | `await execute(query)` | `int` command affected count | PostgreSQL's count, including zero |
-| `await fetch_all(query)` | `list[Record]` | Zero or more |
-| `await fetch_one(query)` | `Record` | Exactly one, otherwise `DatabaseError` |
-| `await fetch_optional(query)` | `Record \| None` | At most one, otherwise `DatabaseError` |
-| `await stream(query)` | `ResultStream` async iterator | Zero or more, one pull at a time |
+| `await query(query)` | `list[Record]` | Zero or more |
+| `await one(query)` | `Record` | Exactly one, otherwise `DatabaseError` |
+| `await optional(query)` | `Record \| None` | At most one, otherwise `DatabaseError` |
+| `await stream(query)` | `RowStream` async iterator | Zero or more, one pull at a time |
 
-All three `fetch_*` terminals materialize the complete result through
+`query`, `one` and `optional` materialize the complete result through
 `ConnectionTrait::query_all`; they do not inject a limit. Use a builder limit
 when the query should be bounded, or streaming for a large result.
 
@@ -129,7 +129,7 @@ raises `ConstructionError` on truth testing, as `CopyOutStream`,
 `CopyRowStream` and `Listener` do: its truth would say nothing of whether
 rows remain, so `if rows:` is refused where it is written.
 
-`ResultStream` wraps pgorm's `query_raw` / owned `RowStream`, without collecting
+`RowStream` wraps the row stream pgorm's `query_raw` returns, without collecting
 the result or adding a prefetch queue. The driver uses a bounded response
 channel and socket backpressure; only one Python `next` operation may run at
 a time. Buffer memory still depends on row/message size. This is a client

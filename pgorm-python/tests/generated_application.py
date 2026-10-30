@@ -56,13 +56,13 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
                     .update(connection)
                 )
                 self.assertEqual((updated.display_name, updated.version), ("Saved", 2))
-                query = app.Account.find().filter(app.Account.col("id") == 1)
+                query = app.Account.find().where(app.Account.col("id") == 1)
                 self.assertEqual([row.id for row in await query.all(connection)], [1])
                 self.assertIsInstance(await query.one(connection), app.AccountModel)
-                self.assertIsInstance(await query.one_opt(connection), app.AccountModel)
+                self.assertIsInstance(await query.optional(connection), app.AccountModel)
                 self.assertEqual(query.inspect().params[0].kind, "i32")
                 self.assertEqual(await updated.into_active().delete(connection), 1)
-                self.assertIsNone(await query.one_opt(connection))
+                self.assertIsNone(await query.optional(connection))
 
     # [spec:pgorm:req:bindings.codegen/test]
     # [spec:pgorm:req:bindings.entity-versions/test]
@@ -84,7 +84,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
             changes = await (
                 app.Account.update_many()
                 .set("note", "bulk")
-                .filter(app.Account.col("id") == 1)
+                .where(app.Account.col("id") == 1)
                 .returning_changes(connection)
             )
             self.assertEqual([(c.old.note, c.new.note) for c in changes], [("noted", "bulk")])
@@ -129,7 +129,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
             page = await query.cursor("id").after_with(1, 10).first(1).all(connection)
             self.assertEqual([(a.id, n) for a, n in page], [(2, None)])
             self.assertIsInstance(
-                await app.AccountOnly.find().one_opt(connection), app.AccountModel
+                await app.AccountOnly.find().optional(connection), app.AccountModel
             )
             required = await app.RequiredNotes.find().all(connection)
             self.assertEqual([(a.id, n.id) for a, n in required], [(1, 10)])
@@ -210,7 +210,7 @@ class GeneratedIntervals(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(model.budgets, [p.Interval(14, 0, 0), p.Interval(-1, 0, 0)])
             cleared = await model.into_active().set_budgets(None).update(connection)
             self.assertIsNone(cleared.budgets)
-            found = await app.IntervalSpan.find().filter(
+            found = await app.IntervalSpan.find().where(
                 app.IntervalSpan.col("id") == 1
             ).one(connection)
             self.assertIsInstance(found, app.IntervalSpanModel)
@@ -276,17 +276,17 @@ class GeneratedDomains(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((model.mood, model.moods), ("glad", ["calm", "glad"]))
             self.assertEqual((model.labels, model.span), (["new"], None))
             self.assertEqual(model.amount, Decimal("19.99"))
-            found = await app.StockLine.find().filter(
+            found = await app.StockLine.find().where(
                 app.StockLine.col("small") > 10
             ).one(connection)
             self.assertEqual(found.codes, ["X", "YZ"])
             # The mood column's domain is over an enum, which PostgreSQL
             # compares only once both sides are cast to the enum.
-            glad = await app.StockLine.find().filter(
+            glad = await app.StockLine.find().where(
                 app.StockLine.col("mood") == "glad"
             ).all(connection)
             self.assertEqual([line.id for line in glad], [1])
-            calmer = await app.StockLine.find().filter(
+            calmer = await app.StockLine.find().where(
                 app.StockLine.col("mood") < "glad"
             ).all(connection)
             self.assertEqual(calmer, [])
@@ -295,7 +295,7 @@ class GeneratedDomains(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(refused.exception.sqlstate, "23514")
 
 
-    # [spec:pgorm:req:bindings.pipeline-sources/test]    a registered column a pipeline reads compares
+    # [spec:pgorm:req:bindings.pipeline-sources+2/test]    a registered column a pipeline reads compares
     # as the enum its domain is over, under its table and under a source's name, where the
     # column named by text is refused with 42883
     async def test_pipeline_compares_registered_domain_as_enum(self):

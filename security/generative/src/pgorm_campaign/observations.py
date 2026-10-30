@@ -62,6 +62,6 @@ def construction(value, p):
             column["name"]: str(value.get(column["name"]).state)
             for column in entity.describe()["columns"]
         }
-    elif isinstance(value, (p.Entity, p.Graph)):
+    elif isinstance(value, (p.Entity, p.EntityGraph)):
         result["registration"] = value.name
     return result

@@ -52,7 +52,7 @@ class UpdateView(Generic[M]):
         change = await self._update.returning_change(connection)
         return Change(self._model_class(change.old), self._model_class(change.new))
 
-    # [spec:pgorm:req:python.truth-testing+2]
+    # [spec:pgorm:req:python.truth-testing+3]
     def __bool__(self) -> bool:
         return bool(self._update)
 
@@ -66,8 +66,8 @@ class UpdateManyView(Generic[M]):
     def set(self, column, value) -> "UpdateManyView[M]":
         return UpdateManyView(self._update.set(column, value), self._model_class)
 
-    def filter(self, predicate) -> "UpdateManyView[M]":
-        return UpdateManyView(self._update.filter(predicate), self._model_class)
+    def where(self, predicate) -> "UpdateManyView[M]":
+        return UpdateManyView(self._update.where(predicate), self._model_class)
 
     async def returning_changes(self, connection) -> list[Change[M]]:
         changes = await self._update.returning_changes(connection)

@@ -3,7 +3,7 @@
 // A registered entity's reads: its columns as expressions whose
 // comparisons are the column's own `ColumnTrait` methods, and its
 // `Select<E>` with Rust's terminals.
-// [spec:pgorm:req:bindings.entity-reads]
+// [spec:pgorm:req:bindings.entity-reads+2]
 
 import { arg, Handle, TRUSTED } from "./builder.js";
 import { runJob } from "./connections.js";
@@ -203,10 +203,10 @@ export class EntityQuery {
   }
 
   /**
-   * The SQL and values a terminal sends: `one` and `oneOpt` with the
+   * The SQL and values a terminal sends: `one` and `optional` with the
    * `LIMIT 1` Rust's terminals add.
    *
-   * @param {"all" | "one" | "oneOpt"} [terminal]
+   * @param {"all" | "one" | "optional"} [terminal]
    */
   inspect(terminal = "all") {
     const [sql, values] = native.entitySelectInspect(this.#native, terminal);
@@ -214,7 +214,7 @@ export class EntityQuery {
   }
 
   /**
-   * @param {"all" | "one" | "oneOpt"} terminal
+   * @param {"all" | "one" | "optional"} terminal
    * @param {unknown} db
    * @param {unknown} options
    */
@@ -248,8 +248,8 @@ export class EntityQuery {
    * @param {unknown} db
    * @param {{ signal?: AbortSignal }} [options]
    */
-  async oneOpt(db, options) {
-    return (await this.#read("oneOpt", db, options))[0] ?? null;
+  async optional(db, options) {
+    return (await this.#read("optional", db, options))[0] ?? null;
   }
 }
 

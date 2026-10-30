@@ -35,7 +35,7 @@ class RegisteredVersions(unittest.IsolatedAsyncioTestCase):
 
     async def test_update_by_key_returns_both_versions(self):
         async with self.pool.connection() as connection:
-            model = await self.account.find().filter(self.account.col("id") == 2).one(connection)
+            model = await self.account.find().where(self.account.col("id") == 2).one(connection)
             change = await self.account.update(model.into_active().set("note", "changed")).returning_change(connection)
             self.assertIsInstance(change, p.Change)
             self.assertEqual((change.old["note"], change.new["note"]), ("two", "changed"))
@@ -53,15 +53,15 @@ class RegisteredVersions(unittest.IsolatedAsyncioTestCase):
         async with self.pool.connection() as connection:
             update = (self.account.update_many().set("note", "bulk").set("mood", "busy")
                       .set("version", self.account.col("version").expr() + 10)
-                      .filter(self.account.col("id") >= 2))
+                      .where(self.account.col("id") >= 2))
             changes = sorted(await update.returning_changes(connection), key=lambda change: change.old["id"])
             self.assertEqual(rows(changes), [(2, "two", "bulk"), (3, None, "bulk")])
             self.assertEqual([change.new["mood"] for change in changes], ["busy", "busy"])
             self.assertEqual([change.new["version"] for change in changes], [11, 11])
-            self.assertEqual(await self.account.update_many().filter(
+            self.assertEqual(await self.account.update_many().where(
                 self.account.col("id") == 99).set("note", "x").returning_changes(connection), [])
             with self.assertRaises(p.DatabaseError):
-                await self.account.update_many().filter(self.account.col("id") == 1).returning_changes(connection)
+                await self.account.update_many().where(self.account.col("id") == 1).returning_changes(connection)
 
     async def test_upsert_says_what_it_did(self):
         renamed = p.ConflictTarget("id").update("display name")
@@ -75,10 +75,10 @@ class RegisteredVersions(unittest.IsolatedAsyncioTestCase):
                                      ("name 1|before", "renamed"))
                 case other:
                     self.fail(f"expected an update, got {other!r}")
-            skipped = p.ConflictTarget("id").ignore()
+            skipped = p.ConflictTarget("id").do_nothing()
             self.assertIsNone(
                 await self.account.insert(self.active(2, "skipped")).on_conflict(skipped).returning_upsert(connection))
-            guarded = renamed.where_(p.literal(False))
+            guarded = renamed.where(p.literal(False))
             self.assertIsNone(
                 await self.account.insert(self.active(2, "guarded")).on_conflict(guarded).returning_upsert(connection))
             batch = self.account.insert_many([self.active(3, "three again"), self.active(5, "five")])

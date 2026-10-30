@@ -71,7 +71,7 @@ impl PyFrameType {
         })
     }
 
-    // [spec:pgorm:req:python.truth-testing+2]
+    // [spec:pgorm:req:python.truth-testing+3]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "window frames cannot be tested as Python booleans",
@@ -409,7 +409,7 @@ impl WindowCall {
 
     /// This call over a `Window` or an `ExtendedWindow` written inline, or
     /// over the window a statement names.
-    pub(crate) fn over(self, window: &Bound<'_, PyAny>) -> PyResult<PyWindowedExpr> {
+    pub(crate) fn over(self, window: &Bound<'_, PyAny>) -> PyResult<PyWindowed> {
         let over = if let Ok(window) = window.extract::<PyRef<'_, PyWindow>>() {
             Over::Inline(window.inner.clone().into())
         } else if let Ok(window) = window.extract::<PyRef<'_, PyExtendedWindow>>() {
@@ -417,7 +417,7 @@ impl WindowCall {
         } else {
             Over::Named(PyIdentifier::new(window)?.name())
         };
-        Ok(PyWindowedExpr {
+        Ok(PyWindowed {
             call: self,
             over,
             alias: None,
@@ -442,15 +442,15 @@ enum Over {
 
 // [spec:pgorm:req:bindings.windows]
 /// A function call under `OVER`, a SELECT item built by `over`.
-#[pyclass(name = "WindowedExpr", module = "pgorm", frozen, from_py_object)]
+#[pyclass(name = "Windowed", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
-pub struct PyWindowedExpr {
+pub struct PyWindowed {
     call: WindowCall,
     over: Over,
     alias: Option<Name>,
 }
 
-impl PyWindowedExpr {
+impl PyWindowed {
     /// Add this item to a SELECT list through the Rust method its window and
     /// alias call for.
     pub(super) fn project(&self, query: &mut SelectStatement) {
@@ -476,7 +476,7 @@ impl PyWindowedExpr {
 }
 
 #[pymethods]
-impl PyWindowedExpr {
+impl PyWindowed {
     fn as_(&self, alias: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
             alias: Some(PyIdentifier::new(alias)?.name()),
@@ -491,7 +491,7 @@ impl PyWindowedExpr {
     }
 
     fn __repr__(&self) -> &'static str {
-        "WindowedExpr(...)"
+        "Windowed(...)"
     }
 }
 
@@ -507,7 +507,7 @@ pub struct PyWindowFunction {
 
 #[pymethods]
 impl PyWindowFunction {
-    fn over(&self, window: &Bound<'_, PyAny>) -> PyResult<PyWindowedExpr> {
+    fn over(&self, window: &Bound<'_, PyAny>) -> PyResult<PyWindowed> {
         let call = WindowCall::Function(self.inner.clone());
         call.over(window)
     }

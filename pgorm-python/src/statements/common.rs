@@ -9,7 +9,7 @@ use pyo3::{
 
 use crate::{
     errors::ConstructionError,
-    expressions::{AliasedExpr, Compiled, OrderBy, PyCondition, require_expr},
+    expressions::{Aliased, Compiled, OrderBy, PyCondition, require_expr},
     identifiers::PyIdentifier,
 };
 
@@ -23,9 +23,9 @@ pub(crate) fn condition(value: &Bound<'_, PyAny>) -> PyResult<Condition> {
 
 pub(super) fn project(query: &mut SelectStatement, items: &Bound<'_, PyTuple>) -> PyResult<()> {
     for item in items.iter() {
-        if let Ok(item) = item.extract::<PyRef<'_, AliasedExpr>>() {
+        if let Ok(item) = item.extract::<PyRef<'_, Aliased>>() {
             query.expr_as(item.expr.inner.clone(), item.alias.name());
-        } else if let Ok(item) = item.extract::<PyRef<'_, super::window::PyWindowedExpr>>() {
+        } else if let Ok(item) = item.extract::<PyRef<'_, super::window::PyWindowed>>() {
             item.project(query);
         } else {
             query.expr(require_expr(&item)?.inner);
@@ -106,7 +106,7 @@ fn list(items: &Bound<'_, PyTuple>) -> PyResult<ReturningClause> {
     let items = items
         .iter()
         .map(|item| {
-            if let Ok(item) = item.extract::<PyRef<'_, AliasedExpr>>() {
+            if let Ok(item) = item.extract::<PyRef<'_, Aliased>>() {
                 Ok(item
                     .expr
                     .inner

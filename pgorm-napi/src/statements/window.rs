@@ -296,12 +296,12 @@ fn call_of(cx: &mut FunctionContext, node: Node) -> NeonResult<Call> {
             SqlJson::ObjectAgg(aggregate) => Ok(Call::ObjectAgg(aggregate)),
             _ => refuse(
                 cx,
-                "OVER follows only a function call or jsonArrayAgg / jsonObjectAgg",
+                "OVER follows only a function call or jsonArrayagg / jsonObjectagg",
             ),
         },
         _ => refuse(
             cx,
-            "OVER follows only a function call or jsonArrayAgg / jsonObjectAgg",
+            "OVER follows only a function call or jsonArrayagg / jsonObjectagg",
         ),
     }
 }

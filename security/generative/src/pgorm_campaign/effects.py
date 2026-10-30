@@ -9,25 +9,25 @@ async def fetch(query, mode, connection, p):
     from pgorm.models.queries import ModelRows
     from pgorm.pipeline import Pipeline, SelectedSources
 
-    method = "one_opt" if mode == "optional" else mode
     for category, prefix in (
         (p.EntityQuery, "pgorm::Select"),
-        (p.GraphQuery, "pgorm::SelectGraph"),
-        (p.GraphCursor, "pgorm::Cursor"),
+        (p.EntityGraphQuery, "pgorm::SelectGraph"),
+        (p.EntityGraphCursor, "pgorm::Cursor"),
         (Pipeline, "pgorm::pipeline::Pipeline"),
         (SelectedSources, "pgorm::pipeline::SelectedSources"),
         (ModelRows, "pgorm::ConnectionTrait::query_raw"),
     ):
         if isinstance(query, category):
-            if not hasattr(query, method):
+            if not hasattr(query, mode):
                 raise p.UnsupportedCapabilityError(
-                    "query has no public " + method + " terminal"
+                    "query has no public " + mode + " terminal"
                 )
-            value = await getattr(query, method)(connection)
-            path = prefix if category is ModelRows else prefix + "::" + method
+            value = await getattr(query, mode)(connection)
+            rust = "one_opt" if mode == "optional" else mode
+            path = prefix if category is ModelRows else prefix + "::" + rust
             break
     else:
-        value = await getattr(connection, "fetch_" + mode)(query)
+        value = await getattr(connection, "query" if mode == "all" else mode)(query)
         path = "pgorm::ConnectionTrait::query_raw"
     rows = value if mode == "all" else ([] if value is None else [value])
     return rows, [path]
@@ -70,7 +70,7 @@ def conflict(data, p):
     """The ON CONFLICT action an upsert declares: update the named columns
     from the proposed row, or, naming none, do nothing."""
     target = p.ConflictTarget(*data["conflict"])
-    return target.update(*data["update"]) if data["update"] else target.ignore()
+    return target.update(*data["update"]) if data["update"] else target.do_nothing()
 
 
 async def versions(name, inputs, data, connection, p):
@@ -85,7 +85,7 @@ async def versions(name, inputs, data, connection, p):
         update = inputs["entity"].update_many()
         for column, value in zip(data["columns"], inputs["values"], strict=True):
             update = update.set(column, value)
-        changes = await update.filter(inputs["predicate"]).returning_changes(connection)
+        changes = await update.where(inputs["predicate"]).returning_changes(connection)
         return [(change.old, change.new) for change in changes], [
             "pgorm::UpdateMany::exec_returning_changes"
         ]
@@ -140,7 +140,7 @@ class Effects:
                     event.update(
                         status="observed", observation=value, native_paths=paths
                     )
-                except self.p.PgOrmError as error:
+                except self.p.PgormError as error:
                     event.update(status="error", observation=observations.error(error))
             await self.reacquire(scoped)
         return None, None
@@ -181,7 +181,7 @@ class Effects:
                     raise RolledBack
         except RolledBack:
             pass
-        except self.p.PgOrmError as error:
+        except self.p.PgormError as error:
             closed.update(status="error", observation=observations.error(error))
             return
         if closed is not event:

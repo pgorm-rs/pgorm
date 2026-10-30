@@ -23,7 +23,7 @@ impl Info {
     pub(crate) fn describe(&self) -> serde_json::Value {
         serde_json::json!({"name": self.name, "rust_shape": self.rust_shape,
             "entities": self.bindings.entities.iter().map(|e| &e.name).collect::<Vec<_>>(),
-            "terminals": ["all", "one", "one_opt"], "result": "tuple of optional models in source order"})
+            "terminals": ["all", "one", "optional"], "result": "tuple of optional models in source order"})
     }
 }
 
@@ -38,7 +38,7 @@ impl Terminal {
         match value {
             "all" => Ok(Self::All),
             "one" => Ok(Self::One),
-            "one_opt" => Ok(Self::Optional),
+            "optional" => Ok(Self::Optional),
             _ => Err(ConstructionError::new_err("unknown pipeline terminal")),
         }
     }
@@ -115,7 +115,7 @@ impl<T: SourceTypes> SourceQuery<T> {
     }
 }
 
-// [spec:pgorm:req:bindings.pipeline-sources]
+// [spec:pgorm:req:bindings.pipeline-sources+2]
 impl<T: SourceTypes> QueryBackend for SourceQuery<T>
 where
     <T::Selection as SourceList>::Row: Send,

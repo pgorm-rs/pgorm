@@ -14850,6 +14850,14 @@ children (
                 text "Operator 2026-10-30: \"everything you said, sure\", accepting all fourteen recommendations on the undecided differences. (1) literal: both bindings bind every plain operand, statements and pipelines alike, and both offer an explicit literal() in statements and pipelines. (2) row-count: a wrong row count is a DecodeError in both. (3) inference: Python infers a list as an array of one kind and a dict as JSON as JavaScript does, keeping the refusals of empty, all-null and mixed lists; a tuple stays refused. (4) raw-sql and (5) records: language differences, kept per binding. (6) names: one name each, mostly JavaScript's: where (never where_ or filter), query / one / optional (never fetch_* or one_opt), do_nothing, set, using, truncate_table, Aliased, Windowed, RowStream, PgormError, EntityGraph / EntityGraphQuery / EntityGraphCursor (freeing Graph for the model graph), PipelineExpr; Python's json_objectagg, json_arrayagg and DDL kept, so JavaScript spells jsonObjectagg, jsonArrayagg and DDL. (7) shapes: decided one at a time with a concrete proposal to the operator when each area is next worked on. (8) columns: Python's model and registered columns offer every expression method. (9) capabilities: capabilities(), require_capability(), UnsupportedCapabilityError and Value.snapshot() stay Python-only as the campaign's surface; Python gains entities(), graphs() and source_tuples(). (10) schema-api: Python adopts JavaScript's DDL builders and pending-ALTER typestates, its per-action functions deleted. (11) update-many-guard: a registered update_many() needs where or all_rows() in both. (12) argument errors: TypeError for an argument of the wrong type in both, ConstructionError only for a value that cannot become what pgorm sends. (13) a listener closed under a waiting pull ends the iteration in both. (14) TLS: both take PEM data as ca, Python keeping cafile as a convenience."
                 after_done true
             }
+
+            {
+                at 2026-10-30T14:43:43.628622Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-read after binding-renames moved bindings.entity-reads, bindings.entity-graphs, bindings.pipeline-sources, python.naming, python.row-count, python.pipeline-operands, python.schema-api, napi.naming, napi.row-count and napi.schema-api to +2 and python.truth-testing to +3. The bodies changed only in the names they spell: optional for one_opt and oneOpt, RowStream, DDL, truncate_table, and the naming rules' lists of by-choice differences cut to the shapes still undecided. Both bindings' code and tests spell the new names, every reference to these rules is pinned at the current version, and both surface tests pass against bindings-surface.json."
+                after_done true
+            }
         )
     }
 
@@ -14997,12 +15005,27 @@ children (
         title "The bindings spell each shared name one way: Python takes JavaScript's names where they differed by choice, and JavaScript takes DDL, jsonObjectagg and jsonArrayagg"
         kind @refactor
         deps (binding-spec-consolidation)
+        sealed true
         log (
             {
                 at 2026-10-30T13:24:34.227637Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Decision (6) of the operator's 2026-10-30 answer (binding-spec-consolidation). Python: AliasedExpr→Aliased, WindowedExpr→Windowed, PgOrmError→PgormError, ResultStream→RowStream, Graph/GraphQuery/GraphCursor→EntityGraph/EntityGraphQuery/EntityGraphCursor, schema.truncate→truncate_table, pipeline Expr→PipelineExpr; on Pool, Connection and Transaction fetch_all/fetch_one/fetch_optional→query/one/optional; every one_opt→optional (model queries and rows, and a pipeline's own terminal); filter on entity, entity-graph, update-many and model queries→where; where_ on Select, Update, Delete, CopyFrom, CopyTo, ConflictTarget and ConflictUpdate→where; MergeInsert/MergeUpdate and_value→set; Conflict/ConflictTarget ignore→do_nothing; CreateIndex method→using. JavaScript: Ddl→DDL, jsonObjectAgg→jsonObjectagg, jsonArrayAgg→jsonArrayagg. The old names are deleted, not aliased or deprecated. Everything that spells them follows: stubs, docs, examples, codegen output, the generative campaign's emitted programs, tests. python.naming and napi.naming lose the exceptions these were, bindings-surface.json moves them out of undecided."
+            }
+
+            {
+                at 2026-10-30T14:30:29.234614Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Applied the decision's principle beyond its list where a name still differed by choice. Never one_opt: besides Python's model queries, model rows and pipeline terminal, the registered entity query, entity-graph query and source selection's one_opt (Python) and oneOpt (JavaScript) became optional in both bindings, inspect's terminal string included; bindings-surface.json's shared EntityQuery, EntityGraphQuery and SelectedSources lists now say optional. python.naming listed primary_keys for a model's key fields as waiting on the operator, JavaScript spelling primaryKey: Python's Model.primary_key, and the primary_key key of model and registration describe(). Kept: the pipeline's filter stage (PRQL's verb, the same in both); the campaign's portable operation names (select.filter, entity.filter), which are its program format rather than binding names; Rust-internal identifiers such as pgorm-napi's Ddl enum. Shapes stay undecided: python.naming and napi.naming now list only the grouping elements, the conflict arbiter and MERGE's actions, and Pipeline.all / one / optional stay under shapes."
+            }
+
+            {
+                at 2026-10-30T14:35:54.859252Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }

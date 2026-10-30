@@ -11,7 +11,7 @@
 import { arg, TRUSTED } from "./builder.js";
 import { Entity } from "./entities.js";
 import { native } from "./operations.js";
-import { CreateTable, Ddl, statement } from "./schema.js";
+import { CreateTable, DDL, statement } from "./schema.js";
 import { CreateIndex } from "./schema-objects.js";
 import { CreateType } from "./schema-types.js";
 
@@ -29,7 +29,7 @@ export class EntitySchema {
   enums;
   /** @readonly @type {readonly CreateIndex[]} */
   indexes;
-  /** @readonly @type {readonly Ddl[]} */
+  /** @readonly @type {readonly DDL[]} */
   comments;
 
   /**

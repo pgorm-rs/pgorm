@@ -28,7 +28,7 @@ def wrap_row(row, models: tuple[type[ModelView], ...], optional: tuple[bool, ...
 class GraphView(Generic[R]):
     __slots__ = ("_graph", "_decode")
 
-    def __init__(self, graph: native.Graph, decode: Callable[..., R]):
+    def __init__(self, graph: native.EntityGraph, decode: Callable[..., R]):
         self._graph, self._decode = graph, decode
 
     @property
@@ -45,14 +45,14 @@ class GraphView(Generic[R]):
 class GraphQueryView(Generic[R]):
     __slots__ = ("_query", "_decode")
 
-    def __init__(self, query: native.GraphQuery, decode: Callable[..., R]):
+    def __init__(self, query: native.EntityGraphQuery, decode: Callable[..., R]):
         self._query, self._decode = query, decode
 
     def col(self, source, column):
         return self._query.col(source, column)
 
-    def filter(self, predicate) -> "GraphQueryView[R]":
-        return GraphQueryView(self._query.filter(predicate), self._decode)
+    def where(self, predicate) -> "GraphQueryView[R]":
+        return GraphQueryView(self._query.where(predicate), self._decode)
 
     def order_by(self, *ordering) -> "GraphQueryView[R]":
         return GraphQueryView(self._query.order_by(*ordering), self._decode)
@@ -66,8 +66,8 @@ class GraphQueryView(Generic[R]):
     async def all(self, connection) -> list[R]:
         return [self._decode(row) for row in await self._query.all(connection)]
 
-    async def one_opt(self, connection) -> R | None:
-        row = await self._query.one_opt(connection)
+    async def optional(self, connection) -> R | None:
+        row = await self._query.optional(connection)
         return None if row is None else self._decode(row)
 
     def __bool__(self) -> bool:
@@ -77,7 +77,7 @@ class GraphQueryView(Generic[R]):
 class GraphCursorView(Generic[R]):
     __slots__ = ("_cursor", "_decode")
 
-    def __init__(self, cursor: native.GraphCursor, decode: Callable[..., R]):
+    def __init__(self, cursor: native.EntityGraphCursor, decode: Callable[..., R]):
         self._cursor, self._decode = cursor, decode
 
     def before(self, value) -> "GraphCursorView[R]":

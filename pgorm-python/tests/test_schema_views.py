@@ -8,7 +8,7 @@ from pgorm import schema as s
 
 
 def accounts_query(table):
-    return p.Select(p.col("id"), p.col("name"), p.col("active")).from_(table).where_(p.col("active") == True)
+    return p.Select(p.col("id"), p.col("name"), p.col("active")).from_(table).where(p.col("active") == True)
 
 
 class ViewConstruction(unittest.TestCase):
@@ -23,7 +23,7 @@ class ViewConstruction(unittest.TestCase):
             self.assertFalse(manifest["schema." + operation]["registration_required"])
             p.require_capability("schema." + operation)
         table = p.Table("account")
-        query = p.Select(p.col("id")).from_(table).where_(p.col("name") != "it's")
+        query = p.Select(p.col("id")).from_(table).where(p.col("name") != "it's")
         view = s.create_view(p.Table("v", schema="app"), query, columns=["key"], check_option="local")
         compiled = view.inspect()
         self.assertEqual(
@@ -37,7 +37,7 @@ class ViewConstruction(unittest.TestCase):
             'REFRESH MATERIALIZED VIEW CONCURRENTLY "m"',
         )
         counting = p.Select(p.literal(1).as_("n")).union_all(
-            p.Select(p.col("n") + 1).from_(p.Table("counter")).where_(p.col("n") < 4)
+            p.Select(p.col("n") + 1).from_(p.Table("counter")).where(p.col("n") < 4)
         )
         recursive = s.create_recursive_view(p.Table("counter", schema="app"), ["n"], counting).inspect()
         self.assertEqual(
@@ -74,7 +74,7 @@ class ViewConstruction(unittest.TestCase):
     # has no ORDER BY, or whose window is undeclared, as it is called, with the Rust constructor's error
     def test_view_bodies_check_tie_limit_and_windows(self):
         table = p.Table("account")
-        step = p.Select(p.col("n") + 1).from_(p.Table("r")).where_(p.col("n") < 4)
+        step = p.Select(p.col("n") + 1).from_(p.Table("r")).where(p.col("n") < 4)
         builders = {
             "create_view": lambda q: s.create_view(p.Table("v"), q),
             "create_recursive_view": lambda q: s.create_recursive_view(p.Table("r"), ["n"], q.union_all(step)),
@@ -117,7 +117,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
         return p.Table(name, schema=self.namespace)
 
     async def names(self, relation):
-        rows = await self.pool.fetch_all(p.Select(p.col("name")).from_(relation).order_by(p.col("id").asc()))
+        rows = await self.pool.query(p.Select(p.col("name")).from_(relation).order_by(p.col("id").asc()))
         return [row["name"] for row in rows]
 
     # [spec:pgorm:req:bindings.schema-views/test]    a view built from a Select reads the rows it
@@ -136,7 +136,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
             view, accounts_query(self.table).select(p.col("id"), p.col("name"), p.col("active"), p.col("id").as_("again")),
             or_replace=True, security_barrier=True,
         ))
-        options = await self.pool.fetch_one(p.RawSQL(
+        options = await self.pool.one(p.RawSQL(
             "SELECT reloptions::text[] AS options FROM pg_class WHERE oid = $1::text::regclass",
             [f'{self.quoted}."active ""x"""'],
         ))
@@ -163,14 +163,14 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
         counter = self.relation("counter")
 
         def counting(source):
-            step = p.Select(p.col("n") + 1).from_(source).where_(p.col("n") < 4)
+            step = p.Select(p.col("n") + 1).from_(source).where(p.col("n") < 4)
             return p.Select(p.literal(1).as_("n")).union_all(step)
 
         with self.assertRaises(p.DatabaseError) as refused:
             await self.pool.execute(s.create_recursive_view(counter, ["n"], counting(counter)))
         self.assertEqual(refused.exception.sqlstate, "42P01")
         await self.pool.execute(s.create_recursive_view(counter, ["n"], counting(p.Table("counter"))))
-        counted = await self.pool.fetch_all(p.Select(p.col("n")).from_(counter).order_by(p.col("n").asc()))
+        counted = await self.pool.query(p.Select(p.col("n")).from_(counter).order_by(p.col("n").asc()))
         self.assertEqual([row["n"] for row in counted], [1, 2, 3, 4])
         await self.pool.execute(s.drop_view(counter))
 
@@ -205,12 +205,12 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
     async def test_table_created_from_query_without_data(self):
         copy = self.relation('copy "x"')
         await self.pool.execute(s.create_table_as(copy, accounts_query(self.table), columns=["account_id"], with_no_data=True))
-        empty = await self.pool.fetch_all(p.Select(p.col("account_id")).from_(copy))
+        empty = await self.pool.query(p.Select(p.col("account_id")).from_(copy))
         self.assertEqual(empty, [])
         await self.pool.execute(p.RawSQL(
             f'INSERT INTO {self.quoted}."copy ""x""" SELECT id, name, active FROM {self.quoted}.account WHERE active'
         ))
-        rows = await self.pool.fetch_all(p.Select(p.col("account_id"), p.col("name")).from_(copy).order_by(p.col("account_id").asc()))
+        rows = await self.pool.query(p.Select(p.col("account_id"), p.col("name")).from_(copy).order_by(p.col("account_id").asc()))
         self.assertEqual([dict(row) for row in rows], [{"account_id": 1, "name": "ada"}, {"account_id": 2, "name": "it's"}])
         await self.pool.execute(s.create_table_as(copy, p.Select(p.literal(1)), if_not_exists=True))
         with self.assertRaises(p.DatabaseError) as refused:

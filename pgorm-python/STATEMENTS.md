@@ -16,7 +16,7 @@ query = (
     select(account.col("name"), count.as_("events"))
     .from_(account)
     .join(event, account.col("id") == event.col("account_id"), kind=Join.Left)
-    .where_(Condition.all(
+    .where(Condition.all(
         account.col("active").eq(True),
         Condition.any(event.col("kind") == "click", event.col("id").is_null()),
     ))
@@ -50,7 +50,7 @@ as do a `TableFunction` and a table's `tablesample` (below). A value-producing
 chose; a sampled table is qualified by its alias, or by its unqualified name
 when it has none. Anything else raises `ConstructionError`.
 
-Repeated `.where_` and `.having` calls combine conditions through the Rust
+Repeated `.where` and `.having` calls combine conditions through the Rust
 condition builder. `.order_by` accepts typed `OrderBy` objects, and
 `.distinct()` sets Rust's DISTINCT option.
 Limits and offsets use the actual Rust `u64` builder methods, restricted to
@@ -167,7 +167,7 @@ The forms without `ALL` return each distinct row once. `union_all` keeps
 every row of both; `intersect_all` returns a row as many times as the query
 returning it less often does; `except_all` returns a row as many times as
 this query returns it beyond the times `other` does. `except` is a Python
-keyword, hence `except_`, as with `from_`, `where_` and `with_`; the others
+keyword, hence `except_`, as with `from_` and `with_`; the others
 are JavaScript's `unionAll`, `intersectAll` and `exceptAll` in snake case.
 
 ```python
@@ -211,7 +211,7 @@ arm reads the view; see
 ## Window functions
 
 A SELECT item calls a function over a window with `expr.over(window)`, which
-returns a `WindowedExpr`; `.as_(name)` names it. `Window` owns a Rust
+returns a `Windowed`; `.as_(name)` names it. `Window` owns a Rust
 `WindowStatement`: `.partition_by(*expressions)`, `.order_by(*orderings)`
 with the same `OrderBy` objects as a statement, and `.frame(frame)`, which
 replaces any frame already set. Each method returns a new window.
@@ -331,8 +331,8 @@ create = (
     .on_conflict(ConflictTarget("id").update("name"))
     .returning(col("id"), col("name"))
 )
-rename = update(account).set("name", "new name").where_(account.col("id") == 1)
-remove = delete(account).where_(account.col("id") == 2).returning()
+rename = update(account).set("name", "new name").where(account.col("id") == 1)
+remove = delete(account).where(account.col("id") == 2).returning()
 ```
 
 Values use the [native conversion policy](VALUES.md): inferred Python integers
@@ -347,7 +347,7 @@ one default row through Rust's `or_default_values`. It cannot be mixed with
 columns or ordinary rows. Its current PostgreSQL spelling is `VALUES (DEFAULT)`.
 
 UPDATE requires at least one assignment. Duplicate assignments raise an error.
-UPDATE and DELETE require a `.where_(...)` call or explicit `.all_rows()` before
+UPDATE and DELETE require a `.where(...)` call or explicit `.all_rows()` before
 inspection/execution preparation. A predicate can intentionally be true: this
 guard requires authored intent and does not prove that a query affects few rows.
 `.all_rows()` permits a statement without a predicate; it does not remove an
@@ -396,7 +396,7 @@ sync = (
     merge(target, source, target.col("id") == source.col("id"))
     .when_matched(MergeUpdate("name", source.col("name")))
     .when_matched(MatchedAction.Delete, condition=source.col("name").is_null())
-    .when_not_matched(MergeInsert("id", source.col("id")).and_value("name", source.col("name")))
+    .when_not_matched(MergeInsert("id", source.col("id")).set("name", source.col("name")))
     .when_not_matched_by_source(MatchedAction.Delete)
     .returning_action()
     .returning(target.col("id"), ReturningRow.Old.col("name").as_("was"))
@@ -419,7 +419,7 @@ Actions are typed by the row they take, as in Rust. A target row is updated
 Anything else raises `TypeError`, so an insert for a target row cannot be
 built. `MergeUpdate(column, value)` and `MergeInsert(column, value)` take
 their first pair at construction, so neither is ever empty, and
-`.and_value(column, value)` adds another. A column is a bare name.
+`.set(column, value)` adds another. A column is a bare name.
 `MergeInsert.overriding(Overriding.SystemValue)` or `Overriding.UserValue`
 writes `OVERRIDING ..` for identity columns.
 
@@ -446,19 +446,19 @@ merge))` reads the rows its RETURNING list yields. A value in a CTE's own
 
 ## Conflict actions
 
-`Conflict.ignore()` selects Rust's untargeted `ON CONFLICT DO NOTHING`.
+`Conflict.do_nothing()` selects Rust's untargeted `ON CONFLICT DO NOTHING`.
 `ConflictTarget(*columns)` requires a nonempty target and preserves the Rust
 target/action states:
 
 | Operation | Rust API |
 | --- | --- |
-| `target.where_(predicate)` | `ConflictTarget::cond_where` for a partial-index target |
-| `target.ignore()` | `ConflictTarget::do_nothing` |
+| `target.where(predicate)` | `ConflictTarget::cond_where` for a partial-index target |
+| `target.do_nothing()` | `ConflictTarget::do_nothing` |
 | `target.update(*columns)` | nonempty `ConflictUpdate` from EXCLUDED column values |
 | `target.set(column, value)` | nonempty `ConflictUpdate` with an expression assignment |
 | `action.update(column)` | `ConflictUpdate::update_column` |
 | `action.set(column, value)` | `ConflictUpdate::value` |
-| `action.where_(predicate)` | `ConflictUpdate::cond_where` for the update action |
+| `action.where(predicate)` | `ConflictUpdate::cond_where` for the update action |
 
 `insert.on_conflict` accepts a completed ignore or update action. An incomplete
 target and an empty update assignment set cannot reach the Rust INSERT builder.
@@ -481,7 +481,7 @@ async def rows():
 
 inserted = await pool.copy_in(load, rows())
 
-query = select(col("id"), col("name")).from_(items).where_(col("id") > 10)
+query = select(col("id"), col("name")).from_(items).where(col("id") > 10)
 async with await pool.copy_out(CopyTo(query, "binary")) as chunks:
     async for chunk in chunks:
         output.write(chunk)
@@ -496,7 +496,7 @@ naming why.
 
 | Option | COPY FROM | COPY TO |
 | --- | --- | --- |
-| `columns(*names)`, `where_(predicate)`, `freeze()` | every format | none |
+| `columns(*names)`, `where(predicate)`, `freeze()` | every format | none |
 | `delimiter`, `null_string`, `header()`, `encoding` | text, csv | text, csv |
 | `default_string`, `header_match()`, `on_error_ignore(reject_limit, log_verbosity)` | text, csv | none |
 | `quote`, `escape` | csv | csv |
@@ -511,7 +511,7 @@ only with a RETURNING list, so `CopyTo` raises `ConstructionError` for one
 without, as Rust refuses to make it a source. COPY takes no
 bind parameters, so `inspect()` returns the Rust rendering with every value
 written inline and empty `params`. A COPY statement is not a query, and
-`execute` and the `fetch_*` terminals refuse it.
+`execute`, `query`, `one` and `optional` refuse it.
 
 ### Running a COPY
 
@@ -616,7 +616,7 @@ the enums naming a join kind, a sample method, a frame mode or an exclusion —
 raise `ConstructionError` on Python truth testing, as SQL expressions do.
 Values, records, pools, connections and transactions keep Python's truth;
 `tests/test_truth_testing.py` lists every exempt class with the reason. The
-streams — `ResultStream`, `CopyOutStream`, `CopyRowStream` and `Listener` —
+streams — `RowStream`, `CopyOutStream`, `CopyRowStream` and `Listener` —
 refuse it too, since a stream's truth would say nothing of whether rows remain.
 
 The extension's Rust `statements::compile` entry point uses exactly these same

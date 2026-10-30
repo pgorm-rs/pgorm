@@ -14,13 +14,13 @@ pub struct PyConflict {
 #[pymethods]
 impl PyConflict {
     #[staticmethod]
-    fn ignore() -> Self {
+    fn do_nothing() -> Self {
         Self {
             inner: OnConflict::do_nothing(),
         }
     }
 
-    // [spec:pgorm:req:python.truth-testing+2]
+    // [spec:pgorm:req:python.truth-testing+3]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "conflict clauses cannot be tested as Python booleans",
@@ -52,13 +52,13 @@ impl PyConflictTarget {
         Ok(Self { inner })
     }
 
-    fn where_(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn r#where(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
             inner: self.inner.clone().cond_where(common::condition(predicate)?),
         })
     }
 
-    fn ignore(&self) -> PyConflict {
+    fn do_nothing(&self) -> PyConflict {
         PyConflict {
             inner: self.inner.clone().do_nothing(),
         }
@@ -127,7 +127,7 @@ impl PyConflictUpdate {
         })
     }
 
-    fn where_(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn r#where(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
             inner: self.inner.clone().cond_where(common::condition(predicate)?),
         })

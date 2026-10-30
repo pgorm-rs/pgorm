@@ -254,11 +254,11 @@ export declare class SourceSelection<Row extends readonly unknown[] = (EntityRec
  */
 export declare class SelectedSources<Row extends readonly unknown[] = (EntityRecord | null)[]> {
   private constructor();
-  inspect(terminal?: "all" | "one" | "oneOpt"): Compiled;
+  inspect(terminal?: "all" | "one" | "optional"): Compiled;
   all(db: Queryable, options?: OperationOptions): Promise<Row[]>;
   /** Exactly one row; none is a `DecodeError`. */
   one(db: Queryable, options?: OperationOptions): Promise<Row>;
-  oneOpt(db: Queryable, options?: OperationOptions): Promise<Row | null>;
+  optional(db: Queryable, options?: OperationOptions): Promise<Row | null>;
 }
 
 /** A pipeline reading `source`; a pipeline source is embedded whole, its bound values with it. */

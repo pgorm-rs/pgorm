@@ -178,7 +178,7 @@ impl Statement {
             .await
             .map_err(|error| failure(&error, secrets))?;
         let expected = match self.terminal {
-            // [spec:pgorm:req:napi.row-count]
+            // [spec:pgorm:req:napi.row-count+2]
             Terminal::One if rows.len() != 1 => "exactly one row",
             Terminal::Optional if rows.len() > 1 => "at most one row",
             _ => "",

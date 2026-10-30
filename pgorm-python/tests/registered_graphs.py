@@ -29,7 +29,7 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         await fixture.RegisteredEntities.asyncTearDown(self)
 
-    # [spec:pgorm:req:bindings.entity-graphs/test]
+    # [spec:pgorm:req:bindings.entity-graphs+2/test]
     async def test_required_optional_and_bare_models(self):
         async with self.pool.connection() as connection:
             query = self.graph.find()
@@ -44,43 +44,43 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(await mixed.all(connection)), 5)
             self.assertTrue(all(len(row) == 3 for row in await mixed.all(connection)))
             root = p.graph("app.AccountOnly").find()
-            self.assertIsInstance(await root.one_opt(connection), p.EntityModel)
+            self.assertIsInstance(await root.optional(connection), p.EntityModel)
             for size, name in ((4, "FourSources"), (5, "FiveSources"), (6, "SixSources"), (7, "SevenSources")):
                 query = p.graph("app." + name).find()
-                row = await query.filter(query.col(0, "id") == 3).one_opt(connection)
+                row = await query.where(query.col(0, "id") == 3).optional(connection)
                 self.assertEqual(len(row), size)
                 self.assertEqual(row[1:], (None,) * (size - 1))
 
-    # [spec:pgorm:req:bindings.entity-graphs/test]
+    # [spec:pgorm:req:bindings.entity-graphs+2/test]
     async def test_manifest_declares_shapes_and_terminals(self):
         manifest = p.capabilities()
         self.assertEqual(manifest["graph_policy"]["source_arities"], list(range(1, 8)))
         graphs = {graph["name"]: graph for graph in manifest["registrations"]["graphs"]}
         self.assertEqual(len(graphs), 12)
         self.assertEqual([source["slot"] for source in graphs["app.MixedNotes"]["sources"]], ["root", "Req", "Opt"])
-        self.assertEqual(graphs["app.AccountNotes"]["terminals"], ["all", "one_opt", "cursor.all"])
+        self.assertEqual(graphs["app.AccountNotes"]["terminals"], ["all", "optional", "cursor.all"])
         self.assertEqual(graphs["app.AccountNotes"]["sources"][1]["entity"], "app.Note")
         self.assertIn("pgorm::query::graph::SelectGraph", graphs["app.AccountNotes"]["rust_shape"])
         self.assertEqual(self.graph.describe(), graphs["app.AccountNotes"])
 
-    # [spec:pgorm:req:bindings.entity-graphs/test]
+    # [spec:pgorm:req:bindings.entity-graphs+2/test]
     async def test_aliases_filters_and_reuse_match_projection(self):
         alias = 'notes "β"'
         query = self.graph.find(aliases=[alias])
-        changed = query.filter(query.col(1, "body") == "second")
+        changed = query.where(query.col(1, "body") == "second")
         self.assertIn('"notes ""β"""', changed.inspect().sql)
         self.assertEqual(changed.inspect().params[0].value, "second")
         self.assertEqual(query.inspect().params, [])
         async with self.pool.connection() as connection:
-            row = await changed.one_opt(connection)
+            row = await changed.optional(connection)
             self.assertEqual((row[0]["id"], row[1]["id"]), (1, 12))
             self.assertEqual(len(await query.all(connection)), 4)
-            absent = query.filter(query.col(0, "id") == 100)
+            absent = query.where(query.col(0, "id") == 100)
             self.assertEqual(await absent.all(connection), [])
-            self.assertIsNone(await absent.one_opt(connection))
-        self.assertNotEqual(changed.inspect().sql, changed.inspect(terminal="one_opt").sql)
+            self.assertIsNone(await absent.optional(connection))
+        self.assertNotEqual(changed.inspect().sql, changed.inspect(terminal="optional").sql)
 
-    # [spec:pgorm:req:bindings.entity-graphs/test]
+    # [spec:pgorm:req:bindings.entity-graphs+2/test]
     async def test_cursor_boundaries_keep_join_tiebreaks(self):
         query = self.graph.find(aliases=["n"])
         cursor = query.cursor("id")
@@ -103,19 +103,19 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
         if path := os.environ.get("PGORM_GRAPH_REPORT"):
             Path(path).write_text(json.dumps(report, indent=2) + "\n")
 
-    # [spec:pgorm:req:bindings.entity-graphs/test]
+    # [spec:pgorm:req:bindings.entity-graphs+2/test]
     async def test_present_decode_failure_is_not_absent(self):
         query = self.graph.find()
         async with self.pool.connection() as connection:
             await connection.execute(p.RawSQL("ALTER TABLE python_entities.notes ALTER COLUMN body DROP NOT NULL"))
             await connection.execute(p.RawSQL("UPDATE python_entities.notes SET body = NULL WHERE id = 11"))
-            broken = query.filter(query.col(1, "id") == 11)
-            for terminal in (broken.all, broken.one_opt, broken.cursor("id").all):
+            broken = query.where(query.col(1, "id") == 11)
+            for terminal in (broken.all, broken.optional, broken.cursor("id").all):
                 with self.assertRaises(p.DecodeError):
                     await terminal(connection)
-            self.assertEqual((await query.filter(query.col(0, "id") == 3).one_opt(connection))[1], None)
+            self.assertEqual((await query.where(query.col(0, "id") == 3).optional(connection))[1], None)
 
-    # [spec:pgorm:req:bindings.entity-graphs/test]
+    # [spec:pgorm:req:bindings.entity-graphs+2/test]
     async def test_composite_root_cursor_ties_on_whole_key(self):
         membership = p.entity("app.Membership")
         async with self.pool.connection() as connection:
@@ -137,7 +137,7 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(values=values), self.assertRaises(p.ConstructionError):
                 cursor.after_with(*values)
 
-    # [spec:pgorm:req:bindings.entity-graphs/test]
+    # [spec:pgorm:req:bindings.entity-graphs+2/test]
     async def test_invalid_shapes_aliases_and_boundaries_fail(self):
         with self.assertRaises(p.UnsupportedCapabilityError):
             p.graph("runtime-created-tuple")
@@ -167,7 +167,7 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(p.ConstructionError):
                 bool(value)
 
-    # [spec:pgorm:req:bindings.entity-graphs/test]
+    # [spec:pgorm:req:bindings.entity-graphs+2/test]
     async def test_cancellation_releases_a_blocked_graph(self):
         async with p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1) as blocker:
             async with blocker.connection() as lock, self.pool.connection() as connection:

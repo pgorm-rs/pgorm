@@ -9,7 +9,7 @@ from .._native import (
     CreateTable as CreateTable, CreateIndex as CreateIndex,
     EntitySchema as EntitySchema, schema_from_entity as from_entity,
     drop_table as drop_table, rename_table as rename_table,
-    rename_column as rename_column, truncate as truncate,
+    rename_column as rename_column, truncate_table as truncate_table,
     add_column as add_column, modify_column as modify_column,
     drop_column as drop_column, set_expression as set_expression,
     drop_expression as drop_expression, add_primary_key as add_primary_key,
@@ -41,7 +41,7 @@ create_domain = CreateDomain
 __all__ = [
     "DataType", "ColumnDef", "DDL", "CreateTable", "CreateIndex", "EntitySchema",
     "create_table", "create_index", "from_entity", "drop_table", "rename_table",
-    "rename_column", "truncate", "add_column", "modify_column", "drop_column",
+    "rename_column", "truncate_table", "add_column", "modify_column", "drop_column",
     "set_expression", "drop_expression",
     "add_primary_key", "add_unique", "add_not_null", "add_check", "validate_constraint",
     "alter_constraint", "drop_constraint", "rename_constraint", "drop_index", "create_enum",

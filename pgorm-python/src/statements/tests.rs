@@ -85,7 +85,7 @@ fn select_structure_matches_rust_builders() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "p.Select(a.col('name'), n.as_('events')).from_(a).join(e, a.col('id') == e.col('account_id'), kind=p.Join.Left).where_(p.Condition.all(a.col('active') == True, p.Condition.any(e.col('kind') == 'click', e.col('id').is_null()))).group_by(a.col('name')).having(n > 2).order_by(n.desc(nulls=p.Nulls.Last), a.col('name').asc()).limit(5).offset(1)",
+            "p.Select(a.col('name'), n.as_('events')).from_(a).join(e, a.col('id') == e.col('account_id'), kind=p.Join.Left).where(p.Condition.all(a.col('active') == True, p.Condition.any(e.col('kind') == 'click', e.col('id').is_null()))).group_by(a.col('name')).having(n > 2).order_by(n.desc(nulls=p.Nulls.Last), a.col('name').asc()).limit(5).offset(1)",
             expected,
         )
     })
@@ -155,7 +155,7 @@ fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "p.Insert(p.Table('account', alias='a')).columns('id', 'name').values(1, 'Alice').on_conflict(p.ConflictTarget('id').where_(p.col('id') > 0).update('name').set('visits', p.literal(1)).where_(p.col('active') == True))",
+            "p.Insert(p.Table('account', alias='a')).columns('id', 'name').values(1, 'Alice').on_conflict(p.ConflictTarget('id').where(p.col('id') > 0).update('name').set('visits', p.literal(1)).where(p.col('active') == True))",
             expected.build(),
         )
     })
@@ -173,7 +173,7 @@ fn update_and_delete_keep_builder_parameter_order() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "p.Update(p.Table('account', schema='application', alias='a')).set('name', \"new' name\").where_(p.col('id', table='a') == 4).returning(p.col('id'))",
+            "p.Update(p.Table('account', schema='application', alias='a')).set('name', \"new' name\").where(p.col('id', table='a') == 4).returning(p.col('id'))",
             Query::update()
                 .table(table.clone())
                 .value(Name::runtime("name"), "new' name")
@@ -184,7 +184,7 @@ fn update_and_delete_keep_builder_parameter_order() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "p.Delete(p.Table('account', schema='application', alias='a')).where_(p.col('id', table='a') == 4).returning()",
+            "p.Delete(p.Table('account', schema='application', alias='a')).where(p.col('id', table='a') == 4).returning()",
             Query::delete()
                 .from_table(table)
                 .and_where(Expr::col((Name::runtime("a"), Name::runtime("id"))).eq(4i64))
@@ -275,11 +275,11 @@ fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
              .when_matched(p.MergeUpdate('name', s.col('name')))\
              .when_matched(p.MatchedAction.Delete, condition=s.col('visits') > 10)\
              .when_matched(p.MatchedAction.DoNothing, condition=s.col('visits') > 1)\
-             .when_not_matched(p.MergeInsert('id', s.col('id')).and_value('name', p.literal('x'))\
+             .when_not_matched(p.MergeInsert('id', s.col('id')).set('name', p.literal('x'))\
                  .overriding(p.Overriding.UserValue), condition=s.col('name') == \"O'Brien\")\
              .when_not_matched(p.NotMatchedAction.InsertDefaultValues)\
              .when_not_matched_by_source(p.MatchedAction.Delete, condition=t.col('visits') == 0)\
-             .when_not_matched_by_source(p.MergeUpdate('visits', 0).and_value('name', 'gone'))\
+             .when_not_matched_by_source(p.MergeUpdate('visits', 0).set('name', 'gone'))\
              .returning_action()\
              .returning(p.ReturningRow.Old.col('visits'), p.ReturningRow.New.star(), old_as='before')\
              .only()",
@@ -343,7 +343,7 @@ fn returning_reads_and_renames_row_versions() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "p.Update(p.Table('account')).set('visits', 1).where_(p.col('id') == 4)\
+            "p.Update(p.Table('account')).set('visits', 1).where(p.col('id') == 4)\
              .returning(p.ReturningRow.Old.col('visits'), p.col('visits', table='n').as_('after'), new_as='n')",
             Query::update()
                 .table(Name::runtime("account"))
@@ -1082,7 +1082,7 @@ fn set_operations_match_rust_builders() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "ids('t').where_(p.col('id') > 1).order_by(p.col('id').desc()).union_all(ids('u').where_(p.col('id') < 9).order_by(p.col('id').asc()).limit(2)).limit(3).offset(1)",
+            "ids('t').where(p.col('id') > 1).order_by(p.col('id').desc()).union_all(ids('u').where(p.col('id') < 9).order_by(p.col('id').asc()).limit(2)).limit(3).offset(1)",
             ids("t")
                 .and_where(Expr::col(n("id")).gt(1i64))
                 .order_by(n("id"), Order::Desc)
@@ -1101,7 +1101,7 @@ fn set_operations_match_rust_builders() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "p.Select().from_(p.Table('w')).except_(p.Select().from_(p.Table('w')).where_(p.col('id') == 2)).with_(p.With('w', ids('t'))).order_by(p.col('id').desc()).limit_with_ties(1)",
+            "p.Select().from_(p.Table('w')).except_(p.Select().from_(p.Table('w')).where(p.col('id') == 2)).with_(p.With('w', ids('t'))).order_by(p.col('id').desc()).limit_with_ties(1)",
             Query::select()
                 .column(Asterisk)
                 .from(n("w"))
@@ -1214,7 +1214,7 @@ fn array_subquery_matches_rust_expr_array() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "(lambda a, e: p.Select(a.col('id'), p.array(p.Select(e.col('id')).from_(e).where_(e.col('account_id') == a.col('id'))).as_('events')).from_(a).where_(p.array(p.Select(e.col('id')).from_(e).where_(e.col('account_id') == a.col('id'))).cast(p.TypeName('int8'), array=True).is_not_null()))(p.Table('account').as_('a'), p.Table('event').as_('e'))",
+            "(lambda a, e: p.Select(a.col('id'), p.array(p.Select(e.col('id')).from_(e).where(e.col('account_id') == a.col('id'))).as_('events')).from_(a).where(p.array(p.Select(e.col('id')).from_(e).where(e.col('account_id') == a.col('id'))).cast(p.TypeName('int8'), array=True).is_not_null()))(p.Table('account').as_('a'), p.Table('event').as_('e'))",
             expected,
         )?;
         let refused = py.eval(
@@ -1275,7 +1275,7 @@ fn subquery_expressions_match_rust_builders() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "(lambda ids, i: p.Select().from_(p.Table('t')).where_(p.Condition.all(p.exists(ids('u')), i == p.scalar(ids('v')), i.is_in(ids('w')), i.is_not_in(ids('x')), i == p.any_(p.Value.array('i64', [1, 2])), i.ne(p.all_(p.array(ids('y')))), i > p.all_(ids('z')), i.lte(p.any_(ids('u'))), p.col('a') >= p.any_(p.col('b')))))(lambda name: p.Select(p.col('id')).from_(p.Table(name)), p.col('id'))",
+            "(lambda ids, i: p.Select().from_(p.Table('t')).where(p.Condition.all(p.exists(ids('u')), i == p.scalar(ids('v')), i.is_in(ids('w')), i.is_not_in(ids('x')), i == p.any_(p.Value.array('i64', [1, 2])), i.ne(p.all_(p.array(ids('y')))), i > p.all_(ids('z')), i.lte(p.any_(ids('u'))), p.col('a') >= p.any_(p.col('b')))))(lambda name: p.Select(p.col('id')).from_(p.Table(name)), p.col('id'))",
             expected,
         )?;
         for refused in [

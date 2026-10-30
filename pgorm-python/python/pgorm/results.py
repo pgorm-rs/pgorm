@@ -19,7 +19,7 @@ Mapping.register(Record)
 
 
 # [spec:pgorm:req:bindings.streams]
-class ResultStream:
+class RowStream:
     """An async iterator owning an active native query and its connection.
 
     Use ``async with await pool.stream(query) as rows`` when iteration might
@@ -41,7 +41,7 @@ class ResultStream:
     def closed(self) -> bool:
         return self._closed or self._native.closed()
 
-    def __aiter__(self) -> "ResultStream":
+    def __aiter__(self) -> "RowStream":
         return self
 
     async def __anext__(self) -> Record:
@@ -69,7 +69,7 @@ class ResultStream:
 
     close = aclose
 
-    async def __aenter__(self) -> "ResultStream":
+    async def __aenter__(self) -> "RowStream":
         if self.closed:
             raise _native.LifecycleError("stream is closed")
         return self
@@ -77,9 +77,9 @@ class ResultStream:
     async def __aexit__(self, *exc: Any) -> None:
         await self.aclose()
 
-    # [spec:pgorm:req:python.truth-testing+2]
+    # [spec:pgorm:req:python.truth-testing+3]
     def __bool__(self) -> bool:
         raise _native.ConstructionError("result streams cannot be tested as Python booleans")
 
     def __repr__(self) -> str:
-        return f"ResultStream(closed={self.closed})"
+        return f"RowStream(closed={self.closed})"

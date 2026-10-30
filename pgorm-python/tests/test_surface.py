@@ -111,7 +111,7 @@ class SurfaceTests(unittest.TestCase):
         }
 
     # [spec:pgorm:req:bindings.surface/test]
-    # [spec:pgorm:req:python.naming/test]
+    # [spec:pgorm:req:python.naming+2/test]
     def test_every_shared_name_is_offered(self):
         missing = sorted(self.expected[key] for key in self.expected if key not in self.live)
         self.assertEqual(missing, [], "shared names the package lacks: add them, or list each as a gap with its plan node")

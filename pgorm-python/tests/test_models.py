@@ -47,7 +47,7 @@ class ModelConstruction(unittest.TestCase):
         fields = {"identity": p.Column("i32", name='id"雪', primary_key=True)}
         model = p.Model('t"表', fields, schema='s"文')
         fields.clear()
-        self.assertEqual(model.primary_keys, ("identity",))
+        self.assertEqual(model.primary_key, ("identity",))
         self.assertIn(
             '"s""文"."t""表"."id""雪" AS "identity"', model.find().inspect().sql
         )
@@ -103,7 +103,7 @@ class ModelConstruction(unittest.TestCase):
         model = accounts().as_("a")
         query = (
             model.select("id", "display_name")
-            .filter(model.col("id") >= 2)
+            .where(model.col("id") >= 2)
             .order_by(model.col("id").desc())
             .limit(3)
         )
@@ -112,7 +112,7 @@ class ModelConstruction(unittest.TestCase):
             model.table.col("display name").as_("display_name"),
         ).from_(model.table)
         native = (
-            native.where_(model.table.col("id") >= p.Value(2, "i32"))
+            native.where(model.table.col("id") >= p.Value(2, "i32"))
             .order_by(model.table.col("id").desc())
             .limit(3)
         )
@@ -166,7 +166,7 @@ class ModelConstruction(unittest.TestCase):
             with self.assertRaises(p.ConstructionError):
                 query.inspect()
             query.all_rows().inspect()
-            query.where_(model.key({"id": 1})).inspect()
+            query.where(model.key({"id": 1})).inspect()
         first = model.insert({"id": 1, "display_name": "A"}).inspect()
         second = model.insert({"display_name": "A", "id": 1}).inspect()
         self.assertEqual((first.sql, first.params), (second.sql, second.params))
@@ -215,17 +215,17 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
             key = self.model.key({"id": row["id"]})
             updated = (
                 await self.model.update({"note": None})
-                .where_(key)
+                .where(key)
                 .returning("id", "note")
                 .one(self.pool)
             )
             self.assertEqual(dict(updated), {"id": row["id"], "note": None})
-            selected = await self.model.find().filter(key).one(self.pool)
+            selected = await self.model.find().where(key).one(self.pool)
             self.assertEqual(selected["display_name"], "Nora")
             self.assertEqual(
-                await self.model.delete().where_(key).execute(self.pool), 1
+                await self.model.delete().where(key).execute(self.pool), 1
             )
-            self.assertIsNone(await self.model.find().filter(key).one_opt(self.pool))
+            self.assertIsNone(await self.model.find().where(key).optional(self.pool))
         row["tags"].append("local mutation")
         self.assertEqual(row["tags"], ["a", None])
 
@@ -248,7 +248,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(json_null.tagged("data").is_null)
         self.assertIsNone(json_null["data"])
         with self.assertRaises(p.DatabaseError):
-            await self.model.find().one_opt(self.pool)
+            await self.model.find().optional(self.pool)
         self.assertEqual(len(await self.model.find().all(self.pool)), 3)
         self.assertEqual(
             len(
@@ -274,7 +274,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
             with self.subTest(columns=columns), self.assertRaises(p.DecodeError):
                 await declaration.find().one(self.pool)
         self.assertTrue(await self.pool.ping())
-        record = await self.pool.fetch_one(p.Select(p.literal(1).as_("wrong")))
+        record = await self.pool.one(p.Select(p.literal(1).as_("wrong")))
         with self.assertRaises(p.DecodeError):
             p.ModelRecord(self.model, record, ("id",))
 
@@ -306,7 +306,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         await pairs.insert({"a": 1, "b": "first"}).execute(self.pool)
         await pairs.insert({"a": 1, "b": "second"}).execute(self.pool)
         row = (
-            await pairs.find().filter(pairs.key({"b": "second", "a": 1})).one(self.pool)
+            await pairs.find().where(pairs.key({"b": "second", "a": 1})).one(self.pool)
         )
         self.assertEqual(dict(row), {"a": 1, "b": "second"})
 
@@ -389,7 +389,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         spans = p.Model("spans", {"span": p.Column(floatrange)}, schema="python_models")
         row = await spans.insert({"span": p.Range(1.5, None)}).returning().one(self.pool)
         self.assertEqual(row.tagged("span"), p.Value(p.Range(1.5, None), floatrange))
-        found = await spans.find().filter(spans.col("span") == p.Range(1.5, None)).one(self.pool)
+        found = await spans.find().where(spans.col("span") == p.Range(1.5, None)).one(self.pool)
         self.assertEqual(found["span"], p.Range(1.5, None))
         with self.assertRaises(p.ConstructionError):
             p.Column(p.CreatedRange("floatrange", "f64"))

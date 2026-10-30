@@ -6,7 +6,7 @@
 // what an application imports.
 // [spec:pgorm:def:bindings.api]
 // [spec:pgorm:req:bindings.surface]
-// [spec:pgorm:req:napi.naming]
+// [spec:pgorm:req:napi.naming+2]
 // [spec:pgorm:def:napi.api+1]
 // [spec:pgorm:req:napi.typing+1]
 
@@ -49,14 +49,14 @@ export {
   isJson,
   isNotJson,
   jsonArray,
-  jsonArrayAgg,
+  jsonArrayagg,
   jsonArrayQuery,
   JsonDefault,
   jsonDefault,
   jsonExists,
   JsonInput,
   jsonObject,
-  jsonObjectAgg,
+  jsonObjectagg,
   jsonParse,
   jsonQuery,
   jsonScalar,
@@ -94,7 +94,7 @@ export {
   commentOnTable,
   createTable,
   CreateTable,
-  Ddl,
+  DDL,
   dropTable,
   renameColumn,
   renameConstraint,

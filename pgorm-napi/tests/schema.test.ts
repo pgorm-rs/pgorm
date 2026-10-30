@@ -21,7 +21,7 @@ import {
   createType,
   DatabaseError,
   DataType,
-  Ddl,
+  DDL,
   dropTable,
   Pool,
   renameColumn,
@@ -342,10 +342,10 @@ test("an ALTER TABLE with no action has nothing to inspect, and every terminal r
   assert.deepStrictEqual(createTable("t").inspect().values, []);
 });
 
-// [spec:pgorm:req:napi.schema-api/test]
+// [spec:pgorm:req:napi.schema-api+2/test]
 // [spec:pgorm:req:napi.typing+1/test]
-test("every complete DDL statement is a Ddl, a Statement the terminals take, made only by the module", () => {
-  const statements: Ddl[] = [
+test("every complete DDL statement is a DDL, a Statement the terminals take, made only by the module", () => {
+  const statements: DDL[] = [
     createTable("t").column(new ColumnDef("a", "integer")),
     alterTable("t").dropColumn("a"),
     createIndex("t", "a"),
@@ -355,9 +355,9 @@ test("every complete DDL statement is a Ddl, a Statement the terminals take, mad
     renameSchema("app", "application"),
   ];
   const run: readonly Statement[] = statements;
-  for (const statement of run) assert.ok(statement instanceof Ddl);
-  // @ts-expect-error a Ddl comes from a DDL function, never its constructor
-  assert.throws(() => new Ddl(null), /a DDL statement is made by the module's DDL functions/);
+  for (const statement of run) assert.ok(statement instanceof DDL);
+  // @ts-expect-error a DDL comes from a DDL function, never its constructor
+  assert.throws(() => new DDL(null), /a DDL statement is made by the module's DDL functions/);
   assert.equal("SchemaStatement" in pgorm, false);
   // @ts-expect-error "schema" names a database schema alone, so no DDL class is SchemaStatement
   assert.equal(pgorm.SchemaStatement, undefined);

@@ -43,7 +43,7 @@ class PackageTests(unittest.TestCase):
             self.assertNotIn("fixtures/", str(path))
 
     # [spec:pgorm:req:bindings.entities/test]
-    # [spec:pgorm:req:bindings.entity-graphs/test]
+    # [spec:pgorm:req:bindings.entity-graphs+2/test]
     def test_standalone_registry_has_no_application_entities(self):
         self.assertEqual(pgorm.capabilities()["registrations"]["entities"], [])
         with self.assertRaises(pgorm.UnsupportedCapabilityError):

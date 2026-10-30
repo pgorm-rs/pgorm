@@ -446,7 +446,7 @@ await pool.query(select().from(new Table("booking"))
 ```
 
 - **SQL/JSON**: `jsonExists`, `jsonValue`, `jsonQuery`, `jsonObject`,
-  `jsonArray`, `jsonArrayQuery`, `jsonObjectAgg`, `jsonArrayAgg`, `jsonParse`
+  `jsonArray`, `jsonArrayQuery`, `jsonObjectagg`, `jsonArrayagg`, `jsonParse`
   (`JSON(..)`), `jsonScalar`, `jsonSerialize`, `formatJson` and
   `isJson`/`isNotJson`. A path is bound as `jsonpath`, PASSING takes an object
   of names to values, and each function takes only its own behaviours —
@@ -625,7 +625,7 @@ await pool.execute(createSequence("ticket").options({ incrementBy: 10, maxValue:
   so a value a statement carries — a `DEFAULT`, a `CHECK`'s operands, an enum
   label, a comment — is written as pgorm-query's escaped literal, and
   `inspect()` gives `{ sql, values: [] }`. Names are identifiers, quoted.
-  Nothing runs until a terminal runs it. Every complete statement is a `Ddl`
+  Nothing runs until a terminal runs it. Every complete statement is a `DDL`
   (pgorm-python's `DDL`), a `Statement` the terminals take.
 - **Schemas**: `createSchema(name, { ifNotExists })`, `dropSchema(names, {
   ifExists, behavior })` over one name or several, and `renameSchema(name,

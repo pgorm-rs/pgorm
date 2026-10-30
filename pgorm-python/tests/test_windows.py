@@ -46,7 +46,7 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
 
     async def column(self, item):
         query = p.Select(item).from_(self.reading).order_by(self.r("id").asc())
-        return [next(iter(row.values())) for row in await self.connection.fetch_all(query)]
+        return [next(iter(row.values())) for row in await self.connection.query(query)]
 
     async def sums(self, by, frame):
         window = p.Window().order_by(self.r(by).asc()).frame(frame)
@@ -114,13 +114,13 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
                  .from_(self.reading).window("Running W", window).order_by(self.r("id").asc()))
         self.assertIn('OVER "Running W" AS "Total"', query.inspect().sql)
         self.assertIn('WINDOW "Running W" AS', query.inspect().sql)
-        rows = [tuple(row.values()) for row in await self.connection.fetch_all(query)]
+        rows = [tuple(row.values()) for row in await self.connection.query(query)]
         self.assertEqual(rows, [(1, 1, 1), (2, 2, 1), (3, 5, 2), (4, 10, 2)])
         # Window names are case-exact identifiers, so this one is undeclared.
         unknown = p.Select(p.call("sum", self.r("weight")).over("running w")).from_(self.reading).window(
             "Running W", window)
         with self.assertRaises(p.ConstructionError):
-            await self.connection.fetch_all(unknown)
+            await self.connection.query(unknown)
 
     async def test_window_clause_holds_every_named_window(self):
         query = (p.Select(p.call("count", self.r("id")).over("by kind").as_("of kind"),
@@ -128,7 +128,7 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
                  .from_(self.reading).window("by kind", p.Window().partition_by(self.r("kind")))
                  .window("all", p.Window()).order_by(self.r("id").asc()))
         self.assertIn('WINDOW "by kind" AS ( PARTITION BY "r"."kind" ), "all" AS (  )', query.inspect().sql)
-        rows = [tuple(row.values()) for row in await self.connection.fetch_all(query)]
+        rows = [tuple(row.values()) for row in await self.connection.query(query)]
         self.assertEqual(rows, [(2, 4)] * 4)
 
     async def test_extended_window_runs_over_its_base(self):
@@ -144,7 +144,7 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
         sql = query.inspect().sql
         self.assertIn('"running" AS ( "kinds" ORDER BY "r"."id" ASC )', sql)
         self.assertIn('"pair" AS ( "ordered" ROWS BETWEEN $1 PRECEDING AND CURRENT ROW )', sql)
-        rows = [tuple(row.values()) for row in await self.connection.fetch_all(query)]
+        rows = [tuple(row.values()) for row in await self.connection.query(query)]
         self.assertEqual(rows, [(1, 1, 1, 1), (2, 2, 3, 1), (3, 5, 6, 2), (4, 10, 12, 2)])
 
     # [spec:pgorm:req:bindings.windows/test]    an inline ExtendedWindow builds on any entry of
@@ -159,7 +159,7 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
         sql = query.inspect().sql
         self.assertIn('OVER ( "kinds" ORDER BY "r"."id" ASC ) AS "running"', sql)
         self.assertIn('OVER ( "kinds" ) AS "of kind"', sql)
-        rows = [tuple(row.values()) for row in await self.connection.fetch_all(query)]
+        rows = [tuple(row.values()) for row in await self.connection.query(query)]
         self.assertEqual(rows, [(1, 1, 2), (2, 2, 2), (3, 5, 2), (4, 10, 2)])
 
         def over(window):
@@ -174,9 +174,9 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(p.ConstructionError):
                 query.inspect()
             with self.assertRaises(p.ConstructionError):
-                await self.connection.fetch_all(query)
+                await self.connection.query(query)
         accepted = over(p.ExtendedWindow("v").frame(F.Rows.current_row())).window("v", ordered)
-        self.assertEqual(len(await self.connection.fetch_all(accepted)), 4)
+        self.assertEqual(len(await self.connection.query(accepted)), 4)
 
     async def test_refused_window_clause_raises_construction_error(self):
         def over(name):
@@ -193,11 +193,11 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(p.ConstructionError):
                 query.inspect()
             with self.assertRaises(p.ConstructionError):
-                await self.connection.fetch_all(query)
+                await self.connection.query(query)
             with self.assertRaises(p.ConstructionError):
                 over("x").window("x", p.Window()).union(query)
         accepted = over("w").window("v", ordered).window("w", p.ExtendedWindow("v").frame(F.Rows.current_row()))
-        self.assertEqual(len(await self.connection.fetch_all(accepted)), 4)
+        self.assertEqual(len(await self.connection.query(accepted)), 4)
 
     def test_extended_window_refuses_partition_and_truth(self):
         extended = p.ExtendedWindow("w")

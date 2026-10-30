@@ -68,7 +68,7 @@ impl PyCreateIndex {
         Self { inner }
     }
 
-    fn method(&self, name: &str) -> PyResult<Self> {
+    fn using(&self, name: &str) -> PyResult<Self> {
         let kind = match name {
             "btree" => IndexType::BTree,
             "hash" => IndexType::Hash,

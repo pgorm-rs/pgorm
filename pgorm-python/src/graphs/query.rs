@@ -1,6 +1,6 @@
 use super::{
     backend::{Change, CursorPlan, Query},
-    cursor::PyGraphCursor,
+    cursor::PyEntityGraphCursor,
 };
 use crate::{
     errors::ConstructionError,
@@ -13,13 +13,13 @@ use pyo3::{
 };
 
 #[derive(Clone, Debug)]
-#[pyclass(name = "GraphQuery", module = "pgorm", frozen, from_py_object)]
-pub struct PyGraphQuery {
+#[pyclass(name = "EntityGraphQuery", module = "pgorm", frozen, from_py_object)]
+pub struct PyEntityGraphQuery {
     pub(crate) inner: Query,
 }
 
 #[pymethods]
-impl PyGraphQuery {
+impl PyEntityGraphQuery {
     #[getter]
     fn graph_name(&self) -> &str {
         &self.inner.info().name
@@ -54,7 +54,7 @@ impl PyGraphQuery {
         ))
     }
 
-    fn filter(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn r#where(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
         let condition = if let Ok(condition) = predicate.extract::<PyRef<'_, PyCondition>>() {
             condition.inner.clone()
         } else if let Ok(expr) = predicate.extract::<PyRef<'_, PyExpr>>() {
@@ -89,7 +89,7 @@ impl PyGraphQuery {
     fn inspect(&self, terminal: &str) -> PyResult<Compiled> {
         let optional = match terminal {
             "all" => false,
-            "one_opt" => true,
+            "optional" => true,
             _ => return Err(ConstructionError::new_err("unknown graph terminal")),
         };
         let (sql, values) = self.inner.compile(optional);
@@ -101,11 +101,11 @@ impl PyGraphQuery {
         Ok(Compiled { sql, values })
     }
 
-    fn cursor(&self, column: &str) -> PyResult<PyGraphCursor> {
+    fn cursor(&self, column: &str) -> PyResult<PyEntityGraphCursor> {
         self.inner.info().bindings.sources[0]
             .entity
             .column(column)?;
-        Ok(PyGraphCursor {
+        Ok(PyEntityGraphCursor {
             query: self.inner.clone(),
             plan: CursorPlan {
                 column: column.to_owned(),
@@ -125,7 +125,7 @@ impl PyGraphQuery {
         super::io::read(py, connection, self.inner.clone(), super::io::Read::All)
     }
 
-    fn one_opt<'py>(
+    fn optional<'py>(
         &self,
         py: Python<'py>,
         connection: &Bound<'_, PyAny>,

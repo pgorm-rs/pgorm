@@ -188,14 +188,14 @@ export declare class EntityQuery<R = EntityRecord> {
   /** `null` removes it. */
   limit(count: number | null): EntityQuery<R>;
   offset(count: number | null): EntityQuery<R>;
-  /** The SQL and values a terminal sends, `one` and `oneOpt` with the limit Rust narrows to one row. */
-  inspect(terminal?: "all" | "one" | "oneOpt"): Compiled;
+  /** The SQL and values a terminal sends, `one` and `optional` with the limit Rust narrows to one row. */
+  inspect(terminal?: "all" | "one" | "optional"): Compiled;
   /** Every row, by `Select::all`. */
   all(db: Queryable, options?: OperationOptions): Promise<R[]>;
   /** The first row, by `Select::one`; none is a {@link DecodeError}. */
   one(db: Queryable, options?: OperationOptions): Promise<R>;
   /** The first row, or `null`, by `Select::one_opt`. */
-  oneOpt(db: Queryable, options?: OperationOptions): Promise<R | null>;
+  optional(db: Queryable, options?: OperationOptions): Promise<R | null>;
 }
 
 /** An ActiveModel column's state, and its value unless it is `notSet`. */
@@ -284,10 +284,10 @@ export declare class EntityGraphQuery<Row = EntityRecord | (EntityRecord | null)
   orderBy(...orderings: OrderBy[]): EntityGraphQuery<Row>;
   /** A column of decoded source `source` — 0 the root, i the i-th slot — qualified as the query names it. */
   col(source: number, column: string): Expr;
-  inspect(terminal?: "all" | "oneOpt"): Compiled;
+  inspect(terminal?: "all" | "optional"): Compiled;
   all(db: Queryable, options?: OperationOptions): Promise<Row[]>;
   /** The first row or `null`: no row, apart from a row whose optional slot is absent. */
-  oneOpt(db: Queryable, options?: OperationOptions): Promise<Row | null>;
+  optional(db: Queryable, options?: OperationOptions): Promise<Row | null>;
   /** A keyset cursor ordered by a root column, every source's primary key after it. */
   cursor(column: string): EntityGraphCursor<Row>;
 }

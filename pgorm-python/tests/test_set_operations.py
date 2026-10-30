@@ -61,7 +61,7 @@ class SetOperationTests(unittest.IsolatedAsyncioTestCase):
         await self.pool.close()
 
     async def numbers(self, query):
-        return [row["n"] for row in await self.connection.fetch_all(query)]
+        return [row["n"] for row in await self.connection.query(query)]
 
     def side(self, table):
         return p.Select(p.col("n")).from_(table)
@@ -92,7 +92,7 @@ class SetOperationTests(unittest.IsolatedAsyncioTestCase):
         tied = left.union_all(right).order_by(descending).limit_with_ties(2)
         self.assertEqual(await self.numbers(tied), [4, 3, 3, 3, 3, 3])
 
-        filtered = left.where_(p.col("n") > 1).union_all(right.where_(p.col("n") < 4)).order_by(ascending)
+        filtered = left.where(p.col("n") > 1).union_all(right.where(p.col("n") < 4)).order_by(ascending)
         compiled = filtered.inspect()
         self.assertIn('WHERE "n" > $1 UNION ALL (SELECT "n" FROM', compiled.sql)
         self.assertIn('WHERE "n" < $2) ORDER BY "n" ASC', compiled.sql)
@@ -109,7 +109,7 @@ class SetOperationTests(unittest.IsolatedAsyncioTestCase):
             (self.side(self.left).union(self.side(self.right)).order_by((p.col("n") + 1).asc()), "0A000"),
         ):
             with self.subTest(sqlstate=sqlstate), self.assertRaises(p.DatabaseError) as refused:
-                await self.connection.fetch_all(query)
+                await self.connection.query(query)
             self.assertEqual(refused.exception.sqlstate, sqlstate)
         self.assertEqual(await self.numbers(qualified.order_by(p.col("n").asc())), [1, 2, 3, 4])
 
@@ -117,8 +117,8 @@ class SetOperationTests(unittest.IsolatedAsyncioTestCase):
     # statement, so every arm reads it
     async def test_with_clause_reaches_every_arm(self):
         shared = p.Table("shared")
-        above = p.Select(p.col("n")).from_(shared).where_(p.col("n") > 2)
-        below = p.Select(p.col("n")).from_(shared).where_(p.col("n") < 2)
+        above = p.Select(p.col("n")).from_(shared).where(p.col("n") > 2)
+        below = p.Select(p.col("n")).from_(shared).where(p.col("n") < 2)
         combined = above.union(below).with_(p.With("shared", self.side(self.left))).order_by(p.col("n").asc())
         self.assertTrue(combined.inspect().sql.startswith('WITH "shared" AS (SELECT "n" FROM'))
         self.assertEqual(await self.numbers(combined), [1, 3])

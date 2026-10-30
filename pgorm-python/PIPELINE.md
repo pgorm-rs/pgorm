@@ -84,7 +84,7 @@ plain string can use PostgreSQL type inference when that is intended; compared w
 a column that compares as an enum, it is inferred as that enum. Other supported `Value` kinds, including
 typed nulls, are available through the binder; literal conversion is limited to
 the native pipeline's scalar literal vocabulary. The SQL builder expression API
-(`p.Expr`) and pipeline expression API (`pl.Expr`) are separate native types.
+(`p.Expr`) and pipeline expression API (`pl.PipelineExpr`) are separate native types.
 
 ## Joins, windows and sets
 
@@ -123,10 +123,10 @@ A `$` after the first character is an ordinary name character.
 ## Results and registered models
 
 `all(connection)` returns dynamic `Record` objects. `one(connection)` and
-`one_opt(connection)` append native `take(1)`; the former errors when no row exists,
+`optional(connection)` append native `take(1)`; the former errors when no row exists,
 and the latter returns `None`. `inspect(terminal="one")` shows that exact SQL.
-Pool and connection `fetch_*` methods also accept pipelines and keep their strict
-dynamic-record cardinality rules. Use `pool.stream(query)` or
+Pool and connection `query`, `one` and `optional` also accept pipelines and keep
+their strict dynamic-record cardinality rules. Use `pool.stream(query)` or
 `connection.stream(query)` for bounded asynchronous record streaming.
 
 An application native module can register a concrete Rust entity tuple:
@@ -159,10 +159,10 @@ rows = await query.all(connection)
 One to six source types are supported. Every returned row is a tuple, and every
 position is optional, including the first under right/full joins. For a single
 source, `(None,)` means a result row whose source was absent; `None` from
-`one_opt` means no result row. Present rows use the real registered Rust model
+`optional` means no result row. Present rows use the real registered Rust model
 decoder, so malformed present data raises `DecodeError`. The Rust terminal
 rejects prior stages that remove source namespaces, such as explicit projection
-or aggregation. Registered source selections expose `all`, `one`, `one_opt` and
+or aggregation. Registered source selections expose `all`, `one`, `optional` and
 `inspect`; model streaming is not exposed.
 
 `p.capabilities()` records the exact pipeline vocabulary, limits and compiled

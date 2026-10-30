@@ -16,12 +16,12 @@ import {
   isJson,
   isNotJson,
   jsonArray,
-  jsonArrayAgg,
+  jsonArrayagg,
   jsonArrayQuery,
   jsonDefault,
   jsonExists,
   jsonObject,
-  jsonObjectAgg,
+  jsonObjectagg,
   jsonParse,
   jsonQuery,
   jsonScalar,
@@ -145,8 +145,8 @@ test("the constructors build JSON on the server, a bound number staying a number
 test("the JSON aggregates take their ordering, NULL handling and FILTER", async () => {
   const row = await pool().one(
     select(
-      jsonArrayAgg(docs.col("id"), { orderBy: [docs.col("id").desc()], filter: docs.col("id").lt(3) }).as("ids"),
-      jsonObjectAgg(docs.col("body"), docs.col("id"), { returning: "jsonb" }).as("bodies"),
+      jsonArrayagg(docs.col("id"), { orderBy: [docs.col("id").desc()], filter: docs.col("id").lt(3) }).as("ids"),
+      jsonObjectagg(docs.col("body"), docs.col("id"), { returning: "jsonb" }).as("bodies"),
     ).from(docs),
   );
   assert.deepStrictEqual(row.ids, [2, 1]);
@@ -207,7 +207,7 @@ test("a behaviour, type or shape a SQL/JSON function cannot take is refused as i
   assert.throws(() => jsonQuery(doc, "$.a", { shaping: "wrapped" as never }), refused(/shaping/));
   assert.throws(() => jsonDefault(new Value("calm", new TypeName("mood"))), refused(/cannot carry an enum's/));
   assert.throws(() => jsonDefault(null as never), refused(/null has no kind/));
-  assert.throws(() => jsonArrayAgg(col("v"), { orderBy: [col("v").asc({ nulls: "first" })] }), refused(/takes no NULLS FIRST/));
+  assert.throws(() => jsonArrayagg(col("v"), { orderBy: [col("v").asc({ nulls: "first" })] }), refused(/takes no NULLS FIRST/));
   assert.throws(() => jsonValue(doc, 1 as never), refused(/path is a string/));
   assert.throws(() => jsonExists(doc, "$.a", { passing: { "": 1 } }), refused(/identifier/));
   assert.throws(() => select(formatJson(col("x")) as never), refused(/not a FORMAT JSON input/));

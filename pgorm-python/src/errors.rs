@@ -1,14 +1,14 @@
 use pyo3::prelude::*;
 
-use crate::PgOrmError;
+use crate::PgormError;
 
-pyo3::create_exception!(pgorm, ConstructionError, PgOrmError);
-pyo3::create_exception!(pgorm, ConnectionError, PgOrmError);
-pyo3::create_exception!(pgorm, DatabaseError, PgOrmError);
-pyo3::create_exception!(pgorm, DecodeError, PgOrmError);
-pyo3::create_exception!(pgorm, TimeoutError, PgOrmError);
-pyo3::create_exception!(pgorm, LifecycleError, PgOrmError);
-pyo3::create_exception!(pgorm, InternalError, PgOrmError);
+pyo3::create_exception!(pgorm, ConstructionError, PgormError);
+pyo3::create_exception!(pgorm, ConnectionError, PgormError);
+pyo3::create_exception!(pgorm, DatabaseError, PgormError);
+pyo3::create_exception!(pgorm, DecodeError, PgormError);
+pyo3::create_exception!(pgorm, TimeoutError, PgormError);
+pyo3::create_exception!(pgorm, LifecycleError, PgormError);
+pyo3::create_exception!(pgorm, InternalError, PgormError);
 pyo3::create_exception!(pgorm, UniqueViolationError, DatabaseError);
 pyo3::create_exception!(pgorm, ForeignKeyViolationError, DatabaseError);
 pyo3::create_exception!(pgorm, CheckViolationError, DatabaseError);
@@ -40,7 +40,7 @@ impl Redactions {
 }
 
 // [spec:pgorm:req:bindings.errors]
-// [spec:pgorm:req:python.row-count]
+// [spec:pgorm:req:python.row-count+2]
 pub(crate) fn database_error(error: pgorm::Error, secrets: &Redactions) -> PyErr {
     let mut source: &(dyn std::error::Error + 'static) = &error;
     loop {

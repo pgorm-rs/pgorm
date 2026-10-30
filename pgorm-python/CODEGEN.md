@@ -102,7 +102,7 @@ async def example(connection):
     )
     print(model.id, model.display_name, model.note)
     changed = await model.into_active().set_display_name("New name").update(connection)
-    rows = await Account.find().filter(Account.col("id") == changed.id).all(connection)
+    rows = await Account.find().where(Account.col("id") == changed.id).all(connection)
     graph = AccountNotes.find(aliases=["related_notes"])
     joined = await graph.cursor("id").first(20).all(connection)
     for account, note in joined:

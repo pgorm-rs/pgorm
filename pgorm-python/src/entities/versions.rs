@@ -201,7 +201,7 @@ impl PyEntityUpdate {
         run(py, connection, self.entity.clone(), write, Answer::Change)
     }
 
-    // [spec:pgorm:req:python.truth-testing+2]
+    // [spec:pgorm:req:python.truth-testing+3]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "entity writes cannot be tested as Python booleans",
@@ -246,7 +246,7 @@ impl PyEntityUpdateMany {
         Ok(next)
     }
 
-    fn filter(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn r#where(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut next = self.clone();
         next.filter = next.filter.add(condition(predicate)?);
         Ok(next)

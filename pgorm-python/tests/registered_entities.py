@@ -54,7 +54,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
     async def test_registration_declares_its_reachable_terminals(self):
         terminals = self.account.describe()["terminals"]
         self.assertEqual(terminals, [
-            "all", "one", "one_opt", "active.insert", "active.update", "active.delete",
+            "all", "one", "optional", "active.insert", "active.update", "active.delete",
             "update.returning_change", "update_many.returning_changes",
             "insert.returning_upsert", "insert_many.returning_upserts",
         ])
@@ -69,7 +69,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             with self.subTest(terminal=terminal):
                 self.assertTrue(callable(getattr(owners[owner], method)))
 
-    # [spec:pgorm:req:python.truth-testing+2/test]
+    # [spec:pgorm:req:python.truth-testing+3/test]
     async def test_write_terminals_refuse_truth_testing(self):
         active = self.active(1)
         writes = [self.account.update(active), self.account.update_many(),
@@ -105,7 +105,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(loaded.reset("id").get("id").state, p.ActiveState.Set)
             self.assertEqual(loaded.get("id").state, p.ActiveState.Unchanged)
             self.assertEqual(await updated.into_active().delete(connection), 1)
-            self.assertIsNone(await self.account.find().one_opt(connection))
+            self.assertIsNone(await self.account.find().optional(connection))
         self.assertEqual(model.tagged("mood").type_name, p.TypeName("Mood", schema="python_entities"))
 
     # [spec:pgorm:req:bindings.entity-writes/test]
@@ -122,13 +122,13 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
                       .set("spans", p.Multirange([p.Range(5.0, 8.0), p.Range(1.0, 3.0)])))
             self.assertEqual(active.get("span").value.created_type, span)
             await active.insert(connection)
-            found = await booking.find().filter(booking.col("span") == p.Range(1.5, 2.5)).one(connection)
+            found = await booking.find().where(booking.col("span") == p.Range(1.5, 2.5)).one(connection)
             self.assertEqual(found["span"], p.Range(1.5, 2.5))
             # The server stores a multirange sorted and merged.
             self.assertEqual(found["spans"], p.Multirange([p.Range(1.0, 3.0), p.Range(5.0, 8.0)]))
             self.assertEqual(found.tagged("span").created_type, span)
             self.assertEqual(found.tagged("spans").created_type, spans)
-            row = await connection.fetch_one(p.RawSQL("SELECT span FROM python_entities.bookings"))
+            row = await connection.one(p.RawSQL("SELECT span FROM python_entities.bookings"))
             self.assertEqual(row["span"], p.Range(1.5, 2.5))
             self.assertEqual(row.tagged("span"), found.tagged("span"))
             moved = await found.into_active().set("span", p.Range(None, 0.5, "(]")).set("spans", None).update(connection)
@@ -138,27 +138,27 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(p.ConstructionError):
                 booking.active().set("span", p.Range(1, 2))
 
-    # [spec:pgorm:req:bindings.entity-reads/test]
+    # [spec:pgorm:req:bindings.entity-reads+2/test]
     async def test_typed_select_reuses_real_entity_projection(self):
         async with self.pool.connection() as connection:
             for identity in (1, 2, 3):
                 await self.active(identity, f"account{identity}").insert(connection)
-            query = self.account.find().filter(self.account.col("id") >= 2)
+            query = self.account.find().where(self.account.col("id") >= 2)
             query = query.order_by(self.account.col("id").expr().desc())
             self.assertEqual([row["id"] for row in await query.all(connection)], [3, 2])
             self.assertEqual((await query.one(connection))["id"], 3)
             self.assertEqual(len(await query.all(connection)), 2)
             self.assertEqual([row["id"] for row in await query.offset(1).limit(1).all(connection)], [2])
-            self.assertEqual((await self.account.find().filter(self.account.col("mood") == "calm").one(connection))["mood"], "calm")
-            none = query.filter(self.account.col("id") == 100)
+            self.assertEqual((await self.account.find().where(self.account.col("mood") == "calm").one(connection))["mood"], "calm")
+            none = query.where(self.account.col("id") == 100)
             self.assertEqual(await none.all(connection), [])
-            self.assertIsNone(await none.one_opt(connection))
+            self.assertIsNone(await none.optional(connection))
             with self.assertRaises(p.DatabaseError):
                 await none.one(connection)
             self.assertNotEqual(query.inspect().sql, query.inspect(terminal="one").sql)
             self.assertEqual(query.inspect().params[0].kind, "i32")
 
-    # [spec:pgorm:req:bindings.entity-reads/test]    a registered column is a member of values and of
+    # [spec:pgorm:req:bindings.entity-reads+2/test]    a registered column is a member of values and of
     # a Select's rows through its ColumnTrait, a column whose domain is over an enum as the enum,
     # where the column's plain expression is refused with 42883
     async def test_column_membership_runs_through_column_trait(self):
@@ -174,7 +174,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
         settled = p.Select(tempers.col("settles_into")).from_(tempers)
         async with self.pool.connection() as connection:
             async def moods(predicate):
-                return sorted(row["mood"] for row in await temper.find().filter(predicate).all(connection))
+                return sorted(row["mood"] for row in await temper.find().where(predicate).all(connection))
 
             self.assertEqual(await moods(mood.is_in(["busy"])), ["busy"])
             self.assertEqual(await moods(mood.is_not_in(("busy",))), ["calm"])
@@ -182,27 +182,27 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await moods(mood.is_not_in(settled)), ["calm"])
             self.assertEqual(await moods(mood.is_in([])), [])
             with self.assertRaises(p.DatabaseError) as refused:
-                await temper.find().filter(mood.expr().is_in(settled)).all(connection)
+                await temper.find().where(mood.expr().is_in(settled)).all(connection)
             self.assertEqual(refused.exception.sqlstate, "42883")
             for identity in (1, 2, 3):
                 await self.active(identity, f"account{identity}").insert(connection)
-            chosen = self.account.find().filter(self.account.col("id").is_in((1, 3)))
+            chosen = self.account.find().where(self.account.col("id").is_in((1, 3)))
             self.assertEqual(sorted(row["id"] for row in await chosen.all(connection)), [1, 3])
         for refused_values in ["busy", [p.col("x")]]:
             with self.subTest(values=refused_values):
                 with self.assertRaises(p.ConstructionError):
                     mood.is_in(refused_values)
 
-    # [spec:pgorm:req:bindings.entity-reads/test]
+    # [spec:pgorm:req:bindings.entity-reads+2/test]
     async def test_one_never_widens_a_zero_limit(self):
         async with self.pool.connection() as connection:
             await self.active(1).insert(connection)
             none = self.account.find().limit(0)
             self.assertEqual(await none.all(connection), [])
-            self.assertIsNone(await none.one_opt(connection))
+            self.assertIsNone(await none.optional(connection))
             with self.assertRaises(p.DatabaseError):
                 await none.one(connection)
-            for terminal in ("one", "one_opt"):
+            for terminal in ("one", "optional"):
                 self.assertTrue(none.inspect(terminal=terminal).sql.endswith("LIMIT $1"))
                 self.assertEqual(none.inspect(terminal=terminal).params[-1].value, 0)
             self.assertEqual((await self.account.find().limit(5).one(connection))["id"], 1)
@@ -211,7 +211,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
     # [spec:pgorm:req:bindings.entity-writes/test]
     async def test_composite_key_entity_writes_by_whole_key(self):
         membership = p.entity("app.Membership")
-        self.assertEqual(membership.describe()["primary_keys"], ["tenant_id", "id"])
+        self.assertEqual(membership.describe()["primary_key"], ["tenant_id", "id"])
         flags = [membership.col(name).describe()["primary_key"] for name in ("tenant_id", "id", "role")]
         self.assertEqual(flags, [True, True, False])
         table = s.from_entity(membership).table
@@ -219,7 +219,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
         self.assertIn('PRIMARY KEY ("tenant_id", "id")', table.inspect().sql)
         async with self.pool.connection() as connection:
             await connection.execute(table)
-            key = await connection.fetch_all(p.RawSQL(
+            key = await connection.query(p.RawSQL(
                 "SELECT a.attname FROM pg_constraint c, unnest(c.conkey) WITH ORDINALITY AS k(attnum, at) "
                 "JOIN pg_attribute a ON a.attnum = k.attnum "
                 "WHERE c.conrelid = 'python_entities.memberships'::regclass AND c.contype = 'p' "
@@ -239,7 +239,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
                 {"tenant_id": 1, "id": shared, "role": "admin"},
                 {"tenant_id": 2, "id": shared, "role": "guest"},
             ])
-            lookup = membership.find().filter((membership.col("tenant_id") == 2) & (membership.col("id") == shared))
+            lookup = membership.find().where((membership.col("tenant_id") == 2) & (membership.col("id") == shared))
             self.assertEqual((await lookup.one(connection))["role"], "guest")
             with self.assertRaisesRegex(p.DatabaseError, "primary key value is not set"):
                 await membership.active().set("tenant_id", 2).set("role", "nobody").update(connection)
@@ -285,33 +285,33 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
         async with self.pool.connection() as connection:
             with self.assertRaises(p.DatabaseError):
                 await self.active(1, "reject_before").insert(connection)
-            self.assertIsNone(await self.account.find().one_opt(connection))
+            self.assertIsNone(await self.account.find().optional(connection))
             with self.assertRaises(p.DatabaseError):
                 await self.active(2, "reject_after").insert(connection)
             self.assertEqual((await self.account.find().one(connection))["id"], 2)
             protected = await self.active(99).insert(connection)
             with self.assertRaises(p.DatabaseError):
                 await protected.into_active().delete(connection)
-            self.assertIsNotNone(await self.account.find().filter(self.account.col("id") == 99).one_opt(connection))
+            self.assertIsNotNone(await self.account.find().where(self.account.col("id") == 99).optional(connection))
             after = await self.active(98).insert(connection)
             with self.assertRaises(p.DatabaseError):
                 await after.into_active().delete(connection)
-            self.assertIsNone(await self.account.find().filter(self.account.col("id") == 98).one_opt(connection))
+            self.assertIsNone(await self.account.find().where(self.account.col("id") == 98).optional(connection))
 
-    # [spec:pgorm:req:bindings.entity-reads/test]
+    # [spec:pgorm:req:bindings.entity-reads+2/test]
     # [spec:pgorm:req:bindings.errors/test]
     async def test_decode_failure_does_not_become_absence(self):
         async with self.pool.connection() as connection:
             await self.active(1).insert(connection)
             await connection.execute(p.RawSQL('ALTER TABLE python_entities.accounts ALTER COLUMN version TYPE bigint'))
             with self.assertRaises(p.DecodeError):
-                await self.account.find().one_opt(connection)
+                await self.account.find().optional(connection)
 
     # [spec:pgorm:req:bindings.errors/test]
     async def test_parameter_failure_preserves_connection(self):
         async with self.pool.connection() as connection:
             with self.assertRaises(p.ConstructionError):
-                await connection.fetch_one(p.RawSQL("SELECT $1::integer AS n", p.Value("text", "text")))
+                await connection.one(p.RawSQL("SELECT $1::integer AS n", p.Value("text", "text")))
             self.assertTrue(await connection.ping())
 
     # [spec:pgorm:req:bindings.entities/test]
@@ -324,7 +324,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(asyncio.CancelledError):
                 await asyncio.wait_for(future, 1)
             await asyncio.wait_for(connection.close(), 1)
-        self.assertEqual(await self.pool.fetch_all(p.RawSQL('SELECT id FROM python_entities.accounts')), [])
+        self.assertEqual(await self.pool.query(p.RawSQL('SELECT id FROM python_entities.accounts')), [])
 
 
 if __name__ == "__main__":

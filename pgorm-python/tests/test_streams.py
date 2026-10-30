@@ -27,22 +27,22 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
     # [spec:pgorm:req:bindings.streams/test]
     async def test_connection_stream_reserves_and_releases_owner(self):
         async with self.pool.connection() as connection:
-            before = await connection.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid"))
+            before = await connection.one(p.RawSQL("SELECT pg_backend_pid() AS pid"))
             stream = await connection.stream(p.RawSQL("SELECT generate_series(1, 3) AS n"))
             with self.assertRaises(p.LifecycleError):
                 await connection.ping()
             self.assertEqual(len([row async for row in stream]), 3)
-            after = await connection.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid"))
+            after = await connection.one(p.RawSQL("SELECT pg_backend_pid() AS pid"))
             self.assertEqual(before["pid"], after["pid"])
 
     # [spec:pgorm:req:bindings.streams/test]
     async def test_early_close_discards_incomplete_query(self):
         async with self.pool.connection() as connection:
-            before = (await connection.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
+            before = (await connection.one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
             async with await connection.stream(p.RawSQL("SELECT generate_series(1, 1000000) AS n")) as rows:
                 self.assertEqual((await anext(rows))["n"], 1)
             self.assertTrue(connection.closed)
-        after = (await self.pool.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
+        after = (await self.pool.one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
         self.assertNotEqual(before, after)
 
     # [spec:pgorm:req:bindings.cancellation/test]
@@ -86,20 +86,20 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
     # [spec:pgorm:req:bindings.cancellation/test]
     async def test_cancelled_query_discards_native_connection(self):
         connection = await self.pool.acquire()
-        before = (await connection.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
-        query = asyncio.create_task(connection.fetch_all(p.RawSQL("SELECT pg_sleep(30)")))
+        before = (await connection.one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
+        query = asyncio.create_task(connection.query(p.RawSQL("SELECT pg_sleep(30)")))
         await asyncio.sleep(0.05)
         self.assertFalse(query.done())
         query.cancel()
         with self.assertRaises(asyncio.CancelledError):
             await asyncio.wait_for(query, 1)
         await asyncio.wait_for(connection.close(), 1)
-        after = (await self.pool.fetch_one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
+        after = (await self.pool.one(p.RawSQL("SELECT pg_backend_pid() AS pid")))["pid"]
         self.assertNotEqual(before, after)
 
     # [spec:pgorm:req:bindings.cancellation/test]
     async def test_pool_shutdown_interrupts_active_query(self):
-        query = asyncio.create_task(self.pool.fetch_all(p.RawSQL("SELECT pg_sleep(30)")))
+        query = asyncio.create_task(self.pool.query(p.RawSQL("SELECT pg_sleep(30)")))
         await asyncio.sleep(0.05)
         await asyncio.wait_for(self.pool.close(), 1)
         with self.assertRaises(p.LifecycleError):
@@ -154,7 +154,7 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(rows.closed)
         self.assertEqual([row["n"] async for row in rows], [1, 2, 3])
 
-    # [spec:pgorm:req:python.truth-testing+2/test]    a stream's truth would not say whether rows remain
+    # [spec:pgorm:req:python.truth-testing+3/test]    a stream's truth would not say whether rows remain
     async def test_result_stream_refuses_truth_testing(self):
         async with await self.pool.stream(p.RawSQL("SELECT 1 AS n")) as rows:
             with self.assertRaises(p.ConstructionError):

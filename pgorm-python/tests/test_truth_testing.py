@@ -32,7 +32,7 @@ EXEMPT = {
     _native._CopyIn, _native._CopyOut, _native._Listener,
     # Registrations and declarations: they name what a query reads and are
     # true as any declared object is; the queries they start refuse.
-    p.Entity, p.Graph, Model, Column, pl.SourceSelection, pl.Binder,
+    p.Entity, p.EntityGraph, Model, Column, pl.SourceSelection, pl.Binder,
     views.EntityView, graph_views.GraphView, FieldType,
 }
 
@@ -42,10 +42,10 @@ EXEMPT = {
 # truth-test their instances.
 BUILT_ELSEWHERE = {
     p.EntityColumn, p.EntityQuery, p.EntityUpdate, p.EntityUpdateMany, p.EntityInsert,
-    p.EntityInsertMany, p.GraphQuery, p.GraphCursor, pl.SelectedSources, s.EntitySchema,
+    p.EntityInsertMany, p.EntityGraphQuery, p.EntityGraphCursor, pl.SelectedSources, s.EntitySchema,
     views.QueryView, graph_views.GraphQueryView, graph_views.GraphCursorView,
     version_views.UpdateView, version_views.UpdateManyView, version_views.InsertView,
-    version_views.InsertManyView, p.Notification, p.Listener, p.ResultStream,
+    version_views.InsertManyView, p.Notification, p.Listener, p.RowStream,
     p.CopyOutStream, p.CopyRowStream,
 }
 
@@ -76,7 +76,7 @@ def statement_samples():
         p.TableFunction(p.call("generate_series", 1, 3)).alias("series"),
         p.GroupingElement.empty(), p.Join.Inner, p.SampleMethod.Bernoulli,
         p.With("recent", query), p.ReturningRow.Old,
-        p.Conflict.ignore(), p.ConflictTarget("id"), p.ConflictTarget("id").update("name"),
+        p.Conflict.do_nothing(), p.ConflictTarget("id"), p.ConflictTarget("id").update("name"),
         p.MatchedAction.Delete, p.NotMatchedAction.DoNothing, p.Overriding.SystemValue,
         p.MergeUpdate("name", "x"), p.MergeInsert("id", 1),
         rows, p.FrameExclusion.Ties, rows.preceding(1), rows.current_row(), rows.following(1),
@@ -110,7 +110,7 @@ def other_samples():
 
 
 class TruthTesting(unittest.TestCase):
-    # [spec:pgorm:req:python.truth-testing+2/test]
+    # [spec:pgorm:req:python.truth-testing+3/test]
     def test_every_query_class_refuses_truth_testing(self):
         samples = statement_samples() + expression_samples() + other_samples()
         for sample in samples:
@@ -127,7 +127,7 @@ class TruthTesting(unittest.TestCase):
             with self.subTest(kind=kind):
                 self.assertIn("__bool__", vars(kind))
 
-    # [spec:pgorm:req:python.truth-testing+2/test]
+    # [spec:pgorm:req:python.truth-testing+3/test]
     def test_exempt_values_keep_python_truth(self):
         self.assertTrue(p.Value(0))
         self.assertTrue(p.Identifier("id"))

@@ -129,25 +129,25 @@ def _error(value):
 
 
 async def _fetch(query, mode, connection):
-    method = "one_opt" if mode == "optional" else mode
     for category, prefix in (
         (p.EntityQuery, "pgorm::Select"),
-        (p.GraphQuery, "pgorm::SelectGraph"),
-        (p.GraphCursor, "pgorm::Cursor"),
+        (p.EntityGraphQuery, "pgorm::SelectGraph"),
+        (p.EntityGraphCursor, "pgorm::Cursor"),
         (pl.Pipeline, "pgorm::pipeline::Pipeline"),
         (pl.SelectedSources, "pgorm::pipeline::SelectedSources"),
         (p.ModelRows, "pgorm::ConnectionTrait::query_raw"),
     ):
         if isinstance(query, category):
-            if not hasattr(query, method):
+            if not hasattr(query, mode):
                 raise p.UnsupportedCapabilityError(
-                    "query has no public " + method + " terminal"
+                    "query has no public " + mode + " terminal"
                 )
-            value = await getattr(query, method)(connection)
-            path = prefix if category is p.ModelRows else prefix + "::" + method
+            value = await getattr(query, mode)(connection)
+            rust = "one_opt" if mode == "optional" else mode
+            path = prefix if category is p.ModelRows else prefix + "::" + rust
             break
     else:
-        value = await getattr(connection, "fetch_" + mode)(query)
+        value = await getattr(connection, "query" if mode == "all" else mode)(query)
         path = "pgorm::ConnectionTrait::query_raw"
     rows = value if mode == "all" else ([] if value is None else [value])
     return {"kind": "rows", "rows": [_row(item) for item in rows]}, [path], rows
@@ -173,7 +173,7 @@ async def _active(model, method, connection):
 
 def _conflict(conflict, update):
     target = p.ConflictTarget(*conflict)
-    return target.update(*update) if update else target.ignore()
+    return target.update(*update) if update else target.do_nothing()
 
 
 async def _versions(name, inputs, data, connection):
@@ -185,7 +185,7 @@ async def _versions(name, inputs, data, connection):
         update = inputs["entity"].update_many()
         for column, value in zip(data["columns"], inputs["values"], strict=True):
             update = update.set(column, value)
-        changes = await update.filter(inputs["predicate"]).returning_changes(connection)
+        changes = await update.where(inputs["predicate"]).returning_changes(connection)
         rows = [(change.old, change.new) for change in changes]
         paths = ["pgorm::UpdateMany::exec_returning_changes"]
     else:
@@ -685,7 +685,7 @@ class Emitter:
             case "select.from":
                 return call(var(i["query"]), "from_", [var(i["table"])])
             case "select.filter" | "write.filter":
-                return call(var(i["query"]), "where_", [var(i["predicate"])])
+                return call(var(i["query"]), "where", [var(i["predicate"])])
             case "select.join":
                 if d["kind"] == "cross":
                     return call(var(i["query"]), "cross_join", [var(i["table"])])
@@ -729,7 +729,7 @@ class Emitter:
                 keys = ", ".join(literal(key) for key in d["keys"])
                 target = "p.ConflictTarget(" + keys + ")"
                 if d["action"] == "nothing":
-                    action = call(target, "ignore", [])
+                    action = call(target, "do_nothing", [])
                 elif "columns" in d:
                     action = call(target, "update", [literal(c) for c in d["columns"]])
                 else:
@@ -759,7 +759,7 @@ class Emitter:
             case "model.select":
                 query = call(var(i["model"]), "select", [])
                 if "predicate" in i:
-                    query = call(query, "filter", [var(i["predicate"])])
+                    query = call(query, "where", [var(i["predicate"])])
                 if i["order"]:
                     query = call(query, "order_by", self.variables(i["order"]))
                 return query
@@ -776,7 +776,7 @@ class Emitter:
                     )
                     query = call(var(i["model"]), d["method"], [values])
                 if "predicate" in i:
-                    query = call(query, "where_", [var(i["predicate"])])
+                    query = call(query, "where", [var(i["predicate"])])
                 return query
             case "model.returning":
                 columns = [literal(column) for column in d["columns"]]
@@ -792,7 +792,7 @@ class Emitter:
             case "entity.find":
                 return call(var(i["entity"]), "find", [])
             case "entity.filter" | "graph.filter":
-                return call(var(i["query"]), "filter", [var(i["predicate"])])
+                return call(var(i["query"]), "where", [var(i["predicate"])])
             case "entity.active":
                 return call(var(i["entity"]), "active", [])
             case "entity.into_active":
@@ -1050,7 +1050,7 @@ class Emitter:
                 lines.append(body + "pass")
             else:
                 self.observe(*closed, body, lines)
-        lines.append(indent + "except p.PgOrmError as error:")
+        lines.append(indent + "except p.PgormError as error:")
         lines.append(body + '_step.update(status="error", observation=_error(error))')
         return consumed
 
@@ -1080,7 +1080,7 @@ class Emitter:
                 for identity in self.required(parameters.input_ids(step["inputs"])):
                     self.node(self.nodes[identity], body, lines)
                 self.effect(step, body, lines)
-                lines.append(indent + "except p.PgOrmError as error:")
+                lines.append(indent + "except p.PgormError as error:")
                 lines.append(
                     body + '_step.update(status="error", observation=_error(error))'
                 )

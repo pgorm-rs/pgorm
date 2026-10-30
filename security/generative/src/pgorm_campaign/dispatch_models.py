@@ -53,7 +53,7 @@ def dispatch(name, i, d, p, fixture):
         case "model.select":
             query = i["model"].select()
             if "predicate" in i:
-                query = query.filter(i["predicate"])
+                query = query.where(i["predicate"])
             if i["order"]:
                 query = query.order_by(*i["order"])
             return query, ["pgorm_query::Query::select"]
@@ -68,7 +68,7 @@ def dispatch(name, i, d, p, fixture):
                 else getattr(i["model"], method)(values)
             )
             if "predicate" in i:
-                query = query.where_(i["predicate"])
+                query = query.where(i["predicate"])
             return query, ["pgorm_query::Query::" + method]
         case "model.returning":
             return i["query"].returning(*d["columns"]), ["pgorm_query::ReturningClause"]
@@ -83,7 +83,7 @@ def dispatch(name, i, d, p, fixture):
         case "entity.find":
             return i["entity"].find(), ["pgorm::EntityTrait::find"]
         case "entity.filter" | "graph.filter":
-            return i["query"].filter(i["predicate"]), ["pgorm::QueryFilter::filter"]
+            return i["query"].where(i["predicate"]), ["pgorm::QueryFilter::filter"]
         case "entity.order" | "graph.order":
             return i["query"].order_by(*i["keys"]), ["pgorm::QueryOrder::order_by"]
         case "entity.active":

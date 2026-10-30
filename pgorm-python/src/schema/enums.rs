@@ -30,7 +30,7 @@ fn label(value: &Bound<'_, PyAny>) -> PyResult<String> {
 }
 
 // [spec:pgorm:req:bindings.schema-types]
-// [spec:pgorm:req:python.schema-api]
+// [spec:pgorm:req:python.schema-api+2]
 #[pyfunction]
 pub(super) fn create_enum(
     name: &Bound<'_, PyAny>,

@@ -138,7 +138,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(refused.exception.sqlstate, sqlstate)
 
     async def quantities(self):
-        rows = await self.pool.fetch_all(
+        rows = await self.pool.query(
             p.select(p.col("id"), p.col("qty")).from_(self.table).order_by(p.col("id").asc())
         )
         return [(row["id"], row["qty"]) for row in rows]
@@ -175,7 +175,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(p.insert(self.table).columns("id").values(4).returning(p.col("id")))
         self.assertEqual(await self.quantities(), [(1, 7), (2, 3), (3, 9), (4, None)])
         await self.refused(s.set_domain_not_null(self.domain), "23502")
-        await self.pool.execute(p.delete(self.table).where_(p.col("id") == 4))
+        await self.pool.execute(p.delete(self.table).where(p.col("id") == 4))
         await self.pool.execute(s.set_domain_not_null(self.domain))
 
         value = p.domain_value()
@@ -185,7 +185,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         )
         await self.refused(p.insert(self.table).columns("id", "qty").values(5, 6), "23514")
         await self.refused(s.validate_domain_constraint(self.domain, "small"), "23514")
-        await self.pool.execute(p.delete(self.table).where_(p.col("qty") >= 5))
+        await self.pool.execute(p.delete(self.table).where(p.col("qty") >= 5))
         await self.pool.execute(s.validate_domain_constraint(self.domain, "small"))
         self.assertEqual(await self.quantities(), [(2, 3)])
 
@@ -198,7 +198,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
     @staticmethod
     async def prepared_statement(db, query):
         """The statement the connection `db` runs on holds prepared for `query`, or None."""
-        row = await db.fetch_optional(p.RawSQL(PREPARED_STATEMENT, [query.inspect().sql]))
+        row = await db.optional(p.RawSQL(PREPARED_STATEMENT, [query.inspect().sql]))
         return None if row is None else row["statement"]
 
     @classmethod
@@ -206,7 +206,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         """Run `query` on one connection of `pool`, answering the qty written and the statement
         that wrote it."""
         async with pool.connection() as connection:
-            written = (await connection.fetch_one(query))["qty"]
+            written = (await connection.one(query))["qty"]
             return written, await cls.prepared_statement(connection, query)
 
     # [spec:pgorm:req:bindings.connections/test]    clear_statement_caches makes the connection
@@ -219,16 +219,16 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         def insert(row):
             return p.insert(self.table).columns("id").values(row).returning(p.col("qty"))
 
-        self.assertEqual((await self.pool.fetch_one(insert(1)))["qty"], 7)
+        self.assertEqual((await self.pool.one(insert(1)))["qty"], 7)
         before = await self.prepared_statement(self.pool, insert(1))
         self.assertIsNotNone(before)
         await self.pool.execute(s.set_domain_default(self.domain, 9))
-        await self.pool.fetch_one(insert(2))
+        await self.pool.one(insert(2))
         self.assertEqual(await self.prepared_statement(self.pool, insert(2)), before)
 
         self.pool.clear_statement_caches()
         self.assertIsNone(await self.prepared_statement(self.pool, insert(3)))
-        self.assertEqual((await self.pool.fetch_one(insert(3)))["qty"], 9)
+        self.assertEqual((await self.pool.one(insert(3)))["qty"], 9)
         after = await self.prepared_statement(self.pool, insert(3))
         self.assertIsNotNone(after)
         self.assertNotEqual(after, before)
@@ -267,7 +267,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         )
 
         async def listening_count():
-            return (await self.pool.fetch_one(listeners))["n"]
+            return (await self.pool.one(listeners))["n"]
 
         try:
             self.assertTrue(await listening.ping())
@@ -309,7 +309,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         await self.create()
         await self.pool.execute(s.rename_domain(self.domain, 'units "雪"'))
         renamed = p.TypeName('units "雪"', schema=self.namespace)
-        typed = await self.pool.fetch_one(p.RawSQL(
+        typed = await self.pool.one(p.RawSQL(
             "SELECT format_type(atttypid, NULL) AS kind FROM pg_attribute "
             "WHERE attrelid = $1::text::regclass AND attname = 'qty'",
             ['"' + self.namespace.replace('"', '""') + '".line'],
@@ -317,7 +317,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(typed["kind"].endswith('"units ""雪"""'), typed["kind"])
         await self.refused(s.drop_domain(renamed), "2BP01")
         await self.pool.execute(s.drop_domain(renamed, cascade=True))
-        columns = await self.pool.fetch_all(p.RawSQL(
+        columns = await self.pool.query(p.RawSQL(
             "SELECT column_name AS name FROM information_schema.columns "
             "WHERE table_schema = $1 AND table_name = 'line'",
             [self.namespace],

@@ -34,7 +34,7 @@ impl PyPipeline {
     pub(crate) fn compile(&self, terminal: &str) -> PyResult<Compiled> {
         let pipeline = match terminal {
             "all" => self.inner.clone(),
-            "one" | "one_opt" => self.inner.clone().take(1),
+            "one" | "optional" => self.inner.clone().take(1),
             _ => return Err(ConstructionError::new_err("unknown pipeline terminal")),
         };
         let (sql, values) = pipeline
@@ -57,16 +57,7 @@ impl PyPipeline {
         let compiled = Py::new(py, self.compile(terminal)?)?
             .into_bound(py)
             .into_any();
-        results::fetch(
-            py,
-            Target::extract(py, connection)?,
-            &compiled,
-            if terminal == "one_opt" {
-                "optional"
-            } else {
-                terminal
-            },
-        )
+        results::fetch(py, Target::extract(py, connection)?, &compiled, terminal)
     }
 }
 
@@ -281,12 +272,12 @@ impl PyPipeline {
         self.read(py, connection, "one")
     }
 
-    fn one_opt<'py>(
+    fn optional<'py>(
         &self,
         py: Python<'py>,
         connection: &Bound<'_, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        self.read(py, connection, "one_opt")
+        self.read(py, connection, "optional")
     }
 
     fn __bool__(&self) -> PyResult<bool> {

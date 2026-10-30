@@ -21,7 +21,7 @@ pub enum Join {
 
 #[pymethods]
 impl Join {
-    // [spec:pgorm:req:python.truth-testing+2]
+    // [spec:pgorm:req:python.truth-testing+3]
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "join kinds cannot be tested as Python booleans",
@@ -121,7 +121,7 @@ impl PySelect {
         Ok(next)
     }
 
-    fn where_(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn r#where(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut next = self.clone();
         next.inner.cond_where(common::condition(predicate)?);
         Ok(next)

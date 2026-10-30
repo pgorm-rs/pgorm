@@ -348,7 +348,7 @@ test("execute resolves with the number of rows a statement affected", async () =
 });
 
 // [spec:pgorm:req:bindings.results/test]
-// [spec:pgorm:req:napi.row-count/test]
+// [spec:pgorm:req:napi.row-count+2/test]
 test("one takes exactly one row and optional at most one, any other count a DecodeError", async () => {
   assert.equal((await pool().one("SELECT 1 AS n")).n, 1);
   await assert.rejects(pool().one("SELECT 1 WHERE false"), (error: unknown) => {

@@ -26,7 +26,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > compiled Rust entity and graph types reach it through the extension's
 > registration mechanism.
 
-> [spec:pgorm:req:python.naming]
+> [spec:pgorm:req:python.naming+2]
 > Python MUST spell a shared rule's neutral name as written: functions,
 > methods and keyword arguments in snake_case, classes in PascalCase, and an
 > option as a keyword argument. A name that is a Python keyword takes a
@@ -43,19 +43,12 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > for `and`, `or` and `not`; and unary `-` for a pipeline's negation.
 >
 > `any_` and `all_` take an underscore, and `tuple_expr` its suffix, so as not
-> to shadow Python's builtins. These names differ from the neutral spelling
-> by choice and wait on the operator (`bindings.surface`): `PgOrmError`, the
-> base error class; `DDL`; `AliasedExpr` and `WindowedExpr`; `ResultStream`;
-> `Graph`, `GraphQuery` and `GraphCursor` for a registered graph, its query
-> and its cursor; `GroupingElement.set`, `.empty`, `.rollup`, `.cube` and
-> `.sets`; `ConflictTarget(columns)` for a conflict arbiter and `ignore()` for
-> DO NOTHING; `MergeUpdate(column, value)`, `MergeInsert(column, value)` and
-> `and_value` for MERGE's actions, and `MatchedAction` and `NotMatchedAction`
-> for the fixed ones; `where_` on statements and `filter` on model, entity and
-> graph queries; `fetch_all`, `fetch_one` and `fetch_optional` for the
-> terminals `query`, `one` and `optional`, and `one_opt` for a model query's
-> `optional`; `primary_keys` for a model's key fields; `truncate` for
-> `truncate_table`; and `CreateIndex.method` for `using`.
+> to shadow Python's builtins. These differ from the shared shape by choice
+> and wait on the operator (`bindings.surface`): the grouping elements as
+> `GroupingElement.set`, `.empty`, `.rollup`, `.cube` and `.sets`;
+> `ConflictTarget(columns)` for a conflict arbiter; and `MergeUpdate(column,
+> value)` and `MergeInsert(column, value)` for MERGE's actions, and
+> `MatchedAction` and `NotMatchedAction` for the fixed ones.
 
 > [spec:pgorm:req:python.package]
 > The package MUST declare its Rust crate, Python distribution, import module,
@@ -135,10 +128,10 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > `Change` of `old` and `new`, an upsert an `Upserted` that is `Inserted` or
 > `Updated`, and a notification a `Notification`.
 
-> [spec:pgorm:req:python.row-count]
-> `fetch_one` finding no row or several, `fetch_optional` finding several, and
-> the `one` and `one_opt` of model, entity, graph and pipeline queries finding
-> a count they do not take MUST raise `DatabaseError` with no SQLSTATE.
+> [spec:pgorm:req:python.row-count+2]
+> `one` finding no row or several, `optional` finding several, and the `one`
+> and `optional` of model, entity, graph and pipeline queries finding a count
+> they do not take MUST raise `DatabaseError` with no SQLSTATE.
 
 > [spec:pgorm:req:python.argument-errors]
 > A value that cannot become what pgorm sends, and an argument a builder
@@ -163,7 +156,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > against it. A model's and a registered entity's column give their plain
 > expression through `expr`.
 
-> [spec:pgorm:req:python.truth-testing+2]
+> [spec:pgorm:req:python.truth-testing+3]
 > Every class the package defines MUST raise `ConstructionError` on Python
 > truth testing — `bool()`, `if`, `not`, `and`, `or` — so `if statement:` or
 > `statement or fallback` fails where it is written instead of reading the
@@ -172,7 +165,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > or frame, a conflict or MERGE action, a sort direction or NULL ordering, an
 > SQL/JSON clause, a pipeline and its sources), a schema object, a
 > registered entity's or graph's queries and writes, with the views
-> generated code wraps them in, every stream — `ResultStream`,
+> generated code wraps them in, every stream — `RowStream`,
 > `CopyOutStream`, `CopyRowStream` and `Listener` — whose truth would say
 > nothing of whether rows remain, so `if rows:` fails as well, and each
 > `Notification`. Exempt are values (`Value`, the range types, `Interval`,
@@ -190,29 +183,28 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > Neither API may be an implicit fallback for unsupported builder operations.
 > Campaign-generated protected queries MUST obey their stricter raw-slot rules.
 
-> [spec:pgorm:req:python.pipeline-operands]
+> [spec:pgorm:req:python.pipeline-operands+2]
 > In `pgorm.pipeline`, a plain scalar operand — `None`, a `bool`, an `int`, a
 > finite `float`, a `str` — MUST be written into the SQL as a literal, as
 > `literal(value)` writes it, and `null()` is `literal(None)`. A value enters
 > as a parameter only through a stage's binder (`bindings.pipeline-binder`).
-> A pipeline's `all`, `one` and `one_opt` run it on a connection or a
+> A pipeline's `all`, `one` and `optional` run it on a connection or a
 > transaction, as the terminals do.
 
-> [spec:pgorm:req:python.schema-api]
+> [spec:pgorm:req:python.schema-api+2]
 > `pgorm.schema` MUST spell the DDL `bindings.schema` describes as these
 > functions and builders, each returning a `DDL` statement unless it is a
 > builder:
 >
 > - `CreateTable(table)` (also `create_table`), `ColumnDef(name, type)`,
->   `CreateIndex(table, first, *, name)` (also `create_index`), whose
->   `method(name)` is `using`, and `CreateDomain(name, base)` (also
->   `create_domain`) are builders;
+>   `CreateIndex(table, first, *, name)` (also `create_index`) and
+>   `CreateDomain(name, base)` (also `create_domain`) are builders;
 > - each ALTER TABLE action is a function over the table it names first:
 >   `add_column`, `modify_column`, `drop_column`, `set_expression`,
 >   `drop_expression`, `add_primary_key`, `add_unique`, `add_check`,
 >   `add_not_null`, `drop_constraint`, `validate_constraint`,
 >   `alter_constraint`, `rename_column` and `rename_constraint`, beside
->   `drop_table`, `rename_table`, `truncate` and `drop_index`;
+>   `drop_table`, `rename_table`, `truncate_table` and `drop_index`;
 > - an enum type is `create_enum(name, values)`, `add_enum_value(name, value,
 >   *, before, after)`, `rename_enum_value`, `rename_enum` and `drop_enum`;
 > - views are `create_view(name, query, *, columns, or_replace, check_option,

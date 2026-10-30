@@ -9,7 +9,7 @@
 
 import { arg, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";
-import { Ddl, relations, statement } from "./schema.js";
+import { DDL, relations, statement } from "./schema.js";
 
 /**
  * @typedef {import("./schema.js").TableRef} TableRef
@@ -28,7 +28,7 @@ function entry(entry) {
 }
 
 /** `CREATE INDEX`; every method returns a new statement. */
-export class CreateIndex extends Ddl {
+export class CreateIndex extends DDL {
   /** @param {unknown} column */
   column(column) {
     return new CreateIndex(native.ddlIndexColumn(arg(this), entry(column)), TRUSTED);
@@ -92,7 +92,7 @@ let alterOf;
  *
  * @param {Handle} receiver
  * @param {unknown} handle
- * @returns {Ddl}
+ * @returns {DDL}
  */
 function next(receiver, handle) {
   return receiver instanceof CreateSequence ? createOf(handle) : alterOf(handle);
@@ -129,7 +129,7 @@ function clauses(Base) {
 }
 
 /** `CREATE SEQUENCE`; every method returns a new statement. */
-export class CreateSequence extends clauses(Ddl) {
+export class CreateSequence extends clauses(DDL) {
   static {
     createOf = (handle) => new CreateSequence(handle, TRUSTED);
   }
@@ -157,7 +157,7 @@ export class PendingAlterSequence extends clauses(Handle) {
 }
 
 /** An `ALTER SEQUENCE` with at least one clause; every method returns a new one. */
-export class AlterSequence extends clauses(Ddl) {
+export class AlterSequence extends clauses(DDL) {
   static {
     alterOf = (handle) => new AlterSequence(handle, TRUSTED);
   }

@@ -1,6 +1,6 @@
 schema_version 7
 
-last_sync_at 2026-10-30T13:42:29.080898Z
+last_sync_at 2026-10-30T14:41:04.802037Z
 
 rule_versions (
     {id bindings.api, version 0}
@@ -453,7 +453,7 @@ derived_priorities (
     {id between-render-parens, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
     {id big-unsigned-binding, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
     {id binding-coverage-per-impl, priority 1, derived_at 2026-10-30T13:42:29.080898Z}
-    {id binding-renames, priority 1, derived_at 2026-10-30T13:42:29.080898Z}
+    {id binding-renames, priority 1, derived_at 2026-10-30T14:41:04.802037Z}
     {id binding-spec-consolidation, priority 0, derived_at 2026-10-26T20:21:09.753689Z}
     {id binding-variant-coverage, priority 1, derived_at 2026-10-26T20:21:09.753689Z}
     {id bindings-array-subquery, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
@@ -643,7 +643,7 @@ derived_priorities (
     {id migration-test-database-gate, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
     {id minimal-feature-build, priority 2, derived_at 2026-09-06T16:36:02.710141Z}
     {id napi-addon-size, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
-    {id napi-binding-decisions, priority 1, derived_at 2026-10-30T13:42:29.080898Z}
+    {id napi-binding-decisions, priority 1, derived_at 2026-10-30T14:41:04.802037Z}
     {id napi-codegen, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
     {id napi-connections, priority 2, derived_at 2026-10-09T14:17:42.819993Z}
     {id napi-domain-entity-test, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
@@ -742,7 +742,7 @@ derived_priorities (
     {id public-enums-non-exhaustive, priority 0, derived_at 2026-10-26T20:21:09.753689Z}
     {id python-acceptance-emcc-probe, priority 0, derived_at 2026-10-09T14:17:42.819993Z}
     {id python-application-check-names, priority 0, derived_at 2026-10-09T14:17:42.819993Z}
-    {id python-binding-decisions, priority 2, derived_at 2026-10-30T13:42:29.080898Z}
+    {id python-binding-decisions, priority 2, derived_at 2026-10-30T14:41:04.802037Z}
     {id python-campaign-entity-key-attributes, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
     {id python-campaign-write-versions, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
     {id python-case-expressions, priority 1, derived_at 2026-10-26T20:21:09.753689Z}
@@ -937,6 +937,7 @@ assertions (
     {id between-render-parens, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:14:51.562869Z}
     {id big-unsigned-binding, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:24.191318Z}
     {id binding-coverage-per-impl, kind @complete, author "brendan@necessary.nu", at 2026-10-30T14:18:38.065807Z}
+    {id binding-renames, kind @complete, author "brendan@necessary.nu", at 2026-10-30T14:35:54.859252Z}
     {id bindings-array-subquery, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:53:58.290968Z}
     {id bindings-copy-created-multiranges, kind @complete, author "brendan@necessary.nu", at 2026-10-26T10:21:29.151829Z}
     {id bindings-expression-gaps, kind @complete, author "brendan@necessary.nu", at 2026-10-26T17:15:31.190363Z}
@@ -2099,11 +2100,15 @@ impl_evidence (
         bindings.relation-conditions
     ), covered_claims (
         {impl_name main, rule bindings.relation-conditions}
+    ), rule_versions_seen (
+        {id bindings.relation-conditions, version 0}
     )}
     {id napi-schema-from-entity, covered_rules (
         bindings.schema-from-entity
     ), covered_claims (
         {impl_name main, rule bindings.schema-from-entity}
+    ), rule_versions_seen (
+        {id bindings.schema-from-entity, version 0}
     )}
     {id napi-values, covered_rules (
         napi.inference

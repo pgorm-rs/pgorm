@@ -19,7 +19,7 @@ fn module(py: Python<'_>) -> PyResult<Bound<'_, PyModule>> {
     Ok(module)
 }
 
-// [spec:pgorm:req:bindings.entity-reads/test]
+// [spec:pgorm:req:bindings.entity-reads+2/test]
 #[test]
 fn query_sql_and_values_match_rust() -> PyResult<()> {
     Python::initialize();
@@ -40,8 +40,8 @@ fn query_sql_and_values_match_rust() -> PyResult<()> {
         for (method, predicate) in comparisons {
             let query = entity
                 .call_method0("find")?
-                .call_method1("filter", (id.call_method1(method, (2,))?,))?
-                .call_method1("filter", (mood.call_method1("eq", ("busy",))?,))?
+                .call_method1("where", (id.call_method1(method, (2,))?,))?
+                .call_method1("where", (mood.call_method1("eq", ("busy",))?,))?
                 .call_method1("order_by", (&descending,))?
                 .call_method1("limit", (4,))?
                 .call_method1("offset", (1,))?;
@@ -51,7 +51,7 @@ fn query_sql_and_values_match_rust() -> PyResult<()> {
                 .order_by(Column::Id, Order::Desc)
                 .limit(4)
                 .offset(1);
-            for terminal in ["all", "one", "one_opt"] {
+            for terminal in ["all", "one", "optional"] {
                 let kwargs = PyDict::new(py);
                 kwargs.set_item("terminal", terminal)?;
                 let inspected = query.call_method("inspect", (), Some(&kwargs))?;
@@ -87,7 +87,7 @@ fn query_sql_and_values_match_rust() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.entity-reads/test]    a column's is_in and is_not_in are its
+// [spec:pgorm:req:bindings.entity-reads+2/test]    a column's is_in and is_not_in are its
 // ColumnTrait membership: is_in / is_not_in over values of its declared kind, and in_subquery /
 // not_in_subquery over a Select's rows, so a column whose domain is over an enum is a member as
 // the enum, the subquery's projection cast beside it

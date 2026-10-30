@@ -15,7 +15,7 @@ import {
   DatabaseError,
   ExtendedWindow,
   FrameType,
-  jsonArrayAgg,
+  jsonArrayagg,
   jsonValue,
   Multirange,
   Pool,
@@ -227,7 +227,7 @@ test("the window-only functions and the JSON aggregates run over a window", asyn
       windowFunction("lag", reading.col("weight"), bind(new Value(1, "i32")), bind(new Value(0, "i32"))).over(ordered).as("prev"),
       windowFunction("ntile", bind(new Value(2, "i32"))).over(ordered).as("half"),
       windowFunction("nth_value", reading.col("id"), bind(new Value(2, "i32"))).over(ordered).as("second"),
-      jsonArrayAgg(reading.col("id")).over(new Window().partitionBy(reading.col("kind")).orderBy(byId)
+      jsonArrayagg(reading.col("id")).over(new Window().partitionBy(reading.col("kind")).orderBy(byId)
         .frame(FrameType.rows.unboundedPreceding().andUnboundedFollowing())).as("ids"),
     ).from(reading).orderBy(reading.col("weight").desc()),
   );
@@ -239,7 +239,7 @@ test("the window-only functions and the JSON aggregates run over a window", asyn
     [4n, 5n, 2, 2, 2n, [4, 5]],
   ]);
   await assert.rejects(
-    pool().query(select(jsonArrayAgg(reading.col("id"), { orderBy: [byId] }).over(new Window())).from(reading)),
+    pool().query(select(jsonArrayagg(reading.col("id"), { orderBy: [byId] }).over(new Window())).from(reading)),
     (error: unknown) => error instanceof DatabaseError && error.sqlstate === "0A000",
   );
 });

@@ -6,7 +6,7 @@
 // `GraphRow` — a slotless row as the root's record, otherwise a tuple of
 // each source's record, an absent `Opt` slot null — and paged by keyset
 // through `SelectGraph::cursor_by`.
-// [spec:pgorm:req:bindings.entity-graphs]
+// [spec:pgorm:req:bindings.entity-graphs+2]
 
 import { arg, TRUSTED } from "./builder.js";
 import { runJob } from "./connections.js";
@@ -149,13 +149,13 @@ export class EntityGraphQuery {
   }
 
   /**
-   * The SQL and values a terminal sends, `oneOpt` with its `LIMIT 1`.
+   * The SQL and values a terminal sends, `optional` with its `LIMIT 1`.
    *
-   * @param {"all" | "oneOpt"} [terminal]
+   * @param {"all" | "optional"} [terminal]
    */
   inspect(terminal = "all") {
-    if (terminal !== "all" && terminal !== "oneOpt") throw new TypeError('a graph inspects "all" or "oneOpt"');
-    const [sql, values] = native.graphQueryInspect(this.#native, terminal === "oneOpt");
+    if (terminal !== "all" && terminal !== "optional") throw new TypeError('a graph inspects "all" or "optional"');
+    const [sql, values] = native.graphQueryInspect(this.#native, terminal === "optional");
     return Object.freeze({ sql, values: Object.freeze(values) });
   }
 
@@ -176,7 +176,7 @@ export class EntityGraphQuery {
    * @param {unknown} db
    * @param {{ signal?: AbortSignal }} [options]
    */
-  async oneOpt(db, options) {
+  async optional(db, options) {
     return rowsOf(this.#entities, await runJob(db, native.graphQueryJob(this.#native, true), options))[0] ?? null;
   }
 

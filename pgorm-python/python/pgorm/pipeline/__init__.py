@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from .. import _native
 from .._native import (
     Pipeline as Pipeline,
-    PipelineExpr as Expr,
+    PipelineExpr as PipelineExpr,
     PipelineBinder as Binder,
     PipelineGrouped as Grouped,
     PipelineSource as Source,
@@ -40,84 +40,84 @@ def from_(value: SourceInput | Model) -> Pipeline:
     return Pipeline(value.table if isinstance(value, Model) else value)
 
 
-def null() -> Expr:
+def null() -> PipelineExpr:
     return literal(None)
 
 
-def this(name: Name) -> Expr:
+def this(name: Name) -> PipelineExpr:
     return _native.pipeline_role("this", name)
 
 
-def that(name: Name) -> Expr:
+def that(name: Name) -> PipelineExpr:
     return _native.pipeline_role("that", name)
 
 
 over = Over
 
 
-def sum(value: Operand) -> Expr:
+def sum(value: Operand) -> PipelineExpr:
     return _native.pipeline_function("sum", value)
 
 
-def min(value: Operand) -> Expr:
+def min(value: Operand) -> PipelineExpr:
     return _native.pipeline_function("min", value)
 
 
-def max(value: Operand) -> Expr:
+def max(value: Operand) -> PipelineExpr:
     return _native.pipeline_function("max", value)
 
 
-def average(value: Operand) -> Expr:
+def average(value: Operand) -> PipelineExpr:
     return _native.pipeline_function("average", value)
 
 
-def stddev(value: Operand) -> Expr:
+def stddev(value: Operand) -> PipelineExpr:
     return _native.pipeline_function("stddev", value)
 
 
-def count(value: Operand) -> Expr:
+def count(value: Operand) -> PipelineExpr:
     return _native.pipeline_function("count", value)
 
 
-def count_distinct(value: Operand) -> Expr:
+def count_distinct(value: Operand) -> PipelineExpr:
     return _native.pipeline_function("count_distinct", value)
 
 
-def count_rows() -> Expr:
+def count_rows() -> PipelineExpr:
     return _native.pipeline_function("count_rows")
 
 
-def row_number() -> Expr:
+def row_number() -> PipelineExpr:
     return _native.pipeline_function("row_number")
 
 
-def rank(value: Operand) -> Expr:
+def rank(value: Operand) -> PipelineExpr:
     return _native.pipeline_function("rank", value)
 
 
-def rank_dense(value: Operand) -> Expr:
+def rank_dense(value: Operand) -> PipelineExpr:
     return _native.pipeline_function("rank_dense", value)
 
 
-def first(value: Operand) -> Expr:
+def first(value: Operand) -> PipelineExpr:
     return _native.pipeline_function("first", value)
 
 
-def last(value: Operand) -> Expr:
+def last(value: Operand) -> PipelineExpr:
     return _native.pipeline_function("last", value)
 
 
-def lag(offset: int, value: Operand) -> Expr:
+def lag(offset: int, value: Operand) -> PipelineExpr:
     return _native.pipeline_function("lag", offset, value)
 
 
-def lead(offset: int, value: Operand) -> Expr:
+def lead(offset: int, value: Operand) -> PipelineExpr:
     return _native.pipeline_function("lead", offset, value)
 
 
 __all__ = [
     "Pipeline",
-    "Expr",
+    "PipelineExpr",
     "Binder",
     "Grouped",
     "Source",

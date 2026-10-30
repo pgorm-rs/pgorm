@@ -9,8 +9,8 @@ from pgorm import pipeline as pl, schema as s
 async def invalid(connection: p.Connection) -> None:
     await connection.execute("SELECT 1")  # expected-error: arg-type
     pending = p.merge(p.Table("t"), p.Table("s"), p.col("id") == 1)
-    await connection.fetch_all(pending)  # expected-error: arg-type
-    scalar: int = await connection.fetch_one(  # expected-error: assignment
+    await connection.query(pending)  # expected-error: arg-type
+    scalar: int = await connection.one(  # expected-error: assignment
         p.select(p.literal(1))
     )
     connection.transaction(mode="invented")  # expected-error: arg-type
@@ -48,7 +48,7 @@ async def invalid(connection: p.Connection) -> None:
     p.Table("t").tablesample("bernoulli", 10)  # expected-error: arg-type
     p.TableFunction(p.Table("t"))  # expected-error: arg-type
     pl.from_(p.Table("t")).filter_with(42)  # expected-error: arg-type
-    optional: p.Record | None = await connection.fetch_all(  # expected-error: assignment
+    optional: p.Record | None = await connection.query(  # expected-error: assignment
         p.select(p.literal(1))
     )
     sqlstate: str = p.DatabaseError("client failure").sqlstate  # expected-error: assignment

@@ -181,7 +181,7 @@ impl PyCopyTo {
     }
 
     #[pyo3(signature = (*_args, **_kwargs))]
-    fn where_(
+    fn r#where(
         &self,
         _args: &Bound<'_, PyTuple>,
         _kwargs: Option<&Bound<'_, PyDict>>,

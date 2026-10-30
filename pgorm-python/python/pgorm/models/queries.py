@@ -37,16 +37,16 @@ class ModelRows:
     async def all(self, connection: Connection | Pool | Transaction) -> list[ModelRecord]:
         return [
             ModelRecord(self.model, row, self.selected)
-            for row in await connection.fetch_all(self.statement)
+            for row in await connection.query(self.statement)
         ]
 
     async def one(self, connection: Connection | Pool | Transaction) -> ModelRecord:
         return ModelRecord(
-            self.model, await connection.fetch_one(self.statement), self.selected
+            self.model, await connection.one(self.statement), self.selected
         )
 
-    async def one_opt(self, connection: Connection | Pool | Transaction) -> ModelRecord | None:
-        row = await connection.fetch_optional(self.statement)
+    async def optional(self, connection: Connection | Pool | Transaction) -> ModelRecord | None:
+        row = await connection.optional(self.statement)
         return None if row is None else ModelRecord(self.model, row, self.selected)
 
     def __bool__(self) -> bool:
@@ -63,8 +63,8 @@ class ModelQuery(ModelRows):
             raise p.ConstructionError("model queries require a native Select")
         ModelRows.__post_init__(self)
 
-    def filter(self, predicate: p.Expr | p.Condition) -> ModelQuery:
-        return replace(self, statement=self.statement.where_(predicate))
+    def where(self, predicate: p.Expr | p.Condition) -> ModelQuery:
+        return replace(self, statement=self.statement.where(predicate))
 
     def order_by(self, *ordering: p.OrderBy) -> ModelQuery:
         return replace(self, statement=self.statement.order_by(*ordering))
@@ -97,12 +97,12 @@ class ModelWrite:
                 "model writes require a model and native CRUD statement"
             )
 
-    def where_(self, predicate: p.Expr | p.Condition) -> ModelWrite:
+    def where(self, predicate: p.Expr | p.Condition) -> ModelWrite:
         if isinstance(self.statement, p.Insert):
             raise p.UnsupportedCapabilityError(
                 "model insert does not support a WHERE clause"
             )
-        return replace(self, statement=self.statement.where_(predicate))
+        return replace(self, statement=self.statement.where(predicate))
 
     def all_rows(self) -> ModelWrite:
         if isinstance(self.statement, p.Insert):

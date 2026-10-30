@@ -94,7 +94,7 @@ impl<E: EntityTrait> Debug for RegisteredColumn<E> {
     }
 }
 
-// [spec:pgorm:req:bindings.pipeline-sources]
+// [spec:pgorm:req:bindings.pipeline-sources+2]
 impl<E: EntityTrait + Send + Sync> PipelineColumn for RegisteredColumn<E> {
     fn lower<'brand>(&self, qualifier: Name) -> pgorm::pipeline::Expr<'brand> {
         pgorm::pipeline::named_runtime(E::default(), qualifier).col(self.0)
@@ -272,7 +272,7 @@ where
         })
     }
 
-    // [spec:pgorm:req:bindings.entity-reads]
+    // [spec:pgorm:req:bindings.entity-reads+2]
     fn membership(
         &self,
         name: &str,
@@ -412,7 +412,7 @@ pub(crate) struct SelectAdapter<E: EntityTrait> {
     pub(crate) info: Arc<EntityInfo>,
 }
 
-// [spec:pgorm:req:bindings.entity-reads]
+// [spec:pgorm:req:bindings.entity-reads+2]
 impl<E> SelectBackend for SelectAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,

@@ -2,7 +2,7 @@ use pgorm::{EntityTrait, GraphItem, GraphRow, SelectGraph, SelectorTrait};
 use pyo3::prelude::*;
 use std::{marker::PhantomData, sync::Arc};
 
-use super::{PyGraph, backend::Info, generic::GraphFactory, slots::GraphSlots};
+use super::{PyEntityGraph, backend::Info, generic::GraphFactory, slots::GraphSlots};
 use crate::{
     UnsupportedCapabilityError,
     entities::{NativeRegistry, Registry},
@@ -15,7 +15,7 @@ impl Registry {
     /// in tuple order, and must use those aliases in the corresponding joins.
     /// Register every source entity first. Python can vary aliases and builder
     /// operations but cannot change this Rust tuple's entity or slot types.
-    // [spec:pgorm:req:bindings.entity-graphs]
+    // [spec:pgorm:req:bindings.entity-graphs+2]
     pub fn graph<E, S, Build>(&mut self, name: &str, build: Build) -> PyResult<&mut Self>
     where
         E: EntityTrait + Send + Sync + 'static,
@@ -51,7 +51,7 @@ impl Registry {
 }
 
 #[pyfunction(pass_module)]
-pub(crate) fn graph(module: &Bound<'_, PyModule>, name: &str) -> PyResult<PyGraph> {
+pub(crate) fn graph(module: &Bound<'_, PyModule>, name: &str) -> PyResult<PyEntityGraph> {
     let registry_object = module.getattr("_registry")?;
     let registry = registry_object.extract::<PyRef<'_, NativeRegistry>>()?;
     registry
@@ -59,7 +59,7 @@ pub(crate) fn graph(module: &Bound<'_, PyModule>, name: &str) -> PyResult<PyGrap
         .graphs
         .get(name)
         .cloned()
-        .map(|factory| PyGraph { factory })
+        .map(|factory| PyEntityGraph { factory })
         .ok_or_else(|| {
             UnsupportedCapabilityError::new_err(
                 "graph shape is not registered in this native build",

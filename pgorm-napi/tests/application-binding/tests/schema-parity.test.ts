@@ -12,7 +12,7 @@ import {
   CreateIndex,
   CreateTable,
   CreateType,
-  type Ddl,
+  type DDL,
   entities,
   entity,
   EntitySchema,
@@ -29,7 +29,7 @@ const golden = JSON.parse(readFileSync(new URL("./schema-parity.json", import.me
 >;
 
 /** A DDL statement's SQL, which carries no values beside it. */
-function sql(statement: Ddl): string {
+function sql(statement: DDL): string {
   const { sql, values } = statement.inspect();
   assert.deepStrictEqual(values, []);
   return sql;

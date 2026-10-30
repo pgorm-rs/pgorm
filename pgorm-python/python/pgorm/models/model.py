@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class Model:
     table: p.Table
     columns: Mapping[str, Column]
-    primary_keys: tuple[str, ...]
+    primary_key: tuple[str, ...]
 
     def __init__(
         self,
@@ -61,7 +61,7 @@ class Model:
         object.__setattr__(self, "columns", MappingProxyType(declarations))
         object.__setattr__(
             self,
-            "primary_keys",
+            "primary_key",
             tuple(name for name, column in declarations.items() if column.primary_key),
         )
 
@@ -83,7 +83,7 @@ class Model:
             raise p.ConstructionError("duplicate model output identity")
         return names
 
-    def _projection(self, fields: tuple[str, ...]) -> tuple[p.AliasedExpr, ...]:
+    def _projection(self, fields: tuple[str, ...]) -> tuple[p.Aliased, ...]:
         return tuple(self.col(name).expression.as_(name) for name in fields)
 
     def select(self, *fields: str) -> ModelQuery:
@@ -97,14 +97,14 @@ class Model:
         return self.select()
 
     def key(self, values: Mapping[str, Any]) -> p.Condition:
-        if not self.primary_keys:
+        if not self.primary_key:
             raise p.ConstructionError("model has no declared primary key")
-        if not isinstance(values, Mapping) or set(values) != set(self.primary_keys):
+        if not isinstance(values, Mapping) or set(values) != set(self.primary_key):
             raise p.ConstructionError(
                 "key lookup requires every declared primary-key field and no others"
             )
         return p.Condition.all(
-            *(self.col(name).eq(values[name]) for name in self.primary_keys)
+            *(self.col(name).eq(values[name]) for name in self.primary_key)
         )
 
     def _assignments(
@@ -162,6 +162,6 @@ class Model:
             "columns": {
                 name: column.describe() for name, column in self.columns.items()
             },
-            "primary_keys": list(self.primary_keys),
+            "primary_key": list(self.primary_key),
             "path": "runtime statements",
         }

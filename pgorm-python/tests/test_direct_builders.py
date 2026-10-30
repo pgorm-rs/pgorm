@@ -93,10 +93,10 @@ class DirectBuilderTests(unittest.IsolatedAsyncioTestCase):
         )
         if variant:
             predicate = predicate.add(a.col("id") >= operand(2))
-        query = query.where_(predicate).order_by(a.col("id").asc(), e.col("id").asc(nulls=p.Nulls.Last))
+        query = query.where(predicate).order_by(a.col("id").asc(), e.col("id").asc(nulls=p.Nulls.Last))
         if variant:
             query = query.limit(2)
-        rows = await pool.fetch_all(record("select_join", query))
+        rows = await pool.query(record("select_join", query))
         expected = [
             {"account_id": 1, "name": "Nora O'Brien", "event_id": 10, "kind": term},
             {"account_id": 2, "name": "Beta%_\\雪", "event_id": 12, "kind": term},
@@ -108,30 +108,30 @@ class DirectBuilderTests(unittest.IsolatedAsyncioTestCase):
 
         a, e = p.Table(accounts, schema=schema), p.Table(events, schema=schema)
         update = p.update(a).set("visits", p.col("visits") + operand(5 + variant))
-        update = update.where_(p.col("id") == operand(1)).returning(p.col("id"), p.col("name"), p.col("visits"))
-        updated = await pool.fetch_one(record("update_returning", update))
+        update = update.where(p.col("id") == operand(1)).returning(p.col("id"), p.col("name"), p.col("visits"))
+        updated = await pool.one(record("update_returning", update))
         self.assertEqual(dict(updated), {"id": 1, "name": "Nora O'Brien", "visits": 15 + variant})
-        delete = record("delete_event", p.delete(e).where_(p.col("id") == operand(11)))
+        delete = record("delete_event", p.delete(e).where(p.col("id") == operand(11)))
         self.assertEqual(await pool.execute(delete), 1)
         self.assertEqual(await pool.execute(delete), 0)
-        missing = p.select(p.col("id")).from_(a).where_(p.col("id") == operand(999))
-        self.assertIsNone(await pool.fetch_optional(record("select_missing", missing)))
+        missing = p.select(p.col("id")).from_(a).where(p.col("id") == operand(999))
+        self.assertIsNone(await pool.optional(record("select_missing", missing)))
         target, source = e.as_("e"), a.as_("a")
         merge = (p.merge(target, source, target.col("id") == source.col("id") + operand(10))
                  .when_matched(p.MergeUpdate("points", target.col("points") + operand(1)),
                                condition=target.col("kind") == operand(term))
                  .when_not_matched(p.MergeInsert("id", source.col("id") + operand(10))
-                                   .and_value("account_id", source.col("id"))
-                                   .and_value("kind", operand("merged")).and_value("points", operand(0)))
+                                   .set("account_id", source.col("id"))
+                                   .set("kind", operand("merged")).set("points", operand(0)))
                  .when_not_matched_by_source(p.MatchedAction.Delete)
                  .returning_action()
                  .returning(target.col("id"), p.ReturningRow.Old.col("points").as_("before"),
                             p.ReturningRow.New.col("points").as_("after")))
-        merged = sorted(tuple(row.values()) for row in await pool.fetch_all(record("merge_events", merge)))
+        merged = sorted(tuple(row.values()) for row in await pool.query(record("merge_events", merge)))
         self.assertEqual(merged, [("DELETE", 10, 2, None), ("INSERT", 11, None, 0),
                                   ("INSERT", 13, None, 0), ("UPDATE", 12, 4, 5)])
         final = p.select(p.col("id"), p.col("visits")).from_(a).order_by(p.col("id").asc())
-        self.assertEqual([tuple(row.values()) for row in await pool.fetch_all(record("select_final", final))],
+        self.assertEqual([tuple(row.values()) for row in await pool.query(record("select_final", final))],
                          [(1, 15 + variant), (2, 20), (3, 30)])
         copied = await self.copy_cases(pool, record, operand, term, e)
         run["verified"] = {"inserted_accounts": 3, "inserted_events": 3, "selected": len(expected), "updated_visits": 15 + variant, "deleted": [1, 0], "missing": True, "merged": len(merged), "copied": copied}
@@ -148,13 +148,13 @@ class DirectBuilderTests(unittest.IsolatedAsyncioTestCase):
         copied = {"csv": await pool.copy_in(record("copy_from_csv", csv_in), rows.getvalue().encode())}
         text_in = p.CopyFrom(e, "text").columns(*columns).null_string("NULL")
         copied["text"] = await pool.copy_in(record("copy_from_text", text_in), b"22\tNULL\tplain\t9\n")
-        query = (p.select(p.col("id"), p.col("kind")).from_(e).where_(p.col("points") >= operand(7))
+        query = (p.select(p.col("id"), p.col("kind")).from_(e).where(p.col("points") >= operand(7))
                  .order_by(p.col("id").asc()))
         csv_out = p.CopyTo(query, "csv").header().force_quote("kind")
         out = await collect(await pool.copy_out(record("copy_to_csv", csv_out)))
         quoted_term = '"' + term.replace('"', '""') + '"'
         self.assertEqual(out.decode(), f'id,kind\n20,{quoted_term}\n21,"copied"\n22,"plain"\n')
-        moved = p.delete(e).where_(p.col("id") >= operand(20)).returning(*map(p.col, columns))
+        moved = p.delete(e).where(p.col("id") >= operand(20)).returning(*map(p.col, columns))
         data = await collect(await pool.copy_out(record("copy_to_binary", p.CopyTo(moved, "binary"))))
         binary_in = p.CopyFrom(e, "binary").columns(*columns)
         copied["binary"] = await pool.copy_in(record("copy_from_binary", binary_in), data)

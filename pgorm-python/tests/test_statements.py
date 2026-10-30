@@ -35,7 +35,7 @@ class StatementTests(unittest.TestCase):
         query = (select(account.col("name"), count.as_("events"))
                  .from_(account)
                  .join(event, account.col("id") == event.col("account_id"), kind=Join.Left)
-                 .where_(Condition.all(account.col("active") == True,
+                 .where(Condition.all(account.col("active") == True,
                                        Condition.any(event.col("kind") == "click", event.col("id").is_null())))
                  .group_by(account.col("name"))
                  .having(count > 2)
@@ -108,14 +108,14 @@ class StatementTests(unittest.TestCase):
 
     def test_conflict_targets_and_updates_follow_rust_typestate(self):
         table = Table("account", alias="a")
-        target = ConflictTarget("id").where_(col("id") > 0)
-        action = target.update("name").set("visits", literal(1)).where_(col("active") == True)
+        target = ConflictTarget("id").where(col("id") > 0)
+        action = target.update("name").set("visits", literal(1)).where(col("active") == True)
         query = insert(table).columns("id", "name").values(1, "Alice").on_conflict(action)
         compiled = query.inspect()
         self.assertIn('ON CONFLICT ("id") WHERE "id" > $3 DO UPDATE SET "name" = "excluded"."name", "visits" = 1', compiled.sql)
         self.assertEqual([value.value for value in compiled.params], [1, "Alice", 0, True])
-        self.assertIn("DO NOTHING", query.on_conflict(target.ignore()).inspect().sql)
-        self.assertIn("ON CONFLICT DO NOTHING", query.on_conflict(Conflict.ignore()).inspect().sql)
+        self.assertIn("DO NOTHING", query.on_conflict(target.do_nothing()).inspect().sql)
+        self.assertIn("ON CONFLICT DO NOTHING", query.on_conflict(Conflict.do_nothing()).inspect().sql)
         for build in [lambda: ConflictTarget(), lambda: target.update(),
                       lambda: query.on_conflict(target)]:
             with self.assertRaises(ConstructionError):
@@ -126,7 +126,7 @@ class StatementTests(unittest.TestCase):
         base = update(table).set("name", "new' name")
         with self.assertRaises(ConstructionError):
             base.inspect()
-        query = base.where_(table.col("id") == 4).returning(col("id"))
+        query = base.where(table.col("id") == 4).returning(col("id"))
         compiled = query.inspect()
         self.assertEqual(compiled.sql, 'UPDATE "application"."account" AS "a" SET "name" = $1 WHERE "a"."id" = $2 RETURNING "id"')
         self.assertEqual(compiled.params, [Value("new' name"), Value(4)])
@@ -137,7 +137,7 @@ class StatementTests(unittest.TestCase):
             update(table).all_rows().inspect()
         with self.assertRaises(ConstructionError):
             delete(table).inspect()
-        self.assertEqual(delete(table).where_(table.col("id") == 4).returning().inspect().params, [Value(4)])
+        self.assertEqual(delete(table).where(table.col("id") == 4).returning().inspect().params, [Value(4)])
         self.assertNotIn("WHERE", delete(table).all_rows().inspect().sql)
 
     def test_raw_sql_preserves_template_and_separate_values(self):

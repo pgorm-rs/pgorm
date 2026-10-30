@@ -32,7 +32,7 @@ async def consumer(connection: Connection) -> None:
     assert_type(model.into_active(), AccountActive)
     assert_type(model.with_value("note", "local"), AccountModel)
     assert_type(await Account.find().all(connection), list[AccountModel])
-    assert_type(await Account.find().one_opt(connection), AccountModel | None)
+    assert_type(await Account.find().optional(connection), AccountModel | None)
     assert_type(
         await AccountNotes.find().all(connection),
         list[tuple[AccountModel, NoteModel | None]],
@@ -44,7 +44,7 @@ async def consumer(connection: Connection) -> None:
     assert_type(
         await RequiredNotes.find().all(connection), list[tuple[AccountModel, NoteModel]]
     )
-    assert_type(await AccountOnly.find().one_opt(connection), AccountModel | None)
+    assert_type(await AccountOnly.find().optional(connection), AccountModel | None)
     span = await IntervalSpan.find().one(connection)
     assert_type(span, IntervalSpanModel)
     assert_type(span.months, Interval)

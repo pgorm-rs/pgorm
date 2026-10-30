@@ -88,8 +88,8 @@ than a limit on what standalone Rust can observe:
   which puts the bound on `S = GraphRow<E, S>` — a marker that carries no data
   and does not implement it. A cursor is moved along its chain, never shared.
 - **a cursor cannot be inspected.** `Cursor` carries no statement builder, so
-  there is nothing for `inspect` to compile. The binding's `GraphCursor` says
-  the same of itself, reporting `"cursor": {"inspect": false}`.
+  there is nothing for `inspect` to compile. The binding's `EntityGraphCursor`
+  says the same of itself, reporting `"cursor": {"inspect": false}`.
 - **a graph read has no `one`.** `SelectGraph` offers `all` and `one_opt` only,
   so `fetch` mode `one` against a graph is refused, exactly as the interpreter
   refuses it.

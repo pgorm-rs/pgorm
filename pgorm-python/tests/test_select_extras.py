@@ -57,7 +57,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
 
     async def rows(self, query, target=None):
         target = target or self.connection
-        return [tuple(row.values()) for row in await target.fetch_all(query)]
+        return [tuple(row.values()) for row in await target.query(query)]
 
     def s(self, name):
         return self.scores.col(name)
@@ -85,7 +85,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(p.ConstructionError, "ORDER BY"):
             await self.connection.stream(unordered)
         async with self.connection.transaction() as tx:
-            for terminal in (tx.fetch_all, tx.fetch_one, tx.fetch_optional, tx.execute):
+            for terminal in (tx.query, tx.one, tx.optional, tx.execute):
                 with self.subTest(terminal=terminal.__name__):
                     with self.assertRaisesRegex(p.ConstructionError, "ORDER BY"):
                         await terminal(unordered)
@@ -132,7 +132,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
     # backslash escape and a chosen one
     async def test_similar_to_matches_whole_strings(self):
         def names(predicate):
-            return self.rows(p.Select(self.s("name")).from_(self.scores).where_(predicate)
+            return self.rows(p.Select(self.s("name")).from_(self.scores).where(predicate)
                              .order_by(self.s("id").asc()))
 
         name = self.s("name")
@@ -169,7 +169,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         ordered = p.select(word).from_(words).order_by(word.collate("C").asc())
         self.assertIn('ORDER BY ("word" COLLATE "C") ASC', ordered.inspect().sql)
         self.assertEqual(await self.rows(ordered), [("A",), ("B",), ("a",), ("b",)])
-        below = p.select(word).from_(words).where_(word.collate("POSIX", schema="pg_catalog") < "a")
+        below = p.select(word).from_(words).where(word.collate("POSIX", schema="pg_catalog") < "a")
         self.assertEqual(sorted(await self.rows(below)), [("A",), ("B",)])
         for collated, sqlstate in ((word.collate("no such collation"), "42704"),
                                    (p.literal(1).collate("C"), "42804")):
@@ -233,7 +233,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
             (T(p.call("generate_series", int4(1), int4(2))).column_definition("a", "integer").alias("g"), "42601"),
         ):
             with self.subTest(sqlstate=sqlstate), self.assertRaises(p.DatabaseError) as refused:
-                await self.connection.fetch_all(p.Select(item.star()).from_(item))
+                await self.connection.query(p.Select(item.star()).from_(item))
             self.assertEqual(refused.exception.sqlstate, sqlstate)
         with self.assertRaises(p.ConstructionError):
             T(p.call("json_to_record", p.Value.json({}))).column_definition("", "integer")
@@ -243,7 +243,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
     async def test_set_returning_calls_need_typed_arguments(self):
         untyped = T(p.call("generate_series", 1, 2)).alias("g")
         with self.assertRaises(p.DatabaseError) as caught:
-            await self.connection.fetch_all(p.Select().from_(untyped))
+            await self.connection.query(p.Select().from_(untyped))
         self.assertEqual(caught.exception.sqlstate, "42725")
 
     # [spec:pgorm:req:sql.ast.select.table-sample/test]    the percentage decides the sample,
@@ -280,7 +280,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
     async def test_array_collects_a_subquery_column(self):
         s = self.scores
         pairs = p.Table(self.pairs).as_("x")
-        partners = p.Select(pairs.col("b")).from_(pairs).where_(pairs.col("a") == s.col("id"))
+        partners = p.Select(pairs.col("b")).from_(pairs).where(pairs.col("a") == s.col("id"))
         collected = await self.rows(
             p.Select(s.col("id"), p.array(partners).as_("partners"))
             .from_(s)
@@ -290,7 +290,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
             [(key, sorted(values)) for key, values in collected],
             [(1, [2, 3]), (2, []), (3, []), (4, [])],
         )
-        nines = p.Select(s.col("name")).from_(s).where_(s.col("score") == 9)
+        nines = p.Select(s.col("name")).from_(s).where(s.col("score") == 9)
         spelled = p.array(nines).cast(p.TypeName("text"), array=True)
         [(names,)] = await self.rows(p.Select(spelled))
         self.assertEqual(sorted(names), ["Bob", "Cy"])

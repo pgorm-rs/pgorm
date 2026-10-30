@@ -4,7 +4,7 @@
 use pgorm::pgorm_query::{Expr, Query};
 use pyo3::prelude::*;
 
-use super::{AliasedExpr, Compiled, OrderBy, PyExpr};
+use super::{Aliased, Compiled, OrderBy, PyExpr};
 use crate::{
     identifiers::{Direction, Nulls, PyIdentifier, collation},
     values::PyTypeName,
@@ -36,8 +36,8 @@ impl PyExpr {
         let collated = Expr::expr(self.inner.clone()).collate(collation(name, schema)?);
         Ok(Self::from_rust(collated.into()))
     }
-    fn as_(&self, alias: &Bound<'_, PyAny>) -> PyResult<AliasedExpr> {
-        Ok(AliasedExpr {
+    fn as_(&self, alias: &Bound<'_, PyAny>) -> PyResult<Aliased> {
+        Ok(Aliased {
             expr: self.clone(),
             alias: PyIdentifier::new(alias)?,
         })
@@ -46,7 +46,7 @@ impl PyExpr {
     /// inline, or the name of the one a statement declares with
     /// `Select.window`. Only a function call or a JSON aggregate takes one,
     /// as PostgreSQL's grammar has it.
-    fn over(&self, window: &Bound<'_, PyAny>) -> PyResult<crate::statements::PyWindowedExpr> {
+    fn over(&self, window: &Bound<'_, PyAny>) -> PyResult<crate::statements::PyWindowed> {
         let call = crate::statements::WindowCall::of(&self.inner)?;
         call.over(window)
     }

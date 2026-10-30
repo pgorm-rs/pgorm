@@ -38,19 +38,19 @@ async def example(connection):
     key = Accounts.key({"id": created["id"]})
     changed = await (
         Accounts.update({"display_name": "Updated"})
-        .where_(key).returning("id", "display_name").one(connection)
+        .where(key).returning("id", "display_name").one(connection)
     )
     rows = await (
         Accounts.select("id", "display_name")
-        .filter(Accounts.col("id") >= created["id"])
+        .where(Accounts.col("id") >= created["id"])
         .order_by(Accounts.col("id").asc()).limit(20).all(connection)
     )
-    deleted = await Accounts.delete().where_(key).execute(connection)
+    deleted = await Accounts.delete().where(key).execute(connection)
     return changed, rows, deleted
 ```
 
 `find()` selects every declared field; `select(*fields)` selects a subset.
-Queries provide `filter`, `order_by`, `limit`, `offset` and `join`. Reusing a
+Queries provide `where`, `order_by`, `limit`, `offset` and `join`. Reusing a
 query preserves its original state. `as_(alias)` produces another descriptor
 whose native expressions use that alias, including self-joins:
 
@@ -78,7 +78,7 @@ declaration alone neither creates a constraint nor checks the database schema.
 `insert(mapping)`, `update(mapping)` and `delete()` return write builders.
 `execute(connection)` returns affected rows. `returning(*fields)` selects
 declared output fields and returns a row-producing builder; no arguments means
-all fields. Updates and deletes require `where_(predicate)` or explicit
+all fields. Updates and deletes require `where(predicate)` or explicit
 `all_rows()`, using the native write guard. An empty update is an error. An empty
 insert requests the Rust builder's default row. Inserts require an unaliased
 table.
@@ -92,7 +92,7 @@ the input mapping or containers cannot change the query.
 
 ## Records and types
 
-`all`, `one` and `one_opt` accept a Pool or acquired Connection. They return
+`all`, `one` and `optional` accept a Pool or acquired Connection. They return
 `ModelRecord` views over detached native Records, keyed by declared Python
 identities. `record.model` identifies the descriptor, `record.native` retains
 PostgreSQL field metadata and `record.tagged(field)` preserves native tags.
@@ -100,7 +100,7 @@ Mutable values returned by record lookup are independent copies.
 
 Output names, native Value types, enum qualifications and nullability must
 match the declaration. A mismatch raises `DecodeError`; it is never interpreted
-as an absent row. Dynamic `one` requires exactly one row and `one_opt` at most
+as an absent row. Dynamic `one` requires exactly one row and `optional` at most
 one, so multiple rows raise `DatabaseError`. Use explicit `limit(1)` to select
 a first row. Errors do not imply rollback of a write already executed.
 

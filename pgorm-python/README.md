@@ -97,8 +97,8 @@ SQL and parameters produced by that builder state. See [runtime statement
 examples](STATEMENTS.md) for joins, grouping, set operations, write guards,
 conflict actions, RETURNING and the explicit `RawSQL` template API.
 
-`await pool.execute(query)` returns affected rows. `fetch_all`, `fetch_one`
-and `fetch_optional` return detached records; `stream` opens an async iterator.
+`await pool.execute(query)` returns affected rows. `query`, `one`
+and `optional` return detached records; `stream` opens an async iterator.
 See [execution, result types and stream ownership](RESULTS.md) for examples,
 PostgreSQL decoding limits and cancellation behavior.
 
@@ -192,7 +192,7 @@ also have an explicit `close()`/`aclose()`, while a transaction ends only with
 its block. Resources cannot migrate to another event loop.
 
 Construction, capability, connection, database, decode, timeout and lifecycle
-failures have distinct exception classes under `PgOrmError`. PostgreSQL server
+failures have distinct exception classes under `PgormError`. PostgreSQL server
 errors retain `sqlstate`, message and structured diagnostics with connection
 credentials redacted. Asyncio cancellation remains `asyncio.CancelledError`.
 Internal Rust panics retain PyO3's identifiable panic exception and are not

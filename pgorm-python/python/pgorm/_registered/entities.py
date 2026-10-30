@@ -153,8 +153,8 @@ class QueryView(Generic[M]):
             raise native_types.LifecycleError("query belongs to another entity registration")
         self._query, self._model_class = query, model
 
-    def filter(self, predicate) -> "QueryView[M]":
-        return QueryView(self._query.filter(predicate), self._model_class)
+    def where(self, predicate) -> "QueryView[M]":
+        return QueryView(self._query.where(predicate), self._model_class)
 
     def order_by(self, *ordering) -> "QueryView[M]":
         return QueryView(self._query.order_by(*ordering), self._model_class)
@@ -174,8 +174,8 @@ class QueryView(Generic[M]):
     async def one(self, connection) -> M:
         return self._model_class(await self._query.one(connection))
 
-    async def one_opt(self, connection) -> M | None:
-        row = await self._query.one_opt(connection)
+    async def optional(self, connection) -> M | None:
+        row = await self._query.optional(connection)
         return None if row is None else self._model_class(row)
 
     def __bool__(self) -> bool:

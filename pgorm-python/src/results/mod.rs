@@ -27,12 +27,9 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
 pub(crate) fn capabilities() -> serde_json::Map<String, serde_json::Value> {
     [
         ("connection.execute", "pgorm::ConnectionTrait::execute"),
-        ("connection.fetch_all", "pgorm::ConnectionTrait::query_all"),
-        ("connection.fetch_one", "pgorm::ConnectionTrait::query_all"),
-        (
-            "connection.fetch_optional",
-            "pgorm::ConnectionTrait::query_all",
-        ),
+        ("connection.query", "pgorm::ConnectionTrait::query_all"),
+        ("connection.one", "pgorm::ConnectionTrait::query_all"),
+        ("connection.optional", "pgorm::ConnectionTrait::query_all"),
         ("connection.stream", "pgorm::ConnectionTrait::query_raw"),
         ("record", "tokio_postgres::Row::try_get / FromSql"),
     ]

@@ -986,11 +986,11 @@ Rust generic at run time, only use the ones compiled in.
 > as on a connection or a transaction. On a pool it runs on a connection lent
 > to it alone, as a pool's statement does.
 
-> [spec:pgorm:req:bindings.entity-reads]
+> [spec:pgorm:req:bindings.entity-reads+2]
 > `find()` MUST be the entity's `E::find()`, and `where`, `order_by`,
 > `limit` and `offset` the `Select<E>` methods of the same meaning. `all`,
-> `one` and `one_opt` MUST be `Select::all`, `one` and `one_opt`, `one` and
-> `one_opt` narrowing the row limit to one as Rust does, and `one` finding
+> `one` and `optional` MUST be `Select::all`, `one` and `one_opt`, `one` and
+> `optional` narrowing the row limit to one as Rust does, and `one` finding
 > no row an error. `inspect()` gives the SQL and values a terminal sends.
 >
 > `col(name)` is the column as the entity's `ColumnTrait` names it, and its
@@ -1033,7 +1033,7 @@ Rust generic at run time, only use the ones compiled in.
 > an expression as written; how an `update_many()` with no condition is held
 > is each binding's own (`napi.update-many-guard`).
 
-> [spec:pgorm:req:bindings.entity-graphs]
+> [spec:pgorm:req:bindings.entity-graphs+2]
 > `graph(name).find(aliases)` MUST build the registered `SelectGraph` with the
 > application's factory, its declared entity tuple, join slot kinds and
 > decoding terminals, each joined slot under the alias given for it, `g1`,
@@ -1044,9 +1044,10 @@ Rust generic at run time, only use the ones compiled in.
 > nothing, and a present slot that does not decode a `DecodeError`. Required
 > rows, optional rows, absent joined sources and decode errors stay distinct.
 > `col(source, column)` qualifies a column of a decoded source as the query
-> names it; `where` and `order_by` are `SelectGraph`'s; `all` and `one_opt`
-> its terminals. An entity combination or arity the module does not register
-> is refused, never lowered to a different API.
+> names it; `where` and `order_by` are `SelectGraph`'s; `all` and `optional`
+> its terminals, `SelectGraph::all` and `one_opt`. An entity combination or
+> arity the module does not register is refused, never lowered to a different
+> API.
 >
 > `cursor(column)` MUST be `SelectGraph::cursor_by` on a root column: `before`
 > and `after` bound that column, and `before_with` and `after_with` the whole
@@ -1054,7 +1055,7 @@ Rust generic at run time, only use the ones compiled in.
 > value converted to its column's declared kind and any other count refused.
 > `first`, `last`, `asc` and `desc` are the cursor's own.
 
-> [spec:pgorm:req:bindings.pipeline-sources]
+> [spec:pgorm:req:bindings.pipeline-sources+2]
 > A registered entity MUST be a pipeline source wherever a relation is, read
 > through its own `IntoSource`, so its table and schema are the ones its Rust
 > declaration names, and `pipeline.col(table, entity.col(name))` MUST lower
@@ -1066,11 +1067,12 @@ Rust generic at run time, only use the ones compiled in.
 > `select_sources(selection, qualifiers)` MUST be pgorm's `select_sources` as
 > the pipeline's last stage, each source projected under the qualifier given
 > for it or its table's name, a count of qualifiers other than the sources'
-> refused. Its `all`, `one` and `one_opt` are `SelectedSources`'s, `one` and
-> `one_opt` taking one row. Each row is a tuple of the sources' records,
-> decoded through each entity's absence witness, a source a row does not carry
-> being null. A pipeline reshaped before the selection is the
-> `ConstructionError` pgorm's refusal names, before anything is sent.
+> refused. Its `all`, `one` and `optional` are `SelectedSources`'s `all`,
+> `one` and `one_opt`, `one` and `optional` taking one row. Each row is a
+> tuple of the sources' records, decoded through each entity's absence
+> witness, a source a row does not carry being null. A pipeline reshaped
+> before the selection is the `ConstructionError` pgorm's refusal names,
+> before anything is sent.
 
 > [spec:pgorm:req:bindings.codegen]
 > Each binding MUST offer a documented workflow that generates, from a

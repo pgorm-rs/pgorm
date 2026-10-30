@@ -2,7 +2,7 @@ use crate::{account::Entity as A, note::Entity as N};
 use pgorm_python::entities::Registry;
 use pyo3::prelude::*;
 
-// [spec:pgorm:req:bindings.pipeline-sources/test]
+// [spec:pgorm:req:bindings.pipeline-sources+2/test]
 pub fn register(registry: &mut Registry) -> PyResult<()> {
     registry.sources::<(A,)>("app.SingleAccount")?;
     registry.sources::<(A, N)>("app.TwoSources")?;
@@ -23,7 +23,7 @@ mod tests {
     use pgorm_python::expressions::Compiled;
     use pyo3::types::PyDict;
 
-    // [spec:pgorm:req:bindings.pipeline-sources/test]
+    // [spec:pgorm:req:bindings.pipeline-sources+2/test]
     #[test]
     fn source_registration_requires_real_entities() -> PyResult<()> {
         Python::initialize();
@@ -38,7 +38,7 @@ mod tests {
         Ok(())
     }
 
-    // [spec:pgorm:req:bindings.pipeline-sources/test]
+    // [spec:pgorm:req:bindings.pipeline-sources+2/test]
     #[test]
     fn source_selection_matches_native_rust_projection() -> PyResult<()> {
         Python::initialize();
@@ -49,7 +49,7 @@ mod tests {
             let pipeline = module.getattr("Pipeline")?.call1((account,))?;
             let selection = module.call_method1("pipeline_sources", ("app.SingleAccount",))?;
             let selected = pipeline.call_method1("select_sources", (selection,))?;
-            for terminal in ["all", "one", "one_opt"] {
+            for terminal in ["all", "one", "optional"] {
                 let kwargs = PyDict::new(py);
                 kwargs.set_item("terminal", terminal)?;
                 let actual: Compiled = selected

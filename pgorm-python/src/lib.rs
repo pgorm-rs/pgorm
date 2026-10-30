@@ -24,8 +24,8 @@ pub mod values;
 
 use pyo3::prelude::*;
 
-pyo3::create_exception!(pgorm, PgOrmError, pyo3::exceptions::PyException);
-pyo3::create_exception!(pgorm, UnsupportedCapabilityError, PgOrmError);
+pyo3::create_exception!(pgorm, PgormError, pyo3::exceptions::PyException);
+pyo3::create_exception!(pgorm, UnsupportedCapabilityError, PgormError);
 
 // [spec:pgorm:def:bindings.api]
 // [spec:pgorm:def:python.api+1]
@@ -51,7 +51,7 @@ pub fn install(module: &Bound<'_, PyModule>, registry: entities::Registry) -> Py
     let py = module.py();
     module.add("__version__", env!("CARGO_PKG_VERSION"))?;
     module.add("__pgorm_version__", env!("PGORM_VERSION"))?;
-    module.add("PgOrmError", py.get_type::<PgOrmError>())?;
+    module.add("PgormError", py.get_type::<PgormError>())?;
     module.add(
         "UnsupportedCapabilityError",
         py.get_type::<UnsupportedCapabilityError>(),

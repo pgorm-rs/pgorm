@@ -40,7 +40,7 @@ impl PyEntityQuery {
         &self.inner.info().name
     }
 
-    fn filter(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
+    fn r#where(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
         let condition = if let Ok(condition) = predicate.extract::<PyRef<'_, PyCondition>>() {
             condition.inner.clone()
         } else if let Ok(expr) = predicate.extract::<PyRef<'_, PyExpr>>() {
@@ -89,7 +89,7 @@ impl PyEntityQuery {
         let terminal = match terminal {
             "all" => Terminal::All,
             "one" => Terminal::One,
-            "one_opt" => Terminal::Optional,
+            "optional" => Terminal::Optional,
             _ => return Err(ConstructionError::new_err("unknown entity terminal")),
         };
         let (sql, values) = self.inner.compile(terminal);
@@ -115,7 +115,7 @@ impl PyEntityQuery {
     ) -> PyResult<Bound<'py, PyAny>> {
         super::io::select(py, connection, self.inner.clone(), Terminal::One)
     }
-    fn one_opt<'py>(
+    fn optional<'py>(
         &self,
         py: Python<'py>,
         connection: &Bound<'_, PyAny>,
