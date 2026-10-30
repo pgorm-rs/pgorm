@@ -14945,4 +14945,19 @@ children (
             }
         )
     }
+
+    {
+        id binding-coverage-per-impl
+        title "Each binding is its own nspec impl, so a shared rule is covered for Python only by Python's code and for JavaScript only by JavaScript's"
+        kind @chore
+        deps (binding-spec-consolidation)
+        log (
+            {
+                at 2026-10-30T13:27:03.272959Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found 2026-10-30 after binding-spec-consolidation merged (8d546de9): .config/nspec/config.styx has one impl, main, over every language, so a bindings.* rule owned by a gap node counts as covered when either binding annotates it, and all ten gap nodes (python-case-expressions, python-select-gaps, python-model-column-operators, quantifier-beyond-comparisons, python-statement-gaps, python-model-gaps, python-schema-gaps, python-registered-pools, napi-schema-from-entity, napi-relation-conditions) derived done with nothing built. nplan judges coverage per impl and multi-impl claims are conjunctive (np dm.implements, inv.impl-unique), so split the impl: main keeps Rust and tooling, python takes pgorm-python, javascript takes pgorm-napi and its workflow; every bindings.* rule is claimed once under python and once under javascript, each by the node that delivers that side; every existing claim is re-keyed to the impl whose annotations cover it. Afterwards each gap node is todo until its own binding's annotations land."
+            }
+        )
+    }
 )
