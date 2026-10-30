@@ -1,6 +1,7 @@
-//! An application's account: an entity with an enum column, a renamed
-//! column, defaults its `ActiveModelBehavior::new` sets, and hooks that
-//! change and refuse writes, so the binding is seen to run them.
+//! An application's account: an entity with an enum column, a renamed and
+//! indexed column, comments, defaults its `ActiveModelBehavior::new` sets,
+//! and hooks that change and refuse writes, so the binding is seen to run
+//! them and to generate its schema.
 
 use pgorm::entity::prelude::*;
 
@@ -19,11 +20,19 @@ pub enum Mood {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[pgorm(table_name = "accounts", schema_name = "napi_entities")]
+#[pgorm(
+    table_name = "accounts",
+    schema_name = "napi_entities",
+    comment = "Accounts' native schema"
+)]
 pub struct Model {
     #[pgorm(primary_key, auto_increment = false)]
     pub id: i32,
-    #[pgorm(column_name = "display name")]
+    #[pgorm(
+        column_name = "display name",
+        indexed,
+        comment = "The user's display name"
+    )]
     pub name: String,
     pub note: Option<String>,
     pub version: i32,

@@ -10,8 +10,9 @@ use std::{any::Any, fmt::Debug, marker::PhantomData, sync::Arc};
 
 use futures_util::future::BoxFuture;
 use pgorm::pgorm_query::{
-    Condition, Expr, Name, NullOrdering, OnConflict, Order, SelectStatement, SimpleExpr, Value,
-    Values,
+    CommentStatement, Condition, Expr, IndexCreateStatement, Name, NullOrdering, OnConflict, Order,
+    SelectStatement, SimpleExpr, TableCreateStatement, Value, Values,
+    extension::TypeCreateStatement,
 };
 use pgorm::{
     ActiveModelBehavior, ActiveModelTrait, ActiveValue, Change as RustChange, ColumnTrait,
@@ -130,8 +131,21 @@ pub(crate) struct Versions {
     pub(crate) new: Model,
 }
 
+/// A registered entity's schema as pgorm's own entity schema path writes it:
+/// its table, the enum types its columns name, its indexes and its comments.
+#[derive(Debug)]
+pub(crate) struct EntitySchema {
+    pub(crate) table: TableCreateStatement,
+    pub(crate) enums: Vec<TypeCreateStatement>,
+    pub(crate) indexes: Vec<IndexCreateStatement>,
+    pub(crate) comments: Vec<CommentStatement>,
+}
+
 pub(crate) trait EntityBackend: Debug + Send + Sync {
     fn info(&self) -> &Arc<EntityInfo>;
+    /// The entity's schema, or the error `Schema::create_table_from_entity`
+    /// refuses its table with.
+    fn schema(&self) -> Result<EntitySchema, Error>;
     /// The entity as a pipeline source, by its own `IntoSource`.
     fn source(&self) -> pgorm::pipeline::Source;
     fn select(&self) -> Select;
@@ -206,6 +220,17 @@ where
 {
     fn info(&self) -> &Arc<EntityInfo> {
         &self.info
+    }
+
+    // [spec:pgorm:req:bindings.schema-from-entity]
+    fn schema(&self) -> Result<EntitySchema, Error> {
+        let schema = pgorm::Schema::new();
+        Ok(EntitySchema {
+            table: schema.create_table_from_entity(E::default())?,
+            enums: schema.create_enum_from_entity(E::default()),
+            indexes: schema.create_index_from_entity(E::default()),
+            comments: schema.create_comments_from_entity(E::default()),
+        })
     }
 
     fn source(&self) -> pgorm::pipeline::Source {

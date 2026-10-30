@@ -9,9 +9,12 @@ pub mod membership;
 pub mod note;
 pub mod parcel;
 pub mod sources;
+pub mod temper;
 
 #[cfg(test)]
 mod parity;
+#[cfg(test)]
+mod schema_parity;
 
 use neon::prelude::*;
 use pgorm_napi::{RegistrationError, Registry};
@@ -24,6 +27,7 @@ pub fn registry() -> Result<Registry, RegistrationError> {
     registry.entity::<note::Entity>("app.Note")?;
     registry.entity::<membership::Entity>("app.Membership")?;
     registry.entity::<parcel::Entity>("app.Parcel")?;
+    registry.entity::<temper::Entity>("app.Temper")?;
     graphs::register(&mut registry)?;
     sources::register(&mut registry)?;
     Ok(registry)

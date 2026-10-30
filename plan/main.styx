@@ -14609,6 +14609,14 @@ children (
                 text "Operator 2026-10-30, decision (8): Python's model and registered columns (ModelColumn and EntityColumn) offer every expression method, as JavaScript's do, not only the typed comparisons; .expr stays only if something still needs it. bindings-surface.json lists the names under the columns question."
                 after_done true
             }
+
+            {
+                at 2026-10-30T14:24:19.140073Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Reads done after binding-coverage-per-impl (2026-10-30) though nothing is built: Python's code annotates bindings.model-columns for the comparisons it has, so the python claim is covered. The work starts spec-first: split what Python lacks out of bindings.model-columns into a rule of its own (the twelve value operators, and per decision (8) every expression method on ModelColumn and EntityColumn), annotate JavaScript's code that already does it, and claim the python side here, so the node is open until Python's code lands."
+                after_done true
+            }
         )
     }
 
@@ -14633,6 +14641,14 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "binding-spec-consolidation gave this node bindings.quantifiers, which states what both bindings do today: ANY and ALL are the right operand of the six comparisons alone. This node extends that rule (a bump) and both bindings together to the operators PostgreSQL takes a quantifier after, re-pinning both bindings' bindings.quantifiers annotations."
+            }
+
+            {
+                at 2026-10-30T14:24:19.463958Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Reads done after binding-coverage-per-impl (2026-10-30): bindings.quantifiers still states today's behaviour, which both bindings cover. The work starts spec-first: bump bindings.quantifiers to the operators PostgreSQL reads a quantifier after (established against the server and pgorm-query's renderer), which leaves both bindings' annotations stale and the node open until both land."
+                after_done true
             }
         )
     }
@@ -14784,6 +14800,14 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed by binding-spec-consolidation. bindings.writes, bindings.merge and bindings.with state what JavaScript's statements do and require it of both bindings; Python lacks: INSERT .. SELECT (Insert.select), OVERRIDING (Insert.overriding), UPDATE .. FROM (Update.from), DELETE .. USING (Delete.using), a WITH clause on INSERT, UPDATE and DELETE (with_), INSERT/UPDATE/DELETE with RETURNING as a CTE body, a conflict arbiter by constraint name (Conflict.on_constraint) or over index expressions with a partial-index predicate, a MERGE whose source is any FROM item (pgorm-python merge takes a Table), and WITH RECURSIVE with SEARCH and CYCLE, CTE column lists and MATERIALIZED (With.recursive; pgorm-python/src/statements/with.rs takes a name and a Select or Merge only). The surface list docs/spec/bindings-surface.json names each missing method under python.gaps with this node; remove an entry as its method lands and the surface tests stay green."
+            }
+
+            {
+                at 2026-10-30T14:24:19.29679Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Reads done after binding-coverage-per-impl (2026-10-30) though nothing is built: Python's code annotates bindings.writes, bindings.merge and bindings.with for the parts it has, so the python claims are covered. The work starts spec-first: split what Python lacks (listed above) out of those rules into rules of their own, annotate JavaScript's code that already does it, and claim the python side here, so the node is open until Python's code lands."
+                after_done true
             }
         )
     }

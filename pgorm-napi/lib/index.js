@@ -84,6 +84,7 @@ export { Relation } from "./relations.js";
 export { Graph } from "./graphs.js";
 export { Cursor, Paginator } from "./cursors.js";
 export { ActiveModel, entities, Entity, entity } from "./entities.js";
+export { EntitySchema, fromEntity } from "./entity-schema.js";
 export { EntityColumn, EntityQuery } from "./entity-queries.js";
 export { EntityInsert, EntityUpdate, EntityUpdateMany } from "./entity-versions.js";
 export { EntityGraph, EntityGraphCursor, EntityGraphQuery, graph, graphs } from "./entity-graphs.js";

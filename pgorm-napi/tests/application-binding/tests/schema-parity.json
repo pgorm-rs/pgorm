@@ -1,0 +1,36 @@
+{
+  "app.Account": {
+    "comments": [
+      "COMMENT ON TABLE \"napi_entities\".\"accounts\" IS 'Accounts'' native schema'",
+      "COMMENT ON COLUMN \"napi_entities\".\"accounts\".\"display name\" IS 'The user''s display name'"
+    ],
+    "enums": [
+      "CREATE TYPE \"napi_entities\".\"mood\" AS ENUM ('calm', 'busy')"
+    ],
+    "indexes": [
+      "CREATE INDEX \"idx-accounts-display name\" ON \"napi_entities\".\"accounts\" (\"display name\")"
+    ],
+    "table": "CREATE TABLE \"napi_entities\".\"accounts\" ( \"id\" integer NOT NULL, \"display name\" varchar NOT NULL, \"note\" varchar, \"version\" integer NOT NULL, \"mood\" napi_entities.mood NOT NULL, PRIMARY KEY (\"id\") )"
+  },
+  "app.Membership": {
+    "comments": [],
+    "enums": [],
+    "indexes": [],
+    "table": "CREATE TABLE \"napi_entities\".\"memberships\" ( \"account_id\" integer NOT NULL, \"team\" varchar NOT NULL, \"role\" varchar NOT NULL, CONSTRAINT \"pk-memberships\" PRIMARY KEY (\"account_id\", \"team\") )"
+  },
+  "app.Note": {
+    "comments": [],
+    "enums": [],
+    "indexes": [],
+    "table": "CREATE TABLE \"napi_entities\".\"notes\" ( \"id\" integer NOT NULL, \"account_id\" integer NOT NULL, \"body\" varchar NOT NULL, PRIMARY KEY (\"id\"), CONSTRAINT \"fk-notes-account_id\" FOREIGN KEY (\"account_id\") REFERENCES \"napi_entities\".\"accounts\" (\"id\") )"
+  },
+  "app.Parcel": {
+    "comments": [],
+    "enums": [],
+    "indexes": [],
+    "table": "CREATE TABLE \"napi_entities\".\"parcels\" ( \"id\" integer NOT NULL, \"qty\" napi_entities.quantity NOT NULL, \"mood\" napi_entities.temper NOT NULL, \"codes\" napi_entities.code[] NOT NULL, PRIMARY KEY (\"id\") )"
+  },
+  "app.Temper": {
+    "refused": "Type Error: relation `Settles` of `tempers` cannot be a foreign key: `tempers`.`settles_into` references `tempers`.`mood`, and PostgreSQL implements no foreign key with a column typed as a domain over an enum on either side (42804)"
+  }
+}

@@ -50,7 +50,7 @@ use crate::{
     connect::job::{JobHandle, Output},
     errors::{Failure, throw},
     rows,
-    statements::{self, Node},
+    statements::{self, Ddl, Node},
     values::read,
 };
 
@@ -94,6 +94,7 @@ const EXPORTS: &[(&str, Export)] = &[
     ("entityNames", entity_names),
     ("entityGet", entity_get),
     ("entityDescribe", entity_describe),
+    ("entitySchema", entity_schema),
     ("entityColumns", entity_columns),
     ("entityCol", entity_col),
     ("entityCompare", entity_compare),
@@ -218,6 +219,42 @@ fn entity_describe(mut cx: FunctionContext) -> JsResult<JsValue> {
         .describe()
         .or_else(|failure| throw(&mut cx, failure))?;
     Ok(cx.string(described.to_string()).upcast())
+}
+
+/// `entitySchema(entity)`: `[table, enums, indexes, comments]`, each
+/// statement one pgorm's own entity schema path wrote. A table that path
+/// refuses is a `ConstructionError` carrying its message, and gives no
+/// schema at all.
+// [spec:pgorm:req:bindings.schema-from-entity]
+fn entity_schema(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let entity = held!(cx, EntityHandle, 0);
+    let schema = match entity.schema() {
+        Ok(schema) => schema,
+        Err(error) => return throw(&mut cx, Failure::Construction(error.to_string())),
+    };
+    let table = cx.boxed(Node::from(Ddl::CreateTable(schema.table)));
+    let enums = ddl_list(&mut cx, schema.enums.into_iter().map(Ddl::CreateType))?;
+    let indexes = ddl_list(&mut cx, schema.indexes.into_iter().map(Ddl::CreateIndex))?;
+    let comments = ddl_list(&mut cx, schema.comments.into_iter().map(Ddl::Comment))?;
+    let parts = JsArray::new(&mut cx, 4);
+    parts.set(&mut cx, 0, table)?;
+    parts.set(&mut cx, 1, enums)?;
+    parts.set(&mut cx, 2, indexes)?;
+    parts.set(&mut cx, 3, comments)?;
+    Ok(parts.upcast())
+}
+
+/// DDL statements as an array of the nodes JavaScript builders own.
+fn ddl_list<'cx>(
+    cx: &mut Cx<'cx>,
+    statements: impl ExactSizeIterator<Item = Ddl>,
+) -> JsResult<'cx, JsArray> {
+    let array = JsArray::new(cx, statements.len());
+    for (index, statement) in statements.enumerate() {
+        let statement = cx.boxed(Node::from(statement));
+        array.set(cx, u32::try_from(index).unwrap_or(u32::MAX), statement)?;
+    }
+    Ok(array)
 }
 
 fn entity_columns(mut cx: FunctionContext) -> JsResult<JsValue> {

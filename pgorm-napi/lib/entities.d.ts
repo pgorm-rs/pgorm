@@ -135,6 +135,10 @@ export interface EntityDescription {
     readonly to: { readonly schema: string | null; readonly table: string };
     readonly columns: readonly (readonly [string, string])[];
     readonly period: readonly [string, string] | null;
+    /** Whether a join by the relation needs every column pair to match (`all`) or any one of them (`any`). */
+    readonly conditionType: "all" | "any";
+    /** Whether an `on_condition` adds a condition of its own: a Rust closure, reported as present or absent only. */
+    readonly onCondition: boolean;
     readonly enforcement: "enforced" | "notEnforced" | null;
     readonly deferrability: "notDeferrable" | "deferrableInitiallyImmediate" | "deferrableInitiallyDeferred" | null;
   }[];
