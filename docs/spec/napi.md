@@ -267,7 +267,7 @@ first rule: a value reaches JavaScript exactly or not at all.
 
 ## Schema
 
-> [spec:pgorm:req:napi.schema-api+2]
+> [spec:pgorm:req:napi.schema-api+3]
 > The module MUST spell the DDL `bindings.schema` describes as these
 > factories and builders, every complete statement a `DDL` and a member of
 > the `Statement` union the terminals take; no export is named
@@ -309,7 +309,9 @@ first rule: a value reaches JavaScript exactly or not at all.
 >   `setNotNull`, `dropNotNull`, `addCheck(condition, { name, notValid })`,
 >   `dropConstraint(name, { ifExists, behavior })`, `renameConstraint`,
 >   `validateConstraint` and `renameTo` each give a statement; and
->   `dropDomain(names, { ifExists, behavior })`.
+>   `dropDomain(names, { ifExists, behavior })`;
+> - `fromEntity(entity)` gives an `EntitySchema` of the table, enum, index
+>   and comment statements (`bindings.schema-from-entity`).
 >
 > A list of names is one name or a non-empty array, an empty array a
 > `ConstructionError`; a behavior is `"cascade"` or `"restrict"`; and a

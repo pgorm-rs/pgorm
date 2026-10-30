@@ -14858,6 +14858,14 @@ children (
                 text "Re-read after binding-renames moved bindings.entity-reads, bindings.entity-graphs, bindings.pipeline-sources, python.naming, python.row-count, python.pipeline-operands, python.schema-api, napi.naming, napi.row-count and napi.schema-api to +2 and python.truth-testing to +3. The bodies changed only in the names they spell: optional for one_opt and oneOpt, RowStream, DDL, truncate_table, and the naming rules' lists of by-choice differences cut to the shapes still undecided. Both bindings' code and tests spell the new names, every reference to these rules is pinned at the current version, and both surface tests pass against bindings-surface.json."
                 after_done true
             }
+
+            {
+                at 2026-10-30T15:29:27.601667Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-read after napi.schema-api moved to +3: it lists fromEntity(entity) giving an EntitySchema (bindings.schema-from-entity), as python.schema-api lists from_entity, now that napi-schema-from-entity built it. The schema module's code and tests are pinned at +3."
+                after_done true
+            }
         )
     }
 
