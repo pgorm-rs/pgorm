@@ -58,10 +58,10 @@ fn merge_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let target = match this(cx, 0)? {
         Node::Table(table) => table,
         other => {
-            return refuse(
-                cx,
-                format!("a MERGE's target is a Table, not {}", other.describe()),
-            );
+            return cx.throw_type_error(format!(
+                "a MERGE's target is a Table, not {}",
+                other.describe()
+            ));
         }
     };
     let source = arg(cx, 1);
@@ -83,10 +83,10 @@ fn arm_action(
     let action = match this(cx, index)? {
         Node::MergeAction(action) => action,
         other => {
-            return refuse(
-                cx,
-                format!("an arm takes a MergeAction, not {}", other.describe()),
-            );
+            return cx.throw_type_error(format!(
+                "an arm takes a MergeAction, not {}",
+                other.describe()
+            ));
         }
     };
     let target_row = kind != "notMatched";
@@ -138,7 +138,7 @@ fn merge_when(cx: &mut FunctionContext) -> NeonResult<Node> {
             next_arm(&mut merge, kind, action, condition);
             merge
         }
-        other => return refuse(cx, format!("expected a MERGE, got {}", other.describe())),
+        other => return cx.throw_type_error(format!("expected a MERGE, got {}", other.describe())),
     };
     Ok(Node::Merge(merge))
 }
@@ -183,7 +183,7 @@ fn statement(cx: &mut FunctionContext) -> NeonResult<Box<MergeStatement>> {
     match this(cx, 0)? {
         Node::Merge(merge) => Ok(merge),
         Node::PendingMerge(_) => refuse(cx, "a MERGE needs a WHEN arm first"),
-        other => refuse(cx, format!("expected a MERGE, got {}", other.describe())),
+        other => cx.throw_type_error(format!("expected a MERGE, got {}", other.describe())),
     }
 }
 
@@ -258,13 +258,10 @@ fn action_set(cx: &mut FunctionContext) -> NeonResult<Node> {
             Action::Insert(insert.and_value(column, value))
         }
         other => {
-            return refuse(
-                cx,
-                format!(
-                    "expected a MERGE update or insert, got {}",
-                    other.describe()
-                ),
-            );
+            return cx.throw_type_error(format!(
+                "expected a MERGE update or insert, got {}",
+                other.describe()
+            ));
         }
     };
     Ok(Node::MergeAction(action))
@@ -274,7 +271,7 @@ fn action_set(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `USER VALUE` on an insert.
 fn action_overriding(cx: &mut FunctionContext) -> NeonResult<Node> {
     let Node::MergeAction(Action::Insert(insert)) = this(cx, 0)? else {
-        return refuse(cx, "overriding applies to a MERGE insert");
+        return cx.throw_type_error("overriding applies to a MERGE insert");
     };
     let overriding = match choice(cx, 1, "overriding", &["systemValue", "userValue"])? {
         "systemValue" => Overriding::SystemValue,

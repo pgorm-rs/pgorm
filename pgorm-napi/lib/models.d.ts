@@ -144,8 +144,9 @@ export declare class Column<K extends ColumnKind = ColumnKind, O extends ColumnO
  * Declare a column of `kind`: a kind's name such as `"i32"`, or a
  * schema-qualified `TypeName` for an enum or `CreatedRange` /
  * `CreatedMultirange` for a range type a schema created, as a decoded row
- * names each. An unknown option, `primaryKey` with `nullable`, a generated
- * column with a `default`, and `values` on a column that is no enum are
+ * names each. An unknown option, or one of the wrong type, is a
+ * `TypeError`; `primaryKey` with `nullable`, a generated column with a
+ * `default`, and `values` on a column that is no enum are
  * {@link ConstructionError}s.
  */
 export declare function column<const K extends ColumnKind, const O extends ColumnOptions = {}>(

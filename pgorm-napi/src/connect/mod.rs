@@ -690,7 +690,7 @@ fn connection_ping(mut cx: FunctionContext) -> JsResult<JsPromise> {
 /// a transaction or stream holds it, end that and discard it; resolves once
 /// it is released.
 // [spec:pgorm:req:bindings.connections]
-// [spec:pgorm:req:napi.lifecycle]
+// [spec:pgorm:req:napi.lifecycle+2]
 fn connection_close(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = connection(&mut cx)?;
     state.close_now();

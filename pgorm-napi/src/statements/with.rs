@@ -39,12 +39,11 @@ fn expression<'cx>(
         Some(Node::Merge(merge)) => CommonTableExpression::new(table, *merge),
         Some(other) => {
             let what = other.describe();
-            return refuse(
-                cx,
-                format!("a common table expression's body is a statement, not {what}"),
-            );
+            return cx.throw_type_error(format!(
+                "a common table expression's body is a statement, not {what}"
+            ));
         }
-        None => return refuse(cx, "a common table expression's body is a statement"),
+        None => return cx.throw_type_error("a common table expression's body is a statement"),
     };
     let columns = arg(cx, index + 2);
     if !absent(cx, columns) {
@@ -56,7 +55,7 @@ fn expression<'cx>(
     if let Ok(flag) = materialized.downcast::<JsBoolean, _>(cx) {
         expression.materialized(flag.value(cx));
     } else if !absent(cx, materialized) {
-        return refuse(cx, "materialized is a boolean");
+        return cx.throw_type_error("materialized is a boolean");
     }
     Ok(expression)
 }
@@ -118,6 +117,6 @@ pub(super) fn clause_at<'cx>(
     let value = arg(cx, index);
     match node(cx, value) {
         Some(Node::With(clause)) => Ok(clause),
-        _ => refuse(cx, "expected a With clause"),
+        _ => cx.throw_type_error("expected a With clause"),
     }
 }

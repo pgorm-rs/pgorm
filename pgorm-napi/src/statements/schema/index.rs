@@ -10,7 +10,7 @@ use pgorm::pgorm_query::{Index, IndexColumn, IndexCreateStatement, IndexOrder, I
 use super::{
     super::{
         Node,
-        args::{arg, name, name_at, node, predicate_at, refuse},
+        args::{arg, name, name_at, node, predicate_at},
     },
     Ddl, Part,
     options::{flag, get, name_option, names, object, pick, relation_at},
@@ -39,10 +39,9 @@ fn entry<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<Index
         Some(Node::Expr(expr)) => return Ok(IndexColumn::expr(expr)),
         Some(other) => {
             let what = other.describe();
-            return refuse(
-                cx,
-                format!("an index entry is a column's name or an expression, not {what}"),
-            );
+            return cx.throw_type_error(format!(
+                "an index entry is a column's name or an expression, not {what}"
+            ));
         }
         None => {}
     }

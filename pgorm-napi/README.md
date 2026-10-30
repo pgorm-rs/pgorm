@@ -260,7 +260,9 @@ for await (const { channel, payload, processId } of listener) {
 - `next({ signal })` takes an `AbortSignal`, and an aborted pull leaves the
   listener open; an aborted `listen` or `unlisten` closes it, since the
   server may have acted on it. `close()`, `await using` and a `for await`
-  loop leaving early close the listener and its connection.
+  loop leaving early close the listener and its connection; a pull waiting
+  when it closes ends as done, and one waiting when its pool closes rejects
+  with a `LifecycleError`.
 - **`notify(channel, payload)`** on a pool, connection or transaction sends
   `SELECT pg_notify($1, $2)` with both bound; in a transaction it is
   delivered when the transaction commits, and never if it rolls back. A
@@ -295,15 +297,17 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
 - **Builders never change.** Each method returns a new builder from a copy of
   its receiver's pgorm-query state, so a base query can be extended in two
   directions. Builders come from the module's functions (`select`, `col`,
-  `bind`, `call`, `caseWhen`, `caseOf`, `exists`, `scalar`, `array`, `tuple`,
+  `bind`, `literal`, `call`, `caseWhen`, `caseOf`, `exists`, `scalar`, `array`, `tuple`,
   `groupingSet`, `rollup`, `cube`, `groupingSets`, `tableFunction`) and the
   `Table` and `With` constructors.
 - **Values are bound, identifiers quoted.** An operand that is not an
   expression is a parameter, inferred as one is or declared with `Value` — an
   enum's label is cast to its type. `null` is refused (test with `isNull()`, or
   bind `Value.null(kind)`). An `Interval`, or a `Temporal.Duration`, binds as
-  pgorm's interval value, its months, days and microseconds kept apart. A name
-  is 1–63 bytes, always an identifier, its dots included.
+  pgorm's interval value, its months, days and microseconds kept apart. Only
+  `literal(v)` writes a value into the SQL text instead, as pgorm-query
+  renders a constant, read as a parameter is and cast as its kind needs. A
+  name is 1–63 bytes, always an identifier, its dots included.
 - **Expressions**: comparisons and arithmetic (`eq` .. `gte`, `add` .. `mod`,
   `concat`), `and`/`or`/`not` and `Condition.all`/`any`, `isNull`, `isIn` a list
   or a `Select`, `between` (`{ symmetric }`), `like`/`ilike`/`similarTo` with
@@ -343,10 +347,12 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
   samples a table. `new With(name, query, { columns, materialized }).cte(..)`
   and `With.recursive(name, query, { search, cycle })` are its common table
   expressions.
-- **Refusals happen as a builder is called**: an argument that cannot be built
-  — an unknown function, a negative limit, a LIKE escape of two characters, an
-  empty tuple — throws a `ConstructionError` there, so a statement that cannot
-  be built never exists. A statement binding more than 65,535 values is refused
+- **Refusals happen as a builder is called**: an argument of a type the method
+  does not take — a number for a name, a plain value where an expression or a
+  `Select` goes, a string outside a closed choice, an unknown option — throws
+  a `TypeError` there, and one that cannot be built — an unknown function, a
+  negative limit, a LIKE escape of two characters, an empty tuple — a
+  `ConstructionError`, so a statement that cannot be built never exists. A statement binding more than 65,535 values is refused
   before anything is sent, and so is a tie limit with no ORDER BY or beside
   SKIP LOCKED — by `inspect()` and every terminal, since the order may come
   after the limit, and as soon as such a query is read into another
@@ -548,8 +554,9 @@ const pages = Account.find().orderBy(Account.col("id").asc()).paginate(50);
   `CreatedMultirange`, and the options `name`, `nullable`, `array`,
   `primaryKey` (each such column, in order, makes the key), `default`,
   `generated` (`"always"`, which no write sets, or `"byDefault"`) and an
-  enum's `values`. A declaration that cannot be used throws a
-  `ConstructionError` as it is made.
+  enum's `values`. A declaration of the wrong shape — an unknown option, an
+  option of the wrong type — throws a `TypeError` as it is made, and one that
+  cannot be used a `ConstructionError`.
 - **Records** are checked against the declaration as they decode: the
   result's columns are exactly the ones selected, each of its declared kind —
   an `int8` read into an `i32` field, or another schema's enum, is a
@@ -862,7 +869,8 @@ Every failure rejects with a subclass of `PgormError`: `DatabaseError` when
 PostgreSQL refuses a statement, with its `sqlstate`, `severity` and optional
 diagnostic fields (`detail`, `hint`, `schema`, `table`, `column`, `datatype`,
 `constraint`); `ConnectionError` when the server cannot be reached;
-`ConstructionError` for an argument pgorm cannot send; `DecodeError` for a
+`ConstructionError` for an argument pgorm cannot send, an argument of a type
+the call does not take being JavaScript's own `TypeError`; `DecodeError` for a
 result that does not decode; `LifecycleError` for a handle used after it
 closed or while another operation holds it; `TimeoutError` when no connection
 frees up in time. Credentials never appear in a message.

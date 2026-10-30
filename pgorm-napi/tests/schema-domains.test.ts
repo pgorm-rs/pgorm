@@ -21,7 +21,7 @@ import {
   Table,
   TypeName,
 } from "../lib/index.js";
-import { scratchDatabase } from "./support.ts";
+import { mistyped, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -94,16 +94,16 @@ test("each domain statement names its domain as a type, renders its clauses in o
   );
 
   assert.throws(() => dropDomain([] as never), refused(/at least one domain/));
-  assert.throws(() => createDomain(new Table("t") as never, "integer"), refused(/string or a TypeName/));
+  assert.throws(() => createDomain(new Table("t") as never, "integer"), mistyped(/string or a TypeName/));
   assert.throws(() => createDomain("d", "nonsense" as never), ConstructionError);
   assert.throws(() => createDomain("", "integer"), refused(/1–63 UTF-8 bytes/));
   assert.throws(() => alterDomain("d").renameTo("x".repeat(64)), refused(/1–63 UTF-8 bytes/));
-  assert.throws(() => createDomain("d", "integer").check(1 as never), refused(/expected an expression/));
+  assert.throws(() => createDomain("d", "integer").check(1 as never), mistyped(/expected an expression/));
   assert.throws(
     () => createDomain("d", "integer").check(domainValue().gt(0), { notValid: true } as never),
     TypeError,
   );
-  assert.throws(() => alterDomain("d").dropConstraint("c", { behavior: "sideways" } as never), ConstructionError);
+  assert.throws(() => alterDomain("d").dropConstraint("c", { behavior: "sideways" } as never), mistyped(/behavior is one of/));
 });
 
 // [spec:pgorm:req:bindings.schema-domains/test]

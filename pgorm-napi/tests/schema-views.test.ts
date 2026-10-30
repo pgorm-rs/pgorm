@@ -27,7 +27,7 @@ import {
   Table,
   Value,
 } from "../lib/index.js";
-import { scratchDatabase } from "./support.ts";
+import { mistyped, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -200,8 +200,8 @@ test("view statements PostgreSQL cannot take are refused as they are built", () 
   );
   assert.throws(() => refreshMaterializedView("m", { cascade: true } as never), TypeError);
   assert.throws(() => dropView("v", { force: true } as never), TypeError);
-  assert.throws(() => createView("v", new Table("t") as never), refused(/expected a Select/));
-  assert.throws(() => createView("v", select(col("a"))).checkOption("both" as never), refused(/"local", "cascaded"/));
+  assert.throws(() => createView("v", new Table("t") as never), mistyped(/expected a Select/));
+  assert.throws(() => createView("v", select(col("a"))).checkOption("both" as never), mistyped(/"local", "cascaded"/));
   assert.throws(() => dropMaterializedView([] as never), refused(/at least one relation/));
   const recursive = createRecursiveView("counter", ["n"], select(col("n")));
   assert.equal("checkOption" in recursive, false);

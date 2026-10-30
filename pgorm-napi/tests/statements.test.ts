@@ -21,6 +21,7 @@ import {
   exists,
   insert,
   Interval,
+  literal,
   Pool,
   scalar,
   select,
@@ -30,7 +31,7 @@ import {
   Value,
   With,
 } from "../lib/index.js";
-import { scratchDatabase } from "./support.ts";
+import { mistyped, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -167,7 +168,7 @@ test("every terminal runs a built statement as it runs SQL text, on a pool, a co
 });
 
 // [spec:pgorm:req:bindings.statements/test]
-// [spec:pgorm:req:napi.argument-errors/test]
+// [spec:pgorm:req:napi.argument-errors+2/test]
 test("a built statement binds its own values, so parameters passed beside it are refused", async () => {
   const query = select().from(account);
   await assert.rejects(pool().query(query, [1] as never), (error: unknown) => {
@@ -282,7 +283,7 @@ test("regex, notRegex, iregex and notIregex, and pathExists, answer as PostgreSQ
   ));
   assert.deepStrictEqual(answers, { found: true, missing: false, strict: null });
   assert.match(doc.pathExists("$.a").inspect().sql, /@\? CAST\(\$2::text AS jsonpath\)$/);
-  assert.throws(() => doc.pathExists(1 as never), refused(/JSON path is a string/));
+  assert.throws(() => doc.pathExists(1 as never), mistyped(/JSON path is a string/));
 });
 
 // [spec:pgorm:req:bindings.quantifiers/test]    matches is @@, and any and all quantify each
@@ -587,7 +588,33 @@ test("an interval binds in a built statement, each field and sign kept", async (
   );
 });
 
+// [spec:pgorm:req:napi.pipeline-operands+2/test]
+test("literal() writes a value into the SQL as pgorm-query renders a constant, and every other operand is bound", async () => {
+  const query = select(
+    literal("O'Brien").as("name"),
+    literal(new Value("glad", mood)).as("mood"),
+    literal(7).add(3).as("sum"),
+    literal(Value.null("i32")).as("nothing"),
+  );
+  const { sql, values } = query.inspect();
+  assert.equal(
+    sql,
+    `SELECT E'O\\'Brien' AS "name", CAST('glad' AS app.mood) AS "mood", 7 + $1 AS "sum", NULL AS "nothing"`,
+  );
+  assert.deepStrictEqual(values.map((value) => [value.kind, value.value]), [["i64", 3n]]);
+  assert.deepStrictEqual(await pool().one(query), { name: "O'Brien", mood: "glad", sum: 10, nothing: null });
+  const written = select(account.col("id"))
+    .from(account)
+    .where(Condition.any(account.col("name").eq(literal("O'Brien")), account.col("mood").eq(literal(new Value("glad", mood)))))
+    .orderBy(account.col("id").asc());
+  assert.deepStrictEqual(written.inspect().values, []);
+  assert.deepStrictEqual(ids(await pool().query(written)), [2n, 3n]);
+  assert.throws(() => literal(null as never), refused(/null has no kind to write/));
+  assert.throws(() => literal(undefined as never), refused(/undefined is no SQL value/));
+});
+
 // [spec:pgorm:req:bindings.identifiers/test]
+// [spec:pgorm:req:napi.argument-errors+2/test]
 test("an identifier is 1–63 UTF-8 bytes without NUL, or refused", () => {
   assert.throws(() => col(""), refused(/identifier/));
   assert.throws(() => col("x".repeat(64)), refused(/identifier/));
@@ -595,7 +622,8 @@ test("an identifier is 1–63 UTF-8 bytes without NUL, or refused", () => {
   assert.equal(col("é".repeat(31)).inspect().sql, `SELECT "${"é".repeat(31)}"`);
   assert.throws(() => new Table("a\0b"), refused(/identifier/));
   assert.throws(() => col("x", { schema: "s" }), refused(/needs its table/));
-  assert.throws(() => col(1 as never), refused(/identifier is a string/));
+  assert.throws(() => col(1 as never), mistyped(/identifier is a string/));
+  assert.throws(() => new Table("t", { alias: 7 as never }), mistyped(/identifier is a string/));
 });
 
 // [spec:pgorm:req:bindings.expressions/test]
@@ -610,29 +638,39 @@ test("call() reaches only the functions pgorm-query constructs, at their argumen
 // [spec:pgorm:req:bindings.select/test]
 test("limits and offsets are non-negative integers within PostgreSQL's bigint", () => {
   const base = select().from(new Table("t"));
-  for (const bad of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1, 2n ** 63n, -1n, "3", Number.NaN]) {
+  for (const bad of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1, 2n ** 63n, -1n, Number.NaN]) {
     assert.throws(() => base.limit(bad as never), refused(/row count/));
     assert.throws(() => base.offset(bad as never), refused(/row count/));
+  }
+  for (const bad of ["3", true]) {
+    assert.throws(() => base.limit(bad as never), mistyped(/row count/));
+    assert.throws(() => base.offset(bad as never), mistyped(/row count/));
   }
   assert.deepStrictEqual(base.limit(2n ** 63n - 1n).inspect().values.map((value) => value.value), [2n ** 63n - 1n]);
 });
 
 // [spec:pgorm:req:bindings.expressions/test]
+// [spec:pgorm:req:napi.argument-errors+2/test]
 test("shapes PostgreSQL has no SQL for are refused as they are built", () => {
   assert.throws(() => (select().select as () => unknown).call(select()), refused(/at least one item/));
   assert.throws(() => (tuple as () => unknown)(), refused(/at least one item/));
   assert.throws(() => col("x").like("a", { escape: "ab" }), refused(/escape is one character/));
   assert.throws(() => col("x").like("a", { escape: "\0" }), refused(/escape is one character/));
-  assert.throws(() => col("x").like("a", { escape: 1 as never }), refused(/escape is one character/));
-  assert.throws(() => col("x").like(1 as never), refused(/pattern is a string/));
-  assert.throws(() => select(bind(1).asc() as never), refused(/projection is an expression, not an ordering/));
-  assert.throws(() => select().from(col("x") as never), refused(/FROM item is a Table or a FromItem/));
-  assert.throws(() => select().join(new Table("t"), col("x"), { kind: "outer" as never }), refused(/join's kind/));
+  assert.throws(() => col("x").like("a", { escape: 1 as never }), mistyped(/escape is a string/));
+  assert.throws(() => col("x").like(1 as never), mistyped(/pattern is a string/));
+  assert.throws(() => select(bind(1).asc() as never), mistyped(/projection is an expression, not an ordering/));
+  assert.throws(() => select(1 as never), mistyped(/projection is an expression/));
+  assert.throws(() => select().from(col("x") as never), mistyped(/FROM item is a Table or a FromItem/));
+  assert.throws(() => select().where(1 as never), mistyped(/expression or a Condition/));
+  assert.throws(() => select().join(new Table("t"), col("x"), { kind: "outer" as never }), mistyped(/join's kind/));
   assert.throws(() => select().join(new Table("t"), col("x"), { lateral: true }), refused(/lateral applies to a subquery/));
-  assert.throws(() => select().lock("exclusive" as never), refused(/lock strength/));
+  assert.throws(() => select().lock("exclusive" as never), mistyped(/lock strength/));
+  assert.throws(() => select().union(col("x") as never), mistyped(/expected a Select/));
+  assert.throws(() => col("x").add(any([1]) as never), refused(/ANY and ALL follow a comparison/));
+  assert.throws(() => col("x").eq(undefined as never), refused(/undefined is no SQL value/));
   const recursive = With.recursive("r", select(bind(1)));
   assert.throws(() => recursive.cte("s", select(bind(1))), refused(/recursive WITH holds exactly one/));
-  assert.throws(() => col("x").asc({ nulls: "middle" as never }), refused(/nulls/));
+  assert.throws(() => col("x").asc({ nulls: "middle" as never }), mistyped(/nulls/));
 });
 
 // [spec:pgorm:req:bindings.statements/test]

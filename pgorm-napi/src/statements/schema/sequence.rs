@@ -90,7 +90,7 @@ fn sequence_if_not_exists(cx: &mut FunctionContext) -> NeonResult<Node> {
             create.if_not_exists();
             Ok(Ddl::CreateSequence(create).into())
         }
-        _ => refuse(cx, "IF NOT EXISTS belongs to a CREATE SEQUENCE"),
+        _ => cx.throw_type_error("IF NOT EXISTS belongs to a CREATE SEQUENCE"),
     }
 }
 
@@ -100,10 +100,7 @@ fn sequence_if_exists(cx: &mut FunctionContext) -> NeonResult<Node> {
             alter.if_exists();
             Ok(Ddl::AlterSequence(alter).into())
         }
-        _ => refuse(
-            cx,
-            "IF EXISTS belongs to an ALTER SEQUENCE with a clause to apply",
-        ),
+        _ => cx.throw_type_error("IF EXISTS belongs to an ALTER SEQUENCE with a clause to apply"),
     }
 }
 
@@ -147,7 +144,7 @@ fn sequence_restart(cx: &mut FunctionContext) -> NeonResult<Node> {
         Some(integer(cx, value, "a restart value")?)
     };
     let pending = match clauses {
-        Clauses::Create(_) => return refuse(cx, "RESTART belongs to an ALTER SEQUENCE"),
+        Clauses::Create(_) => return cx.throw_type_error("RESTART belongs to an ALTER SEQUENCE"),
         Clauses::Pending(pending) => pending,
         Clauses::Alter(mut alter) => {
             match value {

@@ -14866,6 +14866,14 @@ children (
                 text "Re-read after napi.schema-api moved to +3: it lists fromEntity(entity) giving an EntitySchema (bindings.schema-from-entity), as python.schema-api lists from_entity, now that napi-schema-from-entity built it. The schema module's code and tests are pinned at +3."
                 after_done true
             }
+
+            {
+                at 2026-10-30T15:35:04.216473Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-read after napi-binding-decisions (b7a7b5fe) moved bindings.errors, bindings.listen, python.lifecycle, napi.lifecycle, napi.argument-errors and napi.pipeline-operands to +2. bindings.errors gained one clause: a shared rule's ConstructionError is for the argument's value, an argument of the wrong type taking the class each binding's own rule names, which python.argument-errors keeps as ConstructionError for Python. bindings.listen states once that a pull pending when the listener itself closes ends the iteration, which Python's listener already did and JavaScript's now does; python.lifecycle and napi.lifecycle lost their per-binding sentences. napi.argument-errors and napi.pipeline-operands are JavaScript's rewritten rules. Every reference to the six rules, in both bindings, is pinned at +2, and the code they sit on is what napi-binding-decisions left at these versions; Python's sites changed only their pins."
+                after_done true
+            }
         )
     }
 
@@ -15043,12 +15051,34 @@ children (
         title "JavaScript statements take literal(), a wrong-typed argument is a TypeError, and a listener closed under a waiting pull ends the iteration"
         kind @feat
         deps (binding-spec-consolidation)
+        sealed true
         log (
             {
                 at 2026-10-30T13:24:34.329416Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "The JavaScript half of the operator's 2026-10-30 decisions (binding-spec-consolidation): (1) statements gain literal(), every other plain operand still bound; (12) an argument of the wrong type is a TypeError, ConstructionError only for a value that cannot become what pgorm sends (today a wrong WINDOW entry is a ConstructionError and a bad listener capacity a RangeError); (13) a listener closed while a pull waits ends the iteration instead of rejecting with LifecycleError. Also settle (4) raw-sql and (5) records as language differences: their rules stay per binding as settled ones, and bindings-surface.json moves their names from undecided to each side's own names with the reason."
+            }
+
+            {
+                at 2026-10-30T15:22:00.935375Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Where the argument-error line falls in JavaScript, recorded in napi.argument-errors+2. TypeError: an argument whose JavaScript type the call does not take (text that is no string, a flag, count or size of another type, a list that is no array, a pair of the wrong length, options that are no object, a builder of another class or a plain value where a builder goes, a receiver of another class, an unknown option key), and a string outside a closed choice, since Python spells a closed choice as a class whose other values are of another type. ConstructionError: a value that cannot become what pgorm sends. Values have no wrong type: a parameter, an operand (a misplaced any()/all() or a non-expression builder in operand position included), a Value's data, Decimal/Uuid/Interval/Range/Multirange data, a model field's value, a COPY row field and JSON stay ConstructionError, as napi.inference, bindings.value-tags and napi.values pin. Names pgorm has nothing for (a function, a value kind, a built-in type, a pipeline cast, a registration, a field, a column) stay ConstructionError, as Python takes them as str. A pending MERGE/ALTER and a ColumnDef given to a terminal stay ConstructionError per bindings.merge and bindings.schema. The listener capacity stays a RangeError. Shared rules that pin ConstructionError for an argument (bindings.identifiers, the LIMIT clause of bindings.select, path_exists in bindings.expressions, the unknown option of bindings.models, bindings.connections' unusable option) are read through one clause added to bindings.errors+2: a rule's ConstructionError is for the argument's value, a wrong type taking the binding's own class, rather than bumping each. Statement literal() is specified in napi.pipeline-operands+2, widened to statements, for python-binding-decisions to fold with python.pipeline-operands into one shared rule."
+            }
+
+            {
+                at 2026-10-30T15:22:24.369648Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Delivered. (1) literal(value) is exported from the module: args::literal reads the value as a parameter is and wraps it in SimpleExpr::Constant, cast as its kind needs; parity case select/literals against pgorm-query's own builders, and a live test. (12) Every refusal in pgorm-napi's src and lib was classified: Rust's refuse() keeps ConstructionError and a new read::mistyped() throws TypeError; args::choice and options::pick share one closed-choice reader (moved to args::pick), and the pool's tls and recycle are read through it. Moved ConstructionError to TypeError: non-string identifiers and names, non-string JSON paths, LIKE patterns and escapes, non-number counts, sizes, offsets and sampling arguments, every closed choice (join kind, lock strength, frame parts, NULLS, SQL/JSON behaviours, generated/identity modes, deferrability, enforcement, transaction mode and isolation, COPY format and log verbosity, tls, recycle, sequence type, index order, check option, drop behaviour), a builder of the wrong class (Select, expression, Condition, ordering, Window/ExtendedWindow including a WINDOW entry and OVER's window, frame, Table/FROM item, WITH, MERGE action, conflict action, ColumnDef, DataType, TypeName), every wrong receiver, a non-statement or COPY given to a statement terminal, wrong-length pairs, a missing alias on a table function or JSON_TABLE, unknown model and column options, a model column's option of the wrong type, a model key with other fields, a non-string field name, Value.items() on a non-array. (13) A listener closed under a waiting pull resolves it as done; a pool closing under one still rejects with LifecycleError. bindings.listen+2 states it once; python.lifecycle+2 and napi.lifecycle+2 lost their per-binding wording. raw-sql and records are settled language differences: RawSQL and Field moved to python.only, the two questions removed, and pgorm.literal is a shared name. pgorm-napi/checks/codegen.js fails its consumer type-check (unused @ts-expect-error on Account.col(\"mood\").eq(\"wild\")) with HEAD's declarations too, so it predates this node."
+            }
+
+            {
+                at 2026-10-30T15:22:24.475936Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -15064,6 +15094,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "The Python half of the operator's 2026-10-30 decisions (binding-spec-consolidation): (1) a pipeline's plain operand is bound through its stage's binder as JavaScript's is, literal() the one way to write a value into the SQL in statements and pipelines, null() literal(None); (2) a wrong row count from one / optional is a DecodeError, not a DatabaseError without SQLSTATE; (3) a list infers as an array of one kind and a dict as JSON, empty, all-null and mixed lists and every tuple refused; (9) entities(), graphs() and source_tuples() list registrations as JavaScript's do, capabilities(), require_capability(), UnsupportedCapabilityError and Value.snapshot() staying Python-only as the campaign's surface; (11) a registered update_many() needs where or all_rows() before it runs, a ConstructionError otherwise; (12) an argument of the wrong type is a TypeError, ConstructionError only for a value that cannot become what pgorm sends; (13) a listener closed under a waiting pull ends the iteration (Python's behaviour already; confirm and fold the rule into bindings.md); (14) the pool takes PEM data as ca=, cafile= kept as a convenience. Depends on binding-renames so it is built on the final names."
+            }
+
+            {
+                at 2026-10-30T15:53:08.870582Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "From napi-binding-decisions' merge (2026-10-30): bindings.errors+2 gained a clause reading every shared rule's ConstructionError as being for the argument's value, so that five rules saying \"anything else is a ConstructionError\" (bindings.identifiers, bindings.select's LIMIT and OFFSET, bindings.expressions' path_exists, bindings.models' options, bindings.connections' string and options) did not have to change when JavaScript moved wrong-typed arguments to TypeError. When folding the argument-error rules, delete that clause and say it where it belongs: narrow each of the five to \"any other value is a ConstructionError\" (bumped, both bindings' annotations re-pinned), and state the wrong-type class once in the shared argument-errors rule."
             }
         )
     }

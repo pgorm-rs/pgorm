@@ -154,7 +154,7 @@ pub(crate) fn condition<'cx>(
     match statements::node(cx, value) {
         Some(Node::Expr(expr)) => Ok(Condition::all().add(expr)),
         Some(Node::Condition(condition)) => Ok(condition),
-        _ => read::refuse(cx, "a condition is an expression or a Condition"),
+        _ => cx.throw_type_error("a condition is an expression or a Condition"),
     }
 }
 

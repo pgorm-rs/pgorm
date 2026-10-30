@@ -19,6 +19,7 @@ use super::{
 pub(super) const EXPORTS: &[(&str, super::Build)] = &[
     ("exprCol", col),
     ("exprBind", bind),
+    ("exprLiteral", literal),
     ("exprCall", call),
     ("exprTuple", tuple),
     ("exprSubquery", subquery),
@@ -77,6 +78,14 @@ fn bind(cx: &mut FunctionContext) -> NeonResult<Node> {
     Ok(Node::Expr(expr))
 }
 
+/// `exprLiteral(value)`: a value written into the SQL text.
+// [spec:pgorm:req:napi.pipeline-operands+2]
+fn literal(cx: &mut FunctionContext) -> NeonResult<Node> {
+    let value = arg(cx, 0);
+    let expr = args::literal(cx, value)?;
+    Ok(Node::Expr(expr))
+}
+
 /// The functions `call` reaches, each through its pgorm-query constructor
 /// and taking the argument counts the constructor does.
 fn function(name: &str, args: &[SimpleExpr]) -> Option<FunctionCall> {
@@ -122,11 +131,7 @@ fn function(name: &str, args: &[SimpleExpr]) -> Option<FunctionCall> {
 // [spec:pgorm:req:bindings.expressions]
 fn call(cx: &mut FunctionContext) -> NeonResult<Node> {
     let value = arg(cx, 0);
-    let name = if value.is_a::<JsString, _>(cx) {
-        crate::values::read::string(cx, value)?
-    } else {
-        return refuse(cx, "a function's name is a string");
-    };
+    let name = crate::values::read::text(cx, value, "a function's name")?;
     let args = operands_at(cx, 1)?;
     match function(&name, &args) {
         Some(call) => Ok(Node::Expr(call.into())),
@@ -264,10 +269,7 @@ fn binary(cx: &mut FunctionContext) -> NeonResult<Node> {
 fn path_exists(cx: &mut FunctionContext) -> NeonResult<Node> {
     let expr = Expr::expr(receiver(cx, 0)?);
     let path = arg(cx, 1);
-    if !path.is_a::<JsString, _>(cx) {
-        return refuse(cx, "a JSON path is a string");
-    }
-    let path = crate::values::read::string(cx, path)?;
+    let path = crate::values::read::text(cx, path, "a JSON path")?;
     Ok(Node::Expr(expr.json_path_exists(path)))
 }
 
@@ -360,22 +362,21 @@ fn like(cx: &mut FunctionContext) -> NeonResult<Node> {
         ],
     )?;
     let pattern = arg(cx, 2);
-    if !pattern.is_a::<JsString, _>(cx) {
-        return refuse(cx, "a LIKE or SIMILAR TO pattern is a string");
-    }
-    let mut pattern = pgorm::pgorm_query::LikeExpr::new(crate::values::read::string(cx, pattern)?);
+    let pattern = crate::values::read::text(cx, pattern, "a LIKE or SIMILAR TO pattern")?;
+    let mut pattern = pgorm::pgorm_query::LikeExpr::new(pattern);
     let escape = arg(cx, 3);
     if !args::absent(cx, escape) {
-        let refusal = "a pattern's escape is one character, not NUL, or empty to turn escaping off";
-        if !escape.is_a::<JsString, _>(cx) {
-            return refuse(cx, refusal);
-        }
-        let escape = crate::values::read::string(cx, escape)?;
+        let escape = crate::values::read::text(cx, escape, "a pattern's escape")?;
         let mut chars = escape.chars();
         pattern = match (chars.next(), chars.next()) {
             (None, _) => pattern.no_escape(),
             (Some(character), None) if character != '\0' => pattern.escape(character),
-            _ => return refuse(cx, refusal),
+            _ => {
+                return refuse(
+                    cx,
+                    "a pattern's escape is one character, not NUL, or empty to turn escaping off",
+                );
+            }
         };
     }
     let built = match operator {
@@ -521,10 +522,7 @@ fn condition_new(cx: &mut FunctionContext) -> NeonResult<Node> {
 fn condition_receiver<'cx>(cx: &mut FunctionContext<'cx>) -> NeonResult<Condition> {
     match this(cx, 0)? {
         Node::Condition(condition) => Ok(condition),
-        other => refuse(
-            cx,
-            format!("expected a Condition, got {}", other.describe()),
-        ),
+        other => cx.throw_type_error(format!("expected a Condition, got {}", other.describe())),
     }
 }
 
@@ -559,7 +557,7 @@ fn case_when(cx: &mut FunctionContext) -> NeonResult<Node> {
         Some(Node::Expr(SimpleExpr::Case(statement))) => statement.case(condition, result).into(),
         Some(other) => {
             let what = other.describe();
-            return refuse(cx, format!("expected a searched CASE, got {what}"));
+            return cx.throw_type_error(format!("expected a searched CASE, got {what}"));
         }
     };
     Ok(Node::Expr(built))
@@ -576,7 +574,7 @@ fn case_of_when(cx: &mut FunctionContext) -> NeonResult<Node> {
         Node::Expr(SimpleExpr::SimpleCase(statement)) => statement.when(value, result).into(),
         other => {
             let what = other.describe();
-            return refuse(cx, format!("expected a simple CASE, got {what}"));
+            return cx.throw_type_error(format!("expected a simple CASE, got {what}"));
         }
     };
     Ok(Node::Expr(built))
@@ -589,7 +587,7 @@ fn case_else(cx: &mut FunctionContext) -> NeonResult<Node> {
         Node::Expr(SimpleExpr::Case(statement)) => statement.finally(result).into(),
         Node::Expr(SimpleExpr::SimpleCase(statement)) => statement.finally(result).into(),
         other => {
-            return refuse(cx, format!("expected a CASE, got {}", other.describe()));
+            return cx.throw_type_error(format!("expected a CASE, got {}", other.describe()));
         }
     };
     Ok(Node::Expr(built))

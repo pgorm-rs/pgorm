@@ -91,17 +91,17 @@ pub(crate) fn built(node: &Node) -> Option<Result<(String, Values), &'static str
 fn insert_receiver<'cx>(cx: &mut FunctionContext<'cx>) -> NeonResult<Insert> {
     match this(cx, 0)? {
         Node::Insert(insert) => Ok(insert),
-        other => refuse(cx, format!("expected an INSERT, got {}", other.describe())),
+        other => cx.throw_type_error(format!("expected an INSERT, got {}", other.describe())),
     }
 }
 
 fn target<'cx>(cx: &mut FunctionContext<'cx>) -> NeonResult<pgorm::pgorm_query::NamedTable> {
     match this(cx, 0)? {
         Node::Table(table) => Ok(table),
-        other => refuse(
-            cx,
-            format!("a write's target is a Table, not {}", other.describe()),
-        ),
+        other => cx.throw_type_error(format!(
+            "a write's target is a Table, not {}",
+            other.describe()
+        )),
     }
 }
 
@@ -220,7 +220,7 @@ fn update_new(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `updateSet(update, column, value)`: one assignment, each column once.
 fn update_set(cx: &mut FunctionContext) -> NeonResult<Node> {
     let Node::Update(mut update) = this(cx, 0)? else {
-        return refuse(cx, "expected an UPDATE");
+        return cx.throw_type_error("expected an UPDATE");
     };
     let column = name_at(cx, 1)?;
     let value = arg(cx, 2);
@@ -259,7 +259,7 @@ macro_rules! on_write {
             })+
             other => {
                 let what = other.describe();
-                return refuse($cx, format!("{what} takes no such clause"));
+                return $cx.throw_type_error(format!("{what} takes no such clause"));
             }
         }
     };
@@ -299,7 +299,7 @@ fn write_from(cx: &mut FunctionContext) -> NeonResult<Node> {
         }
         other => {
             let what = other.describe();
-            return refuse(cx, format!("{what} reads no FROM or USING item"));
+            return cx.throw_type_error(format!("{what} reads no FROM or USING item"));
         }
     }
     Ok(node)

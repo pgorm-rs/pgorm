@@ -2,7 +2,7 @@
 
 // A dedicated listening connection: the channels it listens on, and the
 // notifications it receives, pulled one at a time.
-// [spec:pgorm:req:bindings.listen]
+// [spec:pgorm:req:bindings.listen+2]
 
 import { LifecycleError } from "./errors.js";
 import { abortable, native, signalOf } from "./operations.js";
@@ -35,10 +35,11 @@ function channelOf(channel) {
  * configuration, receiving the notifications sent on the channels it listens
  * on. It is an async iterator of them, one per `next()`, in the order the
  * server sent them; nothing reconnects it. Its iteration ends once it closes:
- * by `close()`, by a `for await` loop leaving early, by its pool closing, or
- * by the failure it ends with — its connection lost, or a notification
- * arriving while `capacity` wait unread — which the pull that meets it rejects
- * with.
+ * by `close()`, which ends a waiting pull as done; by a `for await` loop
+ * leaving early; by its pool closing, which a waiting pull rejects with a
+ * `LifecycleError`; or by the failure it ends with — its connection lost, or
+ * a notification arriving while `capacity` wait unread — which the pull that
+ * meets it rejects with.
  *
  * @implements {AsyncIterableIterator<import("./index.d.ts").Notification>}
  */
@@ -146,8 +147,8 @@ export class Listener {
   }
 
   /**
-   * Close the listener's connection, ending a pull in flight, and resolve
-   * once it is released.
+   * Close the listener's connection, ending a pull in flight as done, and
+   * resolve once it is released.
    *
    * @returns {Promise<void>}
    */
