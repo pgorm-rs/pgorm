@@ -14536,7 +14536,7 @@ children (
         implements {
             main ([spec:pgorm:req:bindings.case])
         }
-        deps (binding-spec-consolidation)
+        deps (binding-renames)
         log (
             {
                 at 2026-10-26T17:38:14.409574Z
@@ -14561,7 +14561,7 @@ children (
         implements {
             main ([spec:pgorm:req:bindings.from-subqueries] [spec:pgorm:req:bindings.row-locks])
         }
-        deps (binding-spec-consolidation)
+        deps (binding-renames)
         log (
             {
                 at 2026-10-26T17:38:14.570625Z
@@ -14586,7 +14586,7 @@ children (
         implements {
             main ([spec:pgorm:req:bindings.model-columns])
         }
-        deps (binding-spec-consolidation)
+        deps (binding-renames)
         log (
             {
                 at 2026-10-26T17:38:14.718235Z
@@ -14601,6 +14601,14 @@ children (
                 kind @note
                 text "binding-spec-consolidation gave this node bindings.model-columns: a declared column's comparisons and every operator that takes a value (between, not_between, is_distinct_from, is_not_distinct_from, is_in, is_not_in, contains, contained_by, overlaps and the range position operators) convert the value through the field's declared kind. Python's ModelColumn lacks the twelve listed under python.gaps in docs/spec/bindings-surface.json with this node. Whether a Python column should also offer every other expression method itself, as JavaScript's does, is the operator's columns question; this node needs only the twelve."
             }
+
+            {
+                at 2026-10-30T13:24:34.522384Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-30, decision (8): Python's model and registered columns (ModelColumn and EntityColumn) offer every expression method, as JavaScript's do, not only the typed comparisons; .expr stays only if something still needs it. bindings-surface.json lists the names under the columns question."
+                after_done true
+            }
         )
     }
 
@@ -14611,7 +14619,7 @@ children (
         implements {
             main ([spec:pgorm:req:bindings.quantifiers])
         }
-        deps (binding-spec-consolidation)
+        deps (binding-renames)
         log (
             {
                 at 2026-10-26T17:38:14.856956Z
@@ -14751,6 +14759,14 @@ children (
                 kind @decision
                 text "Operator 2026-10-26: \"subagent: review and consolidate the specs\", after asking why Python and JavaScript have different spec rules. docs/spec/python.md (2026-09-08) and docs/spec/napi.md (2026-10-09) each restate the bindings' shared behaviour in their own words, and nothing holds them to each other beyond python.expressions' operator sentence (d9dd0959), so the bindings drift: Python has an expression literal() and JavaScript binds every value (napi.expressions), while both pipelines have a literal; Python lacks CASE, subqueries as FROM items, lateral joins, row locks and the declared-column operators JavaScript has. Move every rule describing behaviour both bindings offer into one shared spec file, written once and annotated by both bindings' code and tests; keep in python.md and napi.md only what differs by language (naming, async shape, native types, typing stubs, packaging, runtimes). Add a test comparing both bindings' public surface that fails when one offers what the other lacks outside a short declared list of language-only differences. Where the bindings differ by choice rather than by a missing feature, the operator decides; where one simply lacks a feature, the shared rule requires it of both and the existing gap nodes (python-case-expressions, python-select-gaps, python-model-column-operators, quantifier-beyond-comparisons) build it."
             }
+
+            {
+                at 2026-10-30T13:24:14.310242Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-30: \"everything you said, sure\", accepting all fourteen recommendations on the undecided differences. (1) literal: both bindings bind every plain operand, statements and pipelines alike, and both offer an explicit literal() in statements and pipelines. (2) row-count: a wrong row count is a DecodeError in both. (3) inference: Python infers a list as an array of one kind and a dict as JSON as JavaScript does, keeping the refusals of empty, all-null and mixed lists; a tuple stays refused. (4) raw-sql and (5) records: language differences, kept per binding. (6) names: one name each, mostly JavaScript's: where (never where_ or filter), query / one / optional (never fetch_* or one_opt), do_nothing, set, using, truncate_table, Aliased, Windowed, RowStream, PgormError, EntityGraph / EntityGraphQuery / EntityGraphCursor (freeing Graph for the model graph), PipelineExpr; Python's json_objectagg, json_arrayagg and DDL kept, so JavaScript spells jsonObjectagg, jsonArrayagg and DDL. (7) shapes: decided one at a time with a concrete proposal to the operator when each area is next worked on. (8) columns: Python's model and registered columns offer every expression method. (9) capabilities: capabilities(), require_capability(), UnsupportedCapabilityError and Value.snapshot() stay Python-only as the campaign's surface; Python gains entities(), graphs() and source_tuples(). (10) schema-api: Python adopts JavaScript's DDL builders and pending-ALTER typestates, its per-action functions deleted. (11) update-many-guard: a registered update_many() needs where or all_rows() in both. (12) argument errors: TypeError for an argument of the wrong type in both, ConstructionError only for a value that cannot become what pgorm sends. (13) a listener closed under a waiting pull ends the iteration in both. (14) TLS: both take PEM data as ca, Python keeping cafile as a convenience."
+                after_done true
+            }
         )
     }
 
@@ -14761,7 +14777,7 @@ children (
         implements {
             main ([spec:pgorm:req:bindings.writes] [spec:pgorm:req:bindings.merge] [spec:pgorm:req:bindings.with])
         }
-        deps (binding-spec-consolidation)
+        deps (binding-renames)
         log (
             {
                 at 2026-10-26T20:22:21.453706Z
@@ -14788,7 +14804,7 @@ children (
                 [spec:pgorm:req:bindings.pagination]
             )
         }
-        deps (binding-spec-consolidation)
+        deps (binding-renames)
         log (
             {
                 at 2026-10-26T20:22:21.553339Z
@@ -14812,13 +14828,21 @@ children (
                 [spec:pgorm:req:bindings.schema-sequences]
             )
         }
-        deps (binding-spec-consolidation)
+        deps (binding-renames)
         log (
             {
                 at 2026-10-26T20:22:21.656156Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed by binding-spec-consolidation. bindings.schema-tables, bindings.schema-alter, bindings.schema-indexes, bindings.schema-types and bindings.schema-sequences state what JavaScript's DDL builds and require it of both bindings. pgorm.schema lacks: foreign keys on CREATE TABLE and ALTER TABLE (CreateTable.foreign_key, add_foreign_key), identity columns (ColumnDef.identity), an ALTER TABLE holding several actions (Python has one function per action), index entries over expressions with an order and operator class, INCLUDE and a partial-index WHERE, shell, composite and range types with their ALTER TYPE attribute actions and DROP TYPE (Python builds enums only), sequences (create, alter, drop, rename, OWNED BY), extensions, and COMMENT ON. How Python spells DDL (functions with keyword arguments versus builders) waits on the operator's schema-api decision; build the missing statements in whichever shape that decision picks. Missing names are listed under python.gaps in docs/spec/bindings-surface.json with this node."
+            }
+
+            {
+                at 2026-10-30T13:24:34.616573Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-30, decision (10): Python adopts JavaScript's DDL builders and pending-ALTER typestates (several actions in one ALTER TABLE), and its per-action functions (add_column, drop_constraint, set_domain_default and the rest under the schema-api question in bindings-surface.json) are deleted, not deprecated."
+                after_done true
             }
         )
     }
@@ -14848,7 +14872,7 @@ children (
         implements {
             main ([spec:pgorm:req:bindings.registered-pools])
         }
-        deps (binding-spec-consolidation)
+        deps (binding-renames)
         log (
             {
                 at 2026-10-26T20:22:21.814939Z
@@ -14873,6 +14897,51 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Filed by binding-spec-consolidation. bindings.relation-conditions requires a registration's describe() to report each relation's condition type (all or any) and whether an on_condition adds its own condition, present or absent only. Python reports both (pgorm-python/src/entities/relations.rs, condition_type and on_condition); JavaScript's relation_json in pgorm-napi/src/entities/info.rs reports columns, period, enforcement and deferrability but neither of these. Add them, with the TypeScript declaration and a test like Python's join_condition_shape_is_reported. The surface test does not see describe()'s fields, so nothing in bindings-surface.json tracks this gap."
+            }
+        )
+    }
+
+    {
+        id binding-renames
+        title "The bindings spell each shared name one way: Python takes JavaScript's names where they differed by choice, and JavaScript takes DDL, jsonObjectagg and jsonArrayagg"
+        kind @refactor
+        deps (binding-spec-consolidation)
+        log (
+            {
+                at 2026-10-30T13:24:34.227637Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Decision (6) of the operator's 2026-10-30 answer (binding-spec-consolidation). Python: AliasedExpr→Aliased, WindowedExpr→Windowed, PgOrmError→PgormError, ResultStream→RowStream, Graph/GraphQuery/GraphCursor→EntityGraph/EntityGraphQuery/EntityGraphCursor, schema.truncate→truncate_table, pipeline Expr→PipelineExpr; on Pool, Connection and Transaction fetch_all/fetch_one/fetch_optional→query/one/optional; every one_opt→optional (model queries and rows, and a pipeline's own terminal); filter on entity, entity-graph, update-many and model queries→where; where_ on Select, Update, Delete, CopyFrom, CopyTo, ConflictTarget and ConflictUpdate→where; MergeInsert/MergeUpdate and_value→set; Conflict/ConflictTarget ignore→do_nothing; CreateIndex method→using. JavaScript: Ddl→DDL, jsonObjectAgg→jsonObjectagg, jsonArrayAgg→jsonArrayagg. The old names are deleted, not aliased or deprecated. Everything that spells them follows: stubs, docs, examples, codegen output, the generative campaign's emitted programs, tests. python.naming and napi.naming lose the exceptions these were, bindings-surface.json moves them out of undecided."
+            }
+        )
+    }
+
+    {
+        id napi-binding-decisions
+        title "JavaScript statements take literal(), a wrong-typed argument is a TypeError, and a listener closed under a waiting pull ends the iteration"
+        kind @feat
+        deps (binding-spec-consolidation)
+        log (
+            {
+                at 2026-10-30T13:24:34.329416Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "The JavaScript half of the operator's 2026-10-30 decisions (binding-spec-consolidation): (1) statements gain literal(), every other plain operand still bound; (12) an argument of the wrong type is a TypeError, ConstructionError only for a value that cannot become what pgorm sends (today a wrong WINDOW entry is a ConstructionError and a bad listener capacity a RangeError); (13) a listener closed while a pull waits ends the iteration instead of rejecting with LifecycleError. Also settle (4) raw-sql and (5) records as language differences: their rules stay per binding as settled ones, and bindings-surface.json moves their names from undecided to each side's own names with the reason."
+            }
+        )
+    }
+
+    {
+        id python-binding-decisions
+        title "Python binds every plain operand, infers lists and dicts, reports a wrong row count as DecodeError, guards update_many, lists its registrations and takes PEM data as ca"
+        kind @feat
+        deps (binding-renames)
+        log (
+            {
+                at 2026-10-30T13:24:34.427389Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "The Python half of the operator's 2026-10-30 decisions (binding-spec-consolidation): (1) a pipeline's plain operand is bound through its stage's binder as JavaScript's is, literal() the one way to write a value into the SQL in statements and pipelines, null() literal(None); (2) a wrong row count from one / optional is a DecodeError, not a DatabaseError without SQLSTATE; (3) a list infers as an array of one kind and a dict as JSON, empty, all-null and mixed lists and every tuple refused; (9) entities(), graphs() and source_tuples() list registrations as JavaScript's do, capabilities(), require_capability(), UnsupportedCapabilityError and Value.snapshot() staying Python-only as the campaign's surface; (11) a registered update_many() needs where or all_rows() before it runs, a ConstructionError otherwise; (12) an argument of the wrong type is a TypeError, ConstructionError only for a value that cannot become what pgorm sends; (13) a listener closed under a waiting pull ends the iteration (Python's behaviour already; confirm and fold the rule into bindings.md); (14) the pool takes PEM data as ca=, cafile= kept as a convenience. Depends on binding-renames so it is built on the final names."
             }
         )
     }
