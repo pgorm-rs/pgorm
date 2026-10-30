@@ -168,13 +168,12 @@ test("an option a COPY's format or direction does not take is a ConstructionErro
 test("a COPY runs through copyIn and copyOut alone, and a source of the wrong shape is a TypeError", async () => {
   await assert.rejects(pool().execute(copyFrom("items", "text")), TypeError);
   await assert.rejects(pool().query(copyTo("items", "text")), /runs through copyIn\(\.\.\) or copyOut\(\.\.\)/);
-  // deno-lint-ignore no-explicit-any
-  const loose = pool() as any;
-  await assert.rejects(loose.copyIn(copyTo("items", "text"), bytes("")), TypeError);
-  await assert.rejects(loose.copyOut(copyFrom("items", "text")), TypeError);
-  await assert.rejects(loose.copyIn(copyFrom("items", "text"), "1\ta\n"), TypeError);
-  await assert.rejects(loose.copyIn(copyFrom("items", "text"), 42), TypeError);
-  await assert.rejects(loose.copyIn(copyFrom("items", "text"), ["1\ta\n"]), TypeError);
+  const loose = pool();
+  await assert.rejects(loose.copyIn(copyTo("items", "text") as never, bytes("")), TypeError);
+  await assert.rejects(loose.copyOut(copyFrom("items", "text") as never), TypeError);
+  await assert.rejects(loose.copyIn(copyFrom("items", "text"), "1\ta\n" as never), TypeError);
+  await assert.rejects(loose.copyIn(copyFrom("items", "text"), 42 as never), TypeError);
+  await assert.rejects(loose.copyIn(copyFrom("items", "text"), ["1\ta\n"] as never), TypeError);
   assert.equal(await count("items"), 0);
 });
 

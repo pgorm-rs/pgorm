@@ -100,8 +100,7 @@ test("a pool sends nothing until used, and refuses an unusable option at constru
       { statementCacheChannel: "c".repeat(64) },
     ]
   ) {
-    // deno-lint-ignore no-explicit-any
-    assert.throws(() => new Pool(dsn(), options as any), ConstructionError, JSON.stringify(options));
+    assert.throws(() => new Pool(dsn(), options as never), ConstructionError, JSON.stringify(options));
   }
   for (
     const options of [
@@ -114,8 +113,7 @@ test("a pool sends nothing until used, and refuses an unusable option at constru
       { statementCacheChannel: 7 },
     ]
   ) {
-    // deno-lint-ignore no-explicit-any
-    assert.throws(() => new Pool(dsn(), options as any), TypeError, JSON.stringify(options));
+    assert.throws(() => new Pool(dsn(), options as never), TypeError, JSON.stringify(options));
   }
   assert.throws(() => new Pool("postgres://["), ConstructionError);
 });
@@ -594,10 +592,8 @@ test("a transaction's mode and isolation level reach the server", async () => {
     (error: unknown) => error instanceof DatabaseError && error.sqlstate === "25006",
   );
   await assert.rejects(pool().transaction(async () => {}, { mode: "default", isolation: "serializable" }), ConstructionError);
-  // deno-lint-ignore no-explicit-any
-  await assert.rejects(pool().transaction(async () => {}, { mode: "sometimes" as any }), TypeError);
-  // deno-lint-ignore no-explicit-any
-  await assert.rejects(pool().transaction(async () => {}, { isolation: "eventual" as any }), TypeError);
+  await assert.rejects(pool().transaction(async () => {}, { mode: "sometimes" as never }), TypeError);
+  await assert.rejects(pool().transaction(async () => {}, { isolation: "eventual" as never }), TypeError);
 });
 
 // [spec:pgorm:req:napi.temporal+1/test]
