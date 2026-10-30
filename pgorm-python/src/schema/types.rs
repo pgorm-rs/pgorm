@@ -2,7 +2,7 @@
 
 use crate::{UnsupportedCapabilityError, errors::ConstructionError, values::PyTypeName};
 use pgorm::pgorm_query::{ColumnType, IntervalSpec, Name, StringLen};
-use pyo3::{prelude::*, types::PyInt};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyInt};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -15,7 +15,7 @@ fn integer(value: Option<&Bound<'_, PyAny>>, label: &str) -> PyResult<Option<u32
     value
         .map(|value| {
             if !value.is_exact_instance_of::<PyInt>() {
-                return Err(ConstructionError::new_err(format!(
+                return Err(PyTypeError::new_err(format!(
                     "{label} requires an exact integer"
                 )));
             }
@@ -77,7 +77,7 @@ impl PyDataType {
             });
         }
         let kind = kind.extract::<&str>().map_err(|_| {
-            ConstructionError::new_err("DataType requires a supported type name or TypeName")
+            PyTypeError::new_err("DataType requires a supported type name or TypeName")
         })?;
         if length.is_some() && !matches!(kind, "char" | "varchar" | "bit" | "varbit" | "vector") {
             return Err(ConstructionError::new_err(

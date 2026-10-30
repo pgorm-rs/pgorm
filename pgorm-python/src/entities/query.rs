@@ -1,5 +1,6 @@
 use pgorm::pgorm_query::IntoCondition;
 use pyo3::{
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyInt, PyTuple},
 };
@@ -21,9 +22,7 @@ pub(crate) fn bound(value: Option<&Bound<'_, PyAny>>) -> PyResult<Option<u64>> {
         return Ok(None);
     };
     if !value.is_exact_instance_of::<PyInt>() {
-        return Err(ConstructionError::new_err(
-            "query bounds require an integer",
-        ));
+        return Err(PyTypeError::new_err("query bounds require an integer"));
     }
     let number: i64 = value
         .extract()
@@ -46,7 +45,7 @@ impl PyEntityQuery {
         } else if let Ok(expr) = predicate.extract::<PyRef<'_, PyExpr>>() {
             expr.inner.clone().into_condition()
         } else {
-            return Err(ConstructionError::new_err(
+            return Err(PyTypeError::new_err(
                 "entity filters require an Expr or Condition",
             ));
         };
@@ -59,9 +58,9 @@ impl PyEntityQuery {
     fn order_by(&self, ordering: &Bound<'_, PyTuple>) -> PyResult<Self> {
         let mut inner = self.inner.clone();
         for order in ordering {
-            let order = order.extract::<PyRef<'_, OrderBy>>().map_err(|_| {
-                ConstructionError::new_err("order_by requires typed OrderBy values")
-            })?;
+            let order = order
+                .extract::<PyRef<'_, OrderBy>>()
+                .map_err(|_| PyTypeError::new_err("order_by requires typed OrderBy values"))?;
             inner = inner.change(Change::Order(
                 order.expr.inner.clone(),
                 order.direction.rust_order(),
@@ -90,7 +89,7 @@ impl PyEntityQuery {
             "all" => Terminal::All,
             "one" => Terminal::One,
             "optional" => Terminal::Optional,
-            _ => return Err(ConstructionError::new_err("unknown entity terminal")),
+            _ => return Err(PyTypeError::new_err("unknown entity terminal")),
         };
         let (sql, values) = self.inner.compile(terminal);
         if values.0.len() > 65535 {

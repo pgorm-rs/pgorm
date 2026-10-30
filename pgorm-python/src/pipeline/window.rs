@@ -1,7 +1,7 @@
 use pgorm::pipeline as pl;
 use pyo3::{prelude::*, types::PyTuple};
 
-use super::{construct::integer, expression::PyPipelineExpr};
+use super::{construct::integer, expression::PyPipelineExpr, scope::Plan};
 use crate::errors::ConstructionError;
 
 /// A real Rust Over specification; binder expressions cannot enter it.
@@ -16,11 +16,27 @@ pub struct PyOver {
     pub(super) inner: pl::Over,
 }
 
-pub(super) fn expressions(values: &Bound<'_, PyTuple>) -> PyResult<Vec<pl::Expr<'static>>> {
-    values
-        .iter()
-        .map(|value| PyPipelineExpr::coerce(&value)?.unbound())
-        .collect()
+pub(super) fn plan(values: &Bound<'_, PyTuple>) -> PyResult<Plan> {
+    Plan::plain(
+        values
+            .iter()
+            .map(|value| PyPipelineExpr::coerce(&value))
+            .collect::<PyResult<_>>()?,
+    )
+}
+
+/// A window's partition or ordering, which take no value: pgorm's `Over`
+/// takes only expressions that bind nothing.
+// [spec:pgorm:req:bindings.pipeline-binder]
+// [spec:pgorm:req:bindings.pipeline-expressions]
+fn keys(values: &Bound<'_, PyTuple>) -> PyResult<Vec<pl::Expr<'static>>> {
+    let plan = plan(values)?;
+    if plan.binds() {
+        return Err(ConstructionError::new_err(
+            "a window's partition and ordering take no value: write a literal() or a column",
+        ));
+    }
+    plan.unbound()
 }
 
 #[pymethods]
@@ -33,14 +49,14 @@ impl PyOver {
     #[pyo3(signature = (*keys))]
     fn by(&self, keys: &Bound<'_, PyTuple>) -> PyResult<Self> {
         Ok(Self {
-            inner: self.inner.clone().by(expressions(keys)?),
+            inner: self.inner.clone().by(self::keys(keys)?),
         })
     }
 
     #[pyo3(signature = (*keys))]
     fn sort_by(&self, keys: &Bound<'_, PyTuple>) -> PyResult<Self> {
         Ok(Self {
-            inner: self.inner.clone().sort_by(expressions(keys)?),
+            inner: self.inner.clone().sort_by(self::keys(keys)?),
         })
     }
 

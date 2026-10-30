@@ -31,7 +31,7 @@ class RowStream:
         self, native: _native._Stream, connection: "Connection", *, release_connection: bool,
     ) -> None:
         if not isinstance(native, _native._Stream):
-            raise _native.ConstructionError("streams must be opened by a pool or connection")
+            raise TypeError("streams must be opened by a pool or connection")
         self._native = native
         self._connection = connection
         self._release_connection = release_connection

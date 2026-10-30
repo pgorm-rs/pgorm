@@ -55,7 +55,6 @@ class ViewConstruction(unittest.TestCase):
         for action in (
             lambda: s.create_recursive_view(p.Table("r"), [], query),
             lambda: s.refresh_materialized_view(p.Table("m"), concurrently=True, with_no_data=True),
-            lambda: s.create_view(p.Table("v"), query, check_option="both"),
             lambda: s.create_view(p.Table("v", alias="w"), query),
             lambda: s.create_materialized_view(p.Table("m", alias="w"), query),
             lambda: s.create_table_as(p.Table("t"), query, columns=[""]),
@@ -63,6 +62,8 @@ class ViewConstruction(unittest.TestCase):
         ):
             with self.subTest(action=action), self.assertRaises(p.ConstructionError):
                 action()
+        with self.assertRaises(TypeError):
+            s.create_view(p.Table("v"), query, check_option="both")
         for action in (
             lambda: s.create_view(p.Table("v"), p.RawSQL("SELECT 1")),
             lambda: s.create_table_as(p.Table("t"), query, columns="key"),

@@ -112,10 +112,14 @@ class Transactions(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(settings["isolation"], (isolation or "serializable").replace("_", " "))
                     self.assertEqual(settings["read_only"], "off" if mode == "read_write" else "on")
                     self.assertEqual(settings["deferrable"], "on" if mode == "deferrable" else "off")
-                    with self.assertRaises(p.ConstructionError):
+                    with self.assertRaises(TypeError):
                         p.Transaction(tx._native, other)
-            for kwargs in ({"mode": "raw SQL"}, {"isolation": "serializable"}, {"mode": "deferrable", "isolation": "serializable"}, {"mode": "read_only", "isolation": "made up"}):
+            for kwargs in ({"isolation": "serializable"}, {"mode": "deferrable", "isolation": "serializable"}):
                 with self.assertRaises(p.ConstructionError):
+                    async with connection.transaction(**kwargs):
+                        self.fail("a refused mode opened a transaction")
+            for kwargs in ({"mode": "raw SQL"}, {"mode": "read_only", "isolation": "made up"}, {"mode": 1}):
+                with self.assertRaises(TypeError):
                     async with connection.transaction(**kwargs):
                         self.fail("a refused mode opened a transaction")
             with self.assertRaises(p.DatabaseError) as caught:

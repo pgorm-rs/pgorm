@@ -1,21 +1,22 @@
 use std::sync::Arc;
 
-use pgorm::{pgorm_query::Value, pipeline as pl};
+use pgorm::pipeline as pl;
 use pyo3::{
     basic::CompareOp,
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyList, PyTuple},
 };
 
 use super::{
     recipe::{Binary, Recipe, Unary},
-    scope::Scope,
+    scope::{Scope, bindable},
 };
 use crate::{
     UnsupportedCapabilityError,
     errors::{ConstructionError, LifecycleError},
     identifiers::PyIdentifier,
-    values::{PyTypeName, PyValue},
+    values::PyTypeName,
 };
 
 /// A native expression recipe with an optional, checked Python callback scope.
@@ -58,47 +59,19 @@ impl PyPipelineExpr {
         })
     }
 
+    /// An operand: a pipeline expression, or a value the stage that takes it
+    /// binds. Only `literal()` writes a value into the SQL.
+    // [spec:pgorm:req:bindings.pipeline-expressions]
+    // [spec:pgorm:req:python.pipeline-operands+2]
     pub(super) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<Self> {
         if let Ok(expression) = value.extract::<PyRef<'_, Self>>() {
             expression.check()?;
             return Ok(expression.clone());
         }
-        let recipe = if value.is_none() {
-            Recipe::Null
-        } else {
-            let value = PyValue::coerce(value)?;
-            if value.has_named_type() {
-                return Err(UnsupportedCapabilityError::new_err(
-                    "pipeline literals do not support qualified enum or created range tags",
-                ));
-            }
-            match value.rust_value() {
-                Value::Bool(Some(value)) => Recipe::Bool(*value),
-                Value::Int(Some(value)) => Recipe::Integer(i64::from(*value)),
-                Value::BigInt(Some(value)) => Recipe::Integer(*value),
-                Value::Double(Some(value)) if value.is_finite() => Recipe::Float(*value),
-                Value::String(Some(value)) => Recipe::Text(value.to_string()),
-                _ => {
-                    return Err(UnsupportedCapabilityError::new_err(
-                        "pipeline literals support None, bool, i32/i64, finite f64 and text; other Values require a Binder",
-                    ));
-                }
-            }
-        };
         Ok(Self {
-            recipe: Arc::new(recipe),
+            recipe: Arc::new(Recipe::Value(bindable(value)?)),
             scope: None,
         })
-    }
-
-    pub(super) fn unbound(&self) -> PyResult<pl::Expr<'static>> {
-        self.check()?;
-        if self.scope.is_some() {
-            return Err(LifecycleError::new_err(
-                "bound expressions can only be consumed by their originating callback",
-            ));
-        }
-        Ok(self.recipe.lower(&[]))
     }
 
     fn binary(&self, operation: Binary, value: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -248,9 +221,7 @@ impl PyPipelineExpr {
 
     fn in_array(&self, values: &Bound<'_, PyAny>) -> PyResult<Self> {
         if !values.is_instance_of::<PyList>() && !values.is_instance_of::<PyTuple>() {
-            return Err(ConstructionError::new_err(
-                "pipeline IN requires a list or tuple",
-            ));
+            return Err(PyTypeError::new_err("pipeline IN requires a list or tuple"));
         }
         let mut members = values
             .try_iter()?
@@ -275,7 +246,7 @@ pub(super) fn alias_name(value: &Bound<'_, PyAny>) -> PyResult<String> {
         if let Recipe::Alias(name) = expression.recipe.as_ref() {
             return Ok(name.clone());
         }
-        return Err(ConstructionError::new_err(
+        return Err(PyTypeError::new_err(
             "pipeline names require identifiers or alias tokens",
         ));
     }

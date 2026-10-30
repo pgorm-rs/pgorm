@@ -1,6 +1,6 @@
 use std::{num::NonZeroUsize, sync::Arc, time::Duration};
 
-use pyo3::PyResult;
+use pyo3::{PyResult, exceptions::PyTypeError};
 use rustls::pki_types::{CertificateDer, pem::PemObject};
 use tokio_postgres::config::SslMode;
 use tokio_postgres_rustls::MakeRustlsConnect;
@@ -51,9 +51,7 @@ impl PoolConfig {
             "verified" => pgorm::RecyclingMethod::Verified,
             "fast" => pgorm::RecyclingMethod::Fast,
             _ => {
-                return Err(ConstructionError::new_err(
-                    "recycle must be 'verified' or 'fast'",
-                ));
+                return Err(PyTypeError::new_err("recycle must be 'verified' or 'fast'"));
             }
         };
         // [spec:pgorm:req:conn.pool.statement-cache.listen+1]    refused here, by name, rather than
@@ -92,7 +90,7 @@ impl PoolConfig {
                 pgorm::connect_with(config, connector, manager, |b| b.max_size(self.max_size))
             }
             _ => {
-                return Err(ConstructionError::new_err(
+                return Err(PyTypeError::new_err(
                     "tls must be 'verify-full' or 'disable'",
                 ));
             }

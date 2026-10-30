@@ -10,8 +10,11 @@ mod snapshot;
 mod temporal;
 mod types;
 
-use pgorm::pgorm_query::{Expr, SimpleExpr, Value};
-use pyo3::{prelude::*, types::PyList};
+use pgorm::pgorm_query::{ArrayType, Expr, SimpleExpr, Value};
+use pyo3::{
+    prelude::*,
+    types::{PyList, PyTuple},
+};
 
 use crate::errors::ConstructionError;
 pub use classes::{PyMultirange, PyRange};
@@ -119,6 +122,29 @@ impl PyValue {
         Self::new(value, None)
     }
 
+    /// An array of `element`'s kind holding `values`, or SQL NULL for `None`.
+    fn array_of(element: Tag, values: &Bound<'_, PyAny>) -> PyResult<Self> {
+        if matches!(element, Tag::Created(_)) {
+            return Err(ConstructionError::new_err(
+                "arrays of a created range or multirange type are not supported",
+            ));
+        }
+        let array_type = element.array_type()?;
+        let inner = if values.is_none() {
+            None
+        } else {
+            let items = values
+                .try_iter()?
+                .map(|item| Self::convert(&item?, element.clone()).map(|value| value.inner))
+                .collect::<PyResult<Vec<_>>>()?;
+            Some(Box::new(items))
+        };
+        Ok(Self {
+            inner: Value::Array(array_type, inner),
+            tag: Tag::Array(Box::new(element)),
+        })
+    }
+
     fn convert(data: &Bound<'_, PyAny>, tag: Tag) -> PyResult<Self> {
         if let Ok(value) = data.extract::<PyRef<'_, Self>>() {
             if value.tag != tag {
@@ -145,24 +171,25 @@ impl PyValue {
     #[new]
     #[pyo3(signature = (value, kind=None))]
     fn new(value: &Bound<'_, PyAny>, kind: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
-        let result = (|| {
-            if kind.is_none()
-                && let Ok(existing) = value.extract::<PyRef<'_, Self>>()
-            {
-                return Ok(existing.clone());
-            }
-            let tag = match kind {
-                Some(kind) => Tag::parse(kind)?,
-                None => Tag::Scalar(convert::infer(value)?),
-            };
-            Self::convert(value, tag)
-        })();
-        result.map_err(construction_error)
+        if kind.is_none()
+            && let Ok(existing) = value.extract::<PyRef<'_, Self>>()
+        {
+            return Ok(existing.clone());
+        }
+        let tag = match kind {
+            Some(kind) => Tag::parse(kind)?,
+            None => inferred(value).map_err(construction_error)?,
+        };
+        match tag {
+            Tag::Array(element) => Self::array_of(*element, value),
+            tag => Self::convert(value, tag),
+        }
+        .map_err(construction_error)
     }
 
     #[staticmethod]
     fn null(kind: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let tag = Tag::parse(kind).map_err(construction_error)?;
+        let tag = Tag::parse(kind)?;
         Ok(Self {
             inner: types::scalar_null(&tag.array_type()?)?,
             tag,
@@ -178,30 +205,14 @@ impl PyValue {
 
     #[staticmethod]
     fn array(kind: &Bound<'_, PyAny>, values: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let result = (|| {
-            let element = Tag::parse(kind)?;
-            if matches!(element, Tag::Created(_)) {
-                return Err(ConstructionError::new_err(
-                    "arrays of a created range or multirange type are not supported",
-                ));
-            }
-            let array_type = element.array_type()?;
-            let inner = if values.is_none() {
-                None
-            } else {
+        let element = Tag::parse(kind)?;
+        (|| {
+            if !values.is_none() {
                 convert::require_sequence(values)?;
-                let items = values
-                    .try_iter()?
-                    .map(|item| Self::convert(&item?, element.clone()).map(|value| value.inner))
-                    .collect::<PyResult<Vec<_>>>()?;
-                Some(Box::new(items))
-            };
-            Ok(Self {
-                inner: Value::Array(array_type, inner),
-                tag: Tag::Array(Box::new(element)),
-            })
-        })();
-        result.map_err(construction_error)
+            }
+            Self::array_of(element, values)
+        })()
+        .map_err(construction_error)
     }
 
     #[getter]
@@ -272,6 +283,46 @@ impl PyValue {
             self.is_null()?
         ))
     }
+}
+
+/// The one kind a plain Python value leaves: a `dict` is JSON, a `list` an
+/// array of the one kind its items other than `None` infer as, and anything
+/// else what `convert::infer` reads it as. An empty or all-`None` list has no
+/// kind, a list of several kinds or of lists no one kind, and a `tuple` reads
+/// as a row rather than a value.
+// [spec:pgorm:req:python.values+6]
+fn inferred(data: &Bound<'_, PyAny>) -> PyResult<Tag> {
+    if !data.is_exact_instance_of::<PyList>() {
+        return convert::infer(data).map(Tag::Scalar);
+    }
+    let mut element: Option<ArrayType> = None;
+    for item in data.try_iter()? {
+        let item = item?;
+        if item.is_none() {
+            continue;
+        }
+        if item.is_instance_of::<PyList>() || item.is_instance_of::<PyTuple>() {
+            return Err(ConstructionError::new_err(
+                "a list of lists has no one kind to infer: declare it with Value.array(kind, items)",
+            ));
+        }
+        let kind = convert::infer(&item)?;
+        match &element {
+            Some(seen) if *seen != kind => {
+                return Err(ConstructionError::new_err(
+                    "a list of several kinds has no one kind to infer: declare it with Value.array(kind, items)",
+                ));
+            }
+            Some(_) => {}
+            None => element = Some(kind),
+        }
+    }
+    let element = element.ok_or_else(|| {
+        ConstructionError::new_err(
+            "an empty or all-None list has no kind to infer: declare it with Value.array(kind, items)",
+        )
+    })?;
+    Ok(Tag::Array(Box::new(Tag::Scalar(element))))
 }
 
 fn construction_error(error: PyErr) -> PyErr {

@@ -242,7 +242,7 @@ class WindowTests(unittest.IsolatedAsyncioTestCase):
         for item in (p.col("weight"), p.col("weight") + 1, p.literal(1), p.json_value(p.col("doc"), "$.a")):
             with self.assertRaises(p.ConstructionError):
                 item.over(window)
-        with self.assertRaises(p.ConstructionError):
+        with self.assertRaises(TypeError):
             window.frame(F.Rows.following(1))
         with self.assertRaises(AttributeError):
             getattr(F.Rows.current_row(), "and_preceding")

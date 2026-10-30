@@ -25,7 +25,9 @@ pub mod values;
 use pyo3::prelude::*;
 
 pyo3::create_exception!(pgorm, PgormError, pyo3::exceptions::PyException);
-pyo3::create_exception!(pgorm, UnsupportedCapabilityError, PgormError);
+// An operation outside the capability manifest is an argument the build has
+// nothing for, so it is the ConstructionError the shared rules name too.
+pyo3::create_exception!(pgorm, UnsupportedCapabilityError, errors::ConstructionError);
 
 // [spec:pgorm:def:bindings.api]
 // [spec:pgorm:def:python.api+1]

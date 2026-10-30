@@ -15,7 +15,7 @@ total = pl.alias("total")
 
 query = (
     pl.from_(items)
-    .filter_with(lambda binder: amount > binder.bind(10))
+    .filter(amount > 10)
     .group(category)
     .aggregate(pl.sum(amount).as_(total))
     .sort(total.desc())
@@ -45,46 +45,60 @@ the enum it compares as:
 ```python
 lines = pl.col("lines", "mood").compares_as(p.TypeName("mood"))
 query = pl.from_(p.Table("lines")).filter(lines == "glad")
-assert query.inspect().sql == "SELECT * FROM lines WHERE CAST(mood AS mood) = 'glad'"
+assert query.inspect().sql == "SELECT * FROM lines WHERE CAST(mood AS mood) = $1"
 ```
 
 Every stage returns a new pipeline. `filter`, `derive`, `select`, `group`,
 `aggregate`, `window`, `sort` and `join` have `*_with` counterparts. Projection,
 grouping and ordering methods accept positional expressions; their callbacks
-return an expression, list or tuple. A bound list supports zero through 32
-expressions. Plain lists have no binding-specific limit. `group` requires a
+return an expression, list or tuple. A stage that binds takes zero through 32
+expressions; a stage that binds nothing has no such limit. `group` requires a
 following `aggregate` before further pipeline stages.
 
 ## Literals and parameters
 
-Plain `None`, booleans, integers, finite floats and strings become native SQL
-literals. `pl.literal` makes that choice explicit. Use `binder.bind(value)` inside
-a synchronous `*_with` callback for parameters. An explicit `p.Value(value, kind)`
-preserves its Rust value variant; plain Python integers infer `i64`.
+A plain operand — a `bool`, `int`, `float`, `str`, `list`, `dict` or `p.Value` —
+is a parameter: the stage that takes it binds it through its own binder, inferred
+as any parameter is, so plain Python integers infer `i64` and an explicit
+`p.Value(value, kind)` keeps its Rust value variant. `None` has no kind to bind;
+write `pl.literal(None)` (or `pl.null()`), `is_null()`, or bind
+`p.Value.null(kind)`. Only `pl.literal(value)` writes a value into the SQL text:
+`None`, a `bool`, an integer within `bigint`, a finite `float` or a `str`, plain
+or as a `p.Value` of that kind.
+
+```python
+bound = pl.from_(items).filter(amount > p.Value(10, "i32"))
+assert bound.inspect().sql.endswith("WHERE amount > $1")
+assert bound.inspect().params[0].kind == "i32"
+written = pl.from_(items).filter(amount > pl.literal(10))
+assert written.inspect().params == []
+```
+
+A synchronous `*_with` callback receives the stage's binder, whose
+`binder.bind(value)` mints one placeholder to reuse within the stage:
 
 ```python
 query = pl.from_(items).filter_with(
-    lambda binder: amount > binder.bind(p.Value(10, "i32"))
+    lambda binder: (amount > binder.bind(10)) & (amount < binder.bind(10) + 90)
 )
-compiled = query.inspect()
-assert compiled.params[0].kind == "i32"
 ```
 
 A callback runs once during construction. Each binding is minted once inside the
-corresponding Rust binder scope. Reusing the expression reuses its placeholder;
-the Rust compiler prunes unused bindings and rebases composed pipelines' values.
-Saving a binder or bound expression does not extend its lifetime: operations on
-it after the callback raise `LifecycleError`. Expressions from different binder
-callbacks cannot be combined, and a bound expression cannot enter an `Over` or a
-plain stage.
+corresponding Rust binder scope, and a plain operand the callback returns is bound
+after them. Reusing the expression reuses its placeholder; the Rust compiler prunes
+unused bindings and rebases composed pipelines' values. Saving a binder or bound
+expression does not extend its lifetime: operations on it after the callback raise
+`LifecycleError`. Expressions from different binder callbacks cannot be combined,
+and a bound expression cannot enter an `Over` or a plain stage. An `Over`'s
+partition and ordering take no value at all, bound or plain: write a column or a
+`pl.literal`.
 
-Qualified enum and enum-array `Value` tags are rejected by the pipeline binder:
-Rust's pipeline binds a value bare and has no cast for a value of a named type. A
-plain string can use PostgreSQL type inference when that is intended; compared with
-a column that compares as an enum, it is inferred as that enum. Other supported `Value` kinds, including
-typed nulls, are available through the binder; literal conversion is limited to
-the native pipeline's scalar literal vocabulary. The SQL builder expression API
-(`p.Expr`) and pipeline expression API (`pl.PipelineExpr`) are separate native types.
+Qualified enum and enum-array `Value` tags are refused as pipeline operands with
+`ConstructionError`: Rust's pipeline binds a value bare and has no cast for a
+value of a named type. A plain string can use PostgreSQL type inference when that
+is intended; compared with a column that compares as an enum, it is inferred as
+that enum. The SQL builder expression API (`p.Expr`) and pipeline expression API
+(`pl.PipelineExpr`) are separate native types.
 
 ## Joins, windows and sets
 

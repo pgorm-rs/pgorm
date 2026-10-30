@@ -33,7 +33,7 @@ class ListenerSurface(unittest.TestCase):
     # [spec:pgorm:req:bindings.listen+2/test]    listeners come from a pool
     # [spec:pgorm:req:python.truth-testing+3/test]    neither Listener nor Notification is a boolean
     def test_listener_objects_refuse_truth_testing(self):
-        with self.assertRaises(p.ConstructionError):
+        with self.assertRaises(TypeError):
             p.Listener(object())
         with self.assertRaises(TypeError):
             p.Notification()
@@ -126,8 +126,10 @@ class ListenerExecution(unittest.IsolatedAsyncioTestCase):
             await self.pool.notify("py_fence", "1")
             self.assertEqual(await received(listener), (odd, "exact"))
             self.assertEqual(await received(listener), ("py_fence", "1"))
-            for name in ("c" * 64, b"py_bytes", 7):
-                with self.subTest(name=name), self.assertRaises(p.ConstructionError):
+            with self.assertRaises(p.ConstructionError):
+                await listener.listen("c" * 64)
+            for name in (b"py_bytes", 7):
+                with self.subTest(name=name), self.assertRaises(TypeError):
                     await listener.listen(name)
             with self.assertRaises(p.DatabaseError) as caught:
                 await listener.listen("")
@@ -135,7 +137,7 @@ class ListenerExecution(unittest.IsolatedAsyncioTestCase):
             await listener.listen("c" * 63)
             self.assertFalse(listener.closed)
             for channel, payload in (("py_fence", b"bytes"), (None, "x")):
-                with self.assertRaises(p.ConstructionError):
+                with self.assertRaises(TypeError):
                     await self.pool.notify(channel, payload)
 
     # [spec:pgorm:req:bindings.listen+2/test]    the payload bound is the server's 22023
@@ -194,9 +196,18 @@ class ListenerExecution(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(listener.closed)
         with self.assertRaises(StopAsyncIteration):
             await anext(listener)
-        for capacity in (0, -1, 1.5, True):
-            with self.subTest(capacity=capacity), self.assertRaises(p.ConstructionError):
+
+    # [spec:pgorm:req:bindings.listen+2/test]    a capacity is a positive whole number
+    # [spec:pgorm:req:python.argument-errors/test]
+    async def test_capacity_is_a_positive_int(self):
+        for capacity in (0, -1, 2**64):
+            with self.subTest(capacity=capacity), self.assertRaises(ValueError):
                 await self.pool.listener(capacity=capacity)
+        for capacity in (1.5, True, "8", None):
+            with self.subTest(capacity=capacity), self.assertRaises(TypeError):
+                await self.pool.listener(capacity=capacity)
+        async with await self.pool.listener(capacity=1) as listener:
+            self.assertFalse(listener.closed)
 
     # [spec:pgorm:req:bindings.listen+2/test]    one pull at a time; listen runs beside it; a cancelled pull loses nothing
     # [spec:pgorm:req:bindings.cancellation/test]
@@ -227,8 +238,18 @@ class ListenerExecution(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(listener.close(), 2)
         with self.assertRaises(StopAsyncIteration):
             await asyncio.wait_for(pending, 2)
+        with self.assertRaises(StopAsyncIteration):
+            await anext(listener)
         with self.assertRaises(p.LifecycleError):
             await listener.listen("py_close")
+        listener = await self.pool.listener()
+        await listener.listen("py_close")
+        pending = asyncio.create_task(anext(listener))
+        await listener.listen("py_close")
+        await asyncio.wait_for(listener.aclose(), 2)
+        with self.assertRaises(StopAsyncIteration):
+            await asyncio.wait_for(pending, 2)
+        self.assertEqual([n async for n in listener], [])
 
         pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
         try:

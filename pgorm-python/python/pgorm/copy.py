@@ -30,11 +30,9 @@ _SLICE = 256 * 1024
 # [spec:pgorm:req:python.argument-errors]
 def _view(item: object) -> memoryview:
     if isinstance(item, str):
-        raise _native.ConstructionError("COPY data is bytes; encode text before copying it")
+        raise TypeError("COPY data is bytes; encode text before copying it")
     if not isinstance(item, Buffer):
-        raise _native.ConstructionError(
-            f"COPY data must be bytes-like, not {type(item).__name__}"
-        )
+        raise TypeError(f"COPY data must be bytes-like, not {type(item).__name__}")
     try:
         return memoryview(item).cast("B")
     except TypeError:
@@ -58,14 +56,14 @@ async def _synchronous(source: Iterable[object]) -> AsyncGenerator[memoryview]:
 def _items(source: object) -> AsyncGenerator[memoryview]:
     """Check the source's shape before the COPY starts; items are checked as pulled."""
     if isinstance(source, str):
-        raise _native.ConstructionError("COPY data is bytes; encode text before copying it")
+        raise TypeError("COPY data is bytes; encode text before copying it")
     if isinstance(source, Buffer):
         return _single(source)
     if isinstance(source, AsyncIterable):
         return _asynchronous(source)
     if isinstance(source, Iterable):
         return _synchronous(source)
-    raise _native.ConstructionError(
+    raise TypeError(
         "copy_in reads bytes-like data or a sync or async iterable of it, "
         f"not {type(source).__name__}"
     )
@@ -128,9 +126,7 @@ class CopyOutStream:
 
     def __init__(self, native: _native._CopyOut, connection: Connection | None) -> None:
         if not isinstance(native, _native._CopyOut):
-            raise _native.ConstructionError(
-                "copy streams must be opened by a pool, connection or transaction"
-            )
+            raise TypeError("copy streams must be opened by a pool, connection or transaction")
         self._native = native
         self._connection = connection
         self._closed = False
@@ -206,7 +202,7 @@ async def _rows_of(source: Iterable[object] | AsyncIterable[object]) -> AsyncGen
 def _row_source(rows: object) -> AsyncGenerator[object]:
     """Check the source's shape before the COPY starts; rows are checked as pulled."""
     if isinstance(rows, (str, Buffer)) or not isinstance(rows, (Iterable, AsyncIterable)):
-        raise _native.ConstructionError(
+        raise TypeError(
             "copy_in_rows reads a sync or async iterable of rows, "
             f"not {type(rows).__name__}"
         )
@@ -260,9 +256,7 @@ class CopyRowStream:
 
     def __init__(self, native: _native._CopyOut, connection: Connection | None) -> None:
         if not isinstance(native, _native._CopyOut):
-            raise _native.ConstructionError(
-                "copy streams must be opened by a pool, connection or transaction"
-            )
+            raise TypeError("copy streams must be opened by a pool, connection or transaction")
         self._native = native
         self._connection = connection
         self._closed = False

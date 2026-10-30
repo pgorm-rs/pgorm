@@ -2,7 +2,7 @@ use super::statement::{PyDDL, Statement};
 use crate::{errors::ConstructionError, identifiers::PyIdentifier, values::PyTypeName};
 use pgorm::pgorm_query::Name;
 use pgorm::pgorm_query::extension::{Type, TypeRef};
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 pub(super) fn type_ref(name: &Bound<'_, PyAny>) -> PyResult<TypeRef> {
     if let Ok(name) = name.extract::<PyRef<'_, PyTypeName>>() {
@@ -20,7 +20,7 @@ pub(super) fn type_ref(name: &Bound<'_, PyAny>) -> PyResult<TypeRef> {
 fn label(value: &Bound<'_, PyAny>) -> PyResult<String> {
     let text = value
         .extract::<&str>()
-        .map_err(|_| ConstructionError::new_err("enum labels require strings"))?;
+        .map_err(|_| PyTypeError::new_err("enum labels require strings"))?;
     if text.len() > 63 || text.contains('\0') {
         return Err(ConstructionError::new_err(
             "enum labels require at most 63 UTF-8 bytes and no NUL",

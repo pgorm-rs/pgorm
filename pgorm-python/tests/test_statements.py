@@ -58,7 +58,7 @@ class StatementTests(unittest.TestCase):
         self.assertEqual(selected.inspect().sql, 'SELECT DISTINCT "left"."id" FROM "left" CROSS JOIN "right"')
         with self.assertRaises(ConstructionError):
             base.select()
-        with self.assertRaises(ConstructionError):
+        with self.assertRaises(TypeError):
             select("untyped column")
         with self.assertRaises(TypeError):
             base.join(right)
@@ -67,14 +67,19 @@ class StatementTests(unittest.TestCase):
 
     def test_limits_and_ordering_reject_ambiguous_inputs(self):
         query = select(literal(1))
-        for invalid in [True, -1, 2**63, 2**64, 1.0, "10"]:
+        for invalid in [-1, 2**63, 2**64]:
             for method in ["limit", "offset"]:
                 with self.subTest(value=invalid, method=method):
                     with self.assertRaises(ConstructionError):
                         getattr(query, method)(invalid)
+        for invalid in [True, 1.0, "10"]:
+            for method in ["limit", "offset"]:
+                with self.subTest(value=invalid, method=method):
+                    with self.assertRaises(TypeError):
+                        getattr(query, method)(invalid)
         self.assertEqual(query.limit(0).inspect().params, [Value(0, "u64")])
         self.assertEqual(query.limit(2**63 - 1).inspect().params, [Value(2**63 - 1, "u64")])
-        with self.assertRaises(ConstructionError):
+        with self.assertRaises(TypeError):
             query.order_by("name DESC")
 
     def test_insert_owns_rows_and_preserves_value_modes(self):
@@ -116,10 +121,11 @@ class StatementTests(unittest.TestCase):
         self.assertEqual([value.value for value in compiled.params], [1, "Alice", 0, True])
         self.assertIn("DO NOTHING", query.on_conflict(target.do_nothing()).inspect().sql)
         self.assertIn("ON CONFLICT DO NOTHING", query.on_conflict(Conflict.do_nothing()).inspect().sql)
-        for build in [lambda: ConflictTarget(), lambda: target.update(),
-                      lambda: query.on_conflict(target)]:
+        for build in [lambda: ConflictTarget(), lambda: target.update()]:
             with self.assertRaises(ConstructionError):
                 build()
+        with self.assertRaises(TypeError):
+            query.on_conflict(target)
 
     def test_update_and_delete_require_explicit_write_intent(self):
         table = Table("account", schema="application", alias="a")
@@ -158,7 +164,7 @@ class StatementTests(unittest.TestCase):
                 query.inline_sql()
         with self.assertRaises(ConstructionError):
             RawSQL("SELECT 1\0")
-        with self.assertRaises(ConstructionError):
+        with self.assertRaises(TypeError):
             RawSQL("SELECT $1", "not a parameter sequence")
 
     def test_statement_truth_testing_is_rejected(self):

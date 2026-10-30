@@ -13,6 +13,9 @@ from .results import Query, Record, RowStream
 from .transactions import IsolationLevel, Transaction, TransactionMode, _scope
 
 
+# The largest listener capacity the native side holds, a Rust usize.
+_USIZE_MAX = 2**64 - 1
+
 STATEMENT_CACHE_CHANNEL: str = _native.STATEMENT_CACHE_CHANNEL
 """The channel pgorm-migration's runner notifies once a batch that applied a
 migration commits; pass it as ``statement_cache_channel`` to clear on it."""
@@ -36,10 +39,15 @@ class Pool:
 
     TLS verifies the certificate and hostname by default. Explicit
     ``sslmode=disable`` in the DSN or ``tls="disable"`` selects plaintext.
-    ``cafile`` supplies PEM trust anchors; otherwise the roots the platform's
+    ``ca`` supplies PEM trust anchors as ``str`` or ``bytes``, and ``cafile``
+    names a file holding them, never both; otherwise the roots the platform's
     certificate store trusts are used, and a store holding none raises
     ``ConstructionError``. A pool keeps reusable connections and one shared
     Tokio runtime.
+
+    An argument of a type the pool does not take, a ``tls`` or ``recycle``
+    outside its choices among them, raises ``TypeError``; a value the pool
+    cannot use raises ``ConstructionError``.
 
     ``statement_cache_channel`` names a channel the pool listens on through a
     connection of its own, from its first acquisition until it closes; every
@@ -52,36 +60,53 @@ class Pool:
         self,
         dsn: str,
         *,
-        tls: str | None = None,
+        tls: Literal["verify-full", "disable"] | None = None,
+        ca: str | bytes | None = None,
         cafile: str | Path | None = None,
         max_size: int = 10,
         connect_timeout: float = 10.0,
         acquire_timeout: float = 30.0,
         statement_cache_size: int = 128,
-        recycle: str = "verified",
+        recycle: Literal["verified", "fast"] = "verified",
         statement_cache_channel: str | None = None,
     ) -> None:
         if not isinstance(dsn, str):
-            raise _native.ConstructionError("dsn must be a string")
-        for name, value in (("max_size", max_size), ("statement_cache_size", statement_cache_size)):
-            if type(value) is not int or value < 0:
+            raise TypeError("dsn is a connection string")
+        if tls not in (None, "verify-full", "disable"):
+            raise TypeError("tls is 'verify-full', 'disable' or None")
+        if recycle not in ("verified", "fast"):
+            raise TypeError("recycle is 'verified' or 'fast'")
+        for name, count in (("max_size", max_size), ("statement_cache_size", statement_cache_size)):
+            if type(count) is not int:
+                raise TypeError(f"{name} is an int")
+            if count < 0:
                 raise _native.ConstructionError(f"{name} must be a nonnegative integer")
-        if isinstance(connect_timeout, bool) or isinstance(acquire_timeout, bool):
-            raise _native.ConstructionError("timeouts must be numeric durations")
+        for name, seconds in (("connect_timeout", connect_timeout), ("acquire_timeout", acquire_timeout)):
+            if isinstance(seconds, bool) or not isinstance(seconds, (int, float)):
+                raise TypeError(f"{name} is a number of seconds")
         if statement_cache_channel is not None and not isinstance(statement_cache_channel, str):
-            raise _native.ConstructionError("statement_cache_channel must be a string or None")
-        try:
-            ca_pem = Path(cafile).read_bytes() if cafile is not None else None
-        except OSError:
-            raise _native.ConstructionError("could not read the CA certificate file") from None
+            raise TypeError("statement_cache_channel is a str or None")
+        if ca is not None and not isinstance(ca, (str, bytes)):
+            raise TypeError("ca is PEM certificate data, as str or bytes")
+        if ca is not None and cafile is not None:
+            raise _native.ConstructionError("pass the CA as ca or as cafile, not both")
+        if isinstance(ca, str):
+            ca_pem: bytes | None = ca.encode()
+        elif ca is not None:
+            ca_pem = ca
+        else:
+            try:
+                ca_pem = Path(cafile).read_bytes() if cafile is not None else None
+            except OSError:
+                raise _native.ConstructionError("could not read the CA certificate file") from None
         try:
             self._native = _native._Pool(
                 dsn, tls=tls, ca_pem=ca_pem, max_size=max_size,
-                connect_timeout=connect_timeout, acquire_timeout=acquire_timeout,
+                connect_timeout=float(connect_timeout), acquire_timeout=float(acquire_timeout),
                 statement_cache_size=statement_cache_size, recycle=recycle,
                 statement_cache_channel=statement_cache_channel,
             )
-        except (TypeError, ValueError, OverflowError) as error:
+        except OverflowError as error:
             raise _native.ConstructionError(str(error)) from None
 
     @property
@@ -189,10 +214,13 @@ class Pool:
 
         The connection is the listener's own, outside the pool's size, and
         closing the pool closes it. ``capacity`` bounds the notifications
-        waiting unread; see ``Listener``.
+        waiting unread; see ``Listener``. A ``capacity`` that is no ``int``
+        raises ``TypeError``, and one that is not positive ``ValueError``.
         """
-        if type(capacity) is not int or capacity < 1:
-            raise _native.ConstructionError("capacity must be a positive integer")
+        if type(capacity) is not int:
+            raise TypeError("capacity is an int")
+        if not 1 <= capacity <= _USIZE_MAX:
+            raise ValueError("capacity must be a positive integer")
         return Listener(await self._native.listener(capacity))
 
     async def notify(self, channel: str, payload: str) -> None:
@@ -230,7 +258,7 @@ class Connection:
 
     def __init__(self, native: _native._Connection, pool: Pool) -> None:
         if not isinstance(native, _native._Connection):
-            raise _native.ConstructionError("connections must be acquired from a pool")
+            raise TypeError("connections must be acquired from a pool")
         self._native = native
         self._pool = pool
 
@@ -257,7 +285,7 @@ class Connection:
         return await self._native.fetch(query, "all")
 
     async def one(self, query: Query) -> Record:
-        """Require exactly one row; zero or multiple rows raise DatabaseError."""
+        """Require exactly one row; zero or multiple rows raise DecodeError."""
         return await self._native.fetch(query, "one")
 
     async def optional(self, query: Query) -> Record | None:

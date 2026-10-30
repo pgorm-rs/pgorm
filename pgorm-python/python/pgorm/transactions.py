@@ -82,7 +82,7 @@ class Transaction:
 
     def __init__(self, native: _native._Transaction, parent: Connection | Transaction) -> None:
         if not isinstance(native, _native._Transaction) or not native.owner_matches(getattr(parent, "_native", None)):
-            raise _native.ConstructionError("transactions must be opened on their actual parent")
+            raise TypeError("transactions must be opened on their actual parent")
         self._native = native
         self._parent = parent
 

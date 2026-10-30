@@ -137,6 +137,6 @@ class JsonTableTests(unittest.IsolatedAsyncioTestCase):
             p.json_table(p.col("doc"), "$", C.ordinality("i"))
         with self.assertRaises(TypeError):
             C.nested("$")
-        with self.assertRaises(p.ConstructionError):
+        with self.assertRaises(TypeError):
             p.Select().from_("docs")
         self.assertEqual(p.json_table(p.col("doc"), "$", C.ordinality("i"), alias="t").alias, "t")

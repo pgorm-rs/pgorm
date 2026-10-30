@@ -13,7 +13,7 @@ pub use query::PyEntityGraphQuery;
 pub use slots::{GraphBindings, GraphSlots};
 
 use crate::{errors::ConstructionError, identifiers::validate_name};
-use pyo3::{prelude::*, types::PyString};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyString};
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
@@ -41,11 +41,11 @@ impl PyEntityGraph {
         let aliases = match aliases.filter(|value| !value.is_none()) {
             Some(value) if !value.is_instance_of::<PyString>() => {
                 value.extract::<Vec<String>>().map_err(|_| {
-                    ConstructionError::new_err("aliases require a sequence of joined-source names")
+                    PyTypeError::new_err("aliases require a sequence of joined-source names")
                 })?
             }
             Some(_) => {
-                return Err(ConstructionError::new_err(
+                return Err(PyTypeError::new_err(
                     "aliases require a sequence, not one string",
                 ));
             }
@@ -91,6 +91,7 @@ pub(crate) fn install(module: &Bound<'_, PyModule>) -> PyResult<()> {
 pub(crate) fn capabilities() -> serde_json::Map<String, serde_json::Value> {
     [
         ("graph", "pgorm_python::entities::Registry::graph"),
+        ("graphs", "pgorm_python::entities::Registry::graph"),
         ("graph.find", "application SelectGraph<E, S> factory"),
         ("graph.column", "pgorm::pgorm_query::Expr::col"),
         ("graph.where", "pgorm::QueryFilter"),

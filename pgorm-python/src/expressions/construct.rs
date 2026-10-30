@@ -1,5 +1,5 @@
 use pgorm::pgorm_query::{ColumnRef, Condition, Expr, Func, Query, SimpleExpr};
-use pyo3::{prelude::*, types::PyTuple};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyTuple};
 
 use super::{PyExpr, compiled::Compiled};
 use crate::{errors::ConstructionError, identifiers::PyIdentifier, values::PyValue};
@@ -78,7 +78,7 @@ pub(super) fn sequence(values: &Bound<'_, PyAny>) -> PyResult<Vec<SimpleExpr>> {
     if !values.is_exact_instance_of::<pyo3::types::PyList>()
         && !values.is_exact_instance_of::<PyTuple>()
     {
-        return Err(ConstructionError::new_err(
+        return Err(PyTypeError::new_err(
             "expression sequence requires a list or tuple",
         ));
     }
@@ -172,7 +172,7 @@ pub(crate) fn require_expr(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
     value
         .extract::<PyRef<'_, PyExpr>>()
         .map(|value| value.clone())
-        .map_err(|_| ConstructionError::new_err("expected a query expression"))
+        .map_err(|_| PyTypeError::new_err("expected a query expression"))
 }
 
 // [spec:pgorm:req:bindings.expressions]

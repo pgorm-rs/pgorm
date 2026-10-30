@@ -5,6 +5,7 @@
 
 use pgorm::pgorm_query::{Func, JsonTableBehavior, JsonTableColumn};
 use pyo3::{
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyDict, PyTuple},
 };
@@ -58,9 +59,7 @@ fn columns(
             column
                 .extract::<PyRef<'_, PyJsonTableColumn>>()
                 .map(|column| column.inner.clone())
-                .map_err(|_| {
-                    ConstructionError::new_err("JSON_TABLE's columns require JsonTableColumn")
-                })
+                .map_err(|_| PyTypeError::new_err("JSON_TABLE's columns require JsonTableColumn"))
         })
         .collect::<PyResult<_>>()?;
     Ok((first.inner.clone(), rest))
@@ -129,7 +128,7 @@ impl PyJsonTableColumn {
             Some("with_conditional_wrapper") => column.with_conditional_wrapper(),
             Some("omit_quotes") => column.omit_quotes(),
             Some(_) => {
-                return Err(ConstructionError::new_err(
+                return Err(PyTypeError::new_err(
                     "shaping requires 'with_wrapper', 'with_conditional_wrapper' or 'omit_quotes'",
                 ));
             }

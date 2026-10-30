@@ -1,9 +1,9 @@
-use pyo3::{prelude::*, types::PyList};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyList};
 use pyo3_async_runtimes::tokio::future_into_py;
 
 use super::PyRecord;
 use crate::{
-    errors::{DatabaseError, InternalError},
+    errors::{DecodeError, InternalError},
     execution::Target,
     statements,
     transactions::work::{Output, Work},
@@ -40,17 +40,16 @@ pub(crate) fn fetch<'py>(
         "one" => 1,
         "optional" => 2,
         _ => {
-            return Err(crate::errors::ConstructionError::new_err(
-                "unknown result terminal",
-            ));
+            return Err(PyTypeError::new_err("unknown result terminal"));
         }
     };
     future_into_py(py, async move {
         let Output::Rows(rows) = target.run(Work::Fetch(compiled)).await? else {
             return Err(InternalError::new_err("unexpected query result"));
         };
+        // [spec:pgorm:req:python.row-count+2]
         if (mode == 1 && rows.len() != 1) || (mode == 2 && rows.len() > 1) {
-            return Err(DatabaseError::new_err(format!(
+            return Err(DecodeError::new_err(format!(
                 "expected {} row, received {}",
                 if mode == 1 {
                     "exactly one"

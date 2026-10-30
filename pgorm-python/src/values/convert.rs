@@ -3,7 +3,8 @@ use pyo3::IntoPyObjectExt;
 use pyo3::{
     prelude::*,
     types::{
-        PyBool, PyBytes, PyDate, PyDateTime, PyFloat, PyInt, PyList, PyString, PyTime, PyTuple,
+        PyBool, PyBytes, PyDate, PyDateTime, PyDict, PyFloat, PyInt, PyList, PyString, PyTime,
+        PyTuple,
     },
 };
 use rust_decimal::Decimal;
@@ -40,6 +41,12 @@ pub(super) fn infer(data: &Bound<'_, PyAny>) -> PyResult<ArrayType> {
         ArrayType::Uuid
     } else if data.is_exact_instance_of::<PyInterval>() {
         ArrayType::Interval
+    } else if data.is_exact_instance_of::<PyDict>() {
+        ArrayType::Json
+    } else if data.is_instance_of::<PyTuple>() {
+        return Err(ConstructionError::new_err(
+            "a tuple reads as a row, not a value: write a list for an array, or declare its kind",
+        ));
     } else {
         return Err(ConstructionError::new_err(
             "ambiguous or unsupported value: supply an explicit kind",

@@ -6,6 +6,7 @@ import json
 import unittest
 
 import pgorm
+import pgorm.pipeline
 from pgorm import _native
 
 
@@ -46,6 +47,9 @@ class PackageTests(unittest.TestCase):
     # [spec:pgorm:req:bindings.entity-graphs+2/test]
     def test_standalone_registry_has_no_application_entities(self):
         self.assertEqual(pgorm.capabilities()["registrations"]["entities"], [])
+        self.assertEqual(
+            (pgorm.entities(), pgorm.graphs(), pgorm.pipeline.source_tuples()), ([], [], [])
+        )
         with self.assertRaises(pgorm.UnsupportedCapabilityError):
             pgorm.entity("app.Account")
         self.assertEqual(pgorm.capabilities()["registrations"]["graphs"], [])

@@ -76,15 +76,24 @@ class ModelConstruction(unittest.TestCase):
                 "t", {"a": p.Column("i32", name="x"), "b": p.Column("i32", name="x")}
             ),
             lambda: p.Column("i32", nullable=True, primary_key=True),
-            lambda: p.Column("i32", nullable=1),
             lambda: p.Column(p.TypeName("Unqualified")),
             lambda: model.as_("a").insert({"id": 1}),
+        ):
+            with self.assertRaises(p.ConstructionError):
+                operation()
+        for operation in (
+            lambda: p.Column("i32", nullable=1),
+            lambda: p.Column(5),
+            lambda: p.Model("t", [("id", p.Column("i32"))]),
+            lambda: p.Model("t", {"id": "i32"}),
+            lambda: model.key([1]),
+            lambda: model.insert([("id", 1)]),
             lambda: p.ModelColumn("id", "i32", p.col("id")),
             lambda: p.ModelQuery(model, p.Insert(model.table), ("id",)),
             lambda: p.ModelRows(model, "SELECT 1", ("id",)),
             lambda: p.ModelWrite(model, p.Select(p.literal(1))),
         ):
-            with self.assertRaises(p.ConstructionError):
+            with self.assertRaises(TypeError):
                 operation()
         for kind in ("u64", "char", "made-up"):
             with (
@@ -137,7 +146,7 @@ class ModelConstruction(unittest.TestCase):
             model.col("id").eq(quantified).inspect().sql,
             (model.table.col("id") == quantified).inspect().sql,
         )
-        with self.assertRaises(p.ConstructionError):
+        with self.assertRaises(TypeError):
             model.col("id").is_in("12")
         self.assertIn("IS NULL", model.col("note").is_null().inspect().sql)
         for value in (model.col("id"), query, accounts().delete()):
@@ -247,7 +256,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(sql_null.tagged("data").is_null)
         self.assertFalse(json_null.tagged("data").is_null)
         self.assertIsNone(json_null["data"])
-        with self.assertRaises(p.DatabaseError):
+        with self.assertRaises(p.DecodeError):
             await self.model.find().optional(self.pool)
         self.assertEqual(len(await self.model.find().all(self.pool)), 3)
         self.assertEqual(

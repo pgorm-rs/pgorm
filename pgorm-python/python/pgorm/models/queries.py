@@ -26,7 +26,7 @@ class ModelRows:
         if not isinstance(self.model, Model) or not isinstance(
             self.statement, (p.Select, p.Insert, p.Update, p.Delete)
         ):
-            raise p.ConstructionError("model rows require a model and native statement")
+            raise TypeError("model rows require a model and native statement")
         object.__setattr__(
             self, "selected", self.model._selection(tuple(self.selected))
         )
@@ -60,7 +60,7 @@ class ModelQuery(ModelRows):
 
     def __post_init__(self) -> None:
         if not isinstance(self.statement, p.Select):
-            raise p.ConstructionError("model queries require a native Select")
+            raise TypeError("model queries require a native Select")
         ModelRows.__post_init__(self)
 
     def where(self, predicate: p.Expr | p.Condition) -> ModelQuery:
@@ -93,9 +93,7 @@ class ModelWrite:
         if not isinstance(self.model, Model) or not isinstance(
             self.statement, (p.Insert, p.Update, p.Delete)
         ):
-            raise p.ConstructionError(
-                "model writes require a model and native CRUD statement"
-            )
+            raise TypeError("model writes require a model and native CRUD statement")
 
     def where(self, predicate: p.Expr | p.Condition) -> ModelWrite:
         if isinstance(self.statement, p.Insert):

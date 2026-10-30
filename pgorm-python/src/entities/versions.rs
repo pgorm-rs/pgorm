@@ -210,13 +210,15 @@ impl PyEntityUpdate {
 }
 
 // [spec:pgorm:req:bindings.entity-versions]
-/// `Entity::update_many()`: an update of every row its filters admit.
+/// `Entity::update_many()`: an update of every row its filters admit, which
+/// runs only once `where` or `all_rows()` has said which rows those are.
 #[pyclass(name = "EntityUpdateMany", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyEntityUpdateMany {
     entity: Arc<dyn EntityBackend>,
     assignments: Vec<(String, Assignment)>,
     filter: Condition,
+    guarded: bool,
 }
 
 impl PyEntityUpdateMany {
@@ -225,6 +227,7 @@ impl PyEntityUpdateMany {
             entity,
             assignments: Vec::new(),
             filter: Condition::all(),
+            guarded: false,
         }
     }
 }
@@ -249,17 +252,32 @@ impl PyEntityUpdateMany {
     fn r#where(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
         let mut next = self.clone();
         next.filter = next.filter.add(condition(predicate)?);
+        next.guarded = true;
         Ok(next)
     }
 
+    /// Every row, said outright.
+    fn all_rows(&self) -> Self {
+        let mut next = self.clone();
+        next.guarded = true;
+        next
+    }
+
     /// Every row the update changed, before and after, in the order the
-    /// server returned them. An update setting nothing is Rust's
-    /// `NothingToSet`, refused before anything is sent.
+    /// server returned them. An update with neither `where` nor `all_rows()`,
+    /// and one setting nothing (Rust's `NothingToSet`), are refused before
+    /// anything is sent.
+    // [spec:pgorm:req:bindings.entity-versions]
     fn returning_changes<'py>(
         &self,
         py: Python<'py>,
         connection: &Bound<'_, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
+        if !self.guarded {
+            return Err(ConstructionError::new_err(
+                "an update of many rows needs where(..) or all_rows() before it runs",
+            ));
+        }
         let write = VersionWrite::Changes(self.assignments.clone(), self.filter.clone());
         run(py, connection, self.entity.clone(), write, Answer::Changes)
     }

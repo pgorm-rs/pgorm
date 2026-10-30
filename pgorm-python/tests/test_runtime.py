@@ -106,20 +106,32 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertIs(pgorm.CancelledError, asyncio.CancelledError)
 
     # [spec:pgorm:req:bindings.errors+2/test]
-    # [spec:pgorm:req:bindings.connections/test]    an empty, overlong or non-string
-    # statement_cache_channel is a ConstructionError
+    # [spec:pgorm:req:bindings.connections/test]    an empty or overlong
+    # statement_cache_channel is a ConstructionError, and one of another type a TypeError
+    # [spec:pgorm:req:python.argument-errors/test]
     async def test_bad_configuration_is_an_explicit_construction_error(self):
         for options in (
-            {"max_size": 0}, {"max_size": -1}, {"max_size": True},
+            {"max_size": 0}, {"max_size": -1},
             {"max_size": 2**100}, {"statement_cache_size": -1},
             {"acquire_timeout": 0}, {"connect_timeout": float("nan")},
-            {"tls": "ignore-certificate"}, {"recycle": "invented"},
             {"statement_cache_channel": ""}, {"statement_cache_channel": "c" * 64},
-            {"statement_cache_channel": 1},
+            {"ca": "not PEM"}, {"ca": b""},
+            {"ca": "x", "cafile": os.environ["PGORM_TEST_CA"]},
         ):
             with self.subTest(options=options):
                 with self.assertRaises(pgorm.ConstructionError):
                     pgorm.Pool(self.dsn, **options)
+        for options in (
+            {"max_size": True}, {"max_size": 1.0}, {"statement_cache_size": "1"},
+            {"acquire_timeout": True}, {"connect_timeout": "10"},
+            {"tls": "ignore-certificate"}, {"tls": 1}, {"recycle": "invented"},
+            {"statement_cache_channel": 1}, {"ca": 1}, {"ca": ["pem"]},
+        ):
+            with self.subTest(options=options):
+                with self.assertRaises(TypeError):
+                    pgorm.Pool(self.dsn, **options)
+        with self.assertRaises(TypeError):
+            pgorm.Pool(b"postgres://")
         secret = "do-not-show-this-password"
         with self.assertRaises(pgorm.ConstructionError) as caught:
             pgorm.Pool(f"unknown-key={secret}")
@@ -200,9 +212,15 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
                     self.assertTrue(await pool.ping())
 
     # [spec:pgorm:req:bindings.connections/test]
+    # [spec:pgorm:req:python.lifecycle+2/test]    the CA as PEM data or as a file
     async def test_verified_tls_accepts_the_configured_ca(self):
         async with pgorm.Pool(self.dsn, tls="verify-full", cafile=os.environ["PGORM_TEST_CA"]) as pool:
             self.assertTrue(await pool.ping())
+        pem = Path(os.environ["PGORM_TEST_CA"]).read_bytes()
+        for ca in (pem, pem.decode()):
+            with self.subTest(ca=type(ca).__name__):
+                async with pgorm.Pool(self.dsn, tls="verify-full", ca=ca) as pool:
+                    self.assertTrue(await pool.ping())
 
     # [spec:pgorm:req:bindings.connections/test]
     async def test_verified_tls_binds_scram_to_the_certificate(self):

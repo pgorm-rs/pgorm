@@ -10,7 +10,7 @@ use pgorm::pgorm_query::{
     ConstraintChange, ConstraintDrop, NotNullConstraint, Table, TableCreateStatement, TableKey,
     TableName, Unique, Values,
 };
-use pyo3::{prelude::*, types::PyTuple};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyTuple};
 
 pub(super) fn table_name(table: &PyTable) -> PyResult<TableName> {
     if table.inner.alias.is_some() {
@@ -426,7 +426,7 @@ pub(super) fn alter_constraint(
         "enforced" => ConstraintChange::Enforced,
         "not_enforced" => ConstraintChange::NotEnforced,
         _ => {
-            return Err(ConstructionError::new_err(
+            return Err(PyTypeError::new_err(
                 "a constraint change is 'inherit', 'no_inherit', 'enforced' or 'not_enforced'",
             ));
         }

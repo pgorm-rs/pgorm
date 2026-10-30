@@ -24,9 +24,7 @@ class ModelRecord(Mapping[str, Any]):
         from .model import Model
 
         if not isinstance(self.model, Model) or not isinstance(self.native, p.Record):
-            raise p.ConstructionError(
-                "model records require a Model and native PostgreSQL Record"
-            )
+            raise TypeError("model records require a Model and native PostgreSQL Record")
         selected = self.model._selection(self.selected)
         object.__setattr__(self, "selected", selected)
         if self.native.keys() != selected:

@@ -12,7 +12,10 @@ use std::{
 };
 
 use futures_util::StreamExt;
-use pyo3::prelude::*;
+use pyo3::{
+    exceptions::{PyTypeError, PyValueError},
+    prelude::*,
+};
 use pyo3_async_runtimes::tokio::future_into_py;
 use serde_json::{Value, json};
 use tokio::sync::Mutex;
@@ -85,7 +88,7 @@ pub(crate) fn open<'py>(
     pool.check_owner(py)?;
     pool.ensure_open()?;
     let capacity = NonZeroUsize::new(capacity)
-        .ok_or_else(|| ConstructionError::new_err("capacity must be a positive integer"))?;
+        .ok_or_else(|| PyValueError::new_err("capacity must be a positive integer"))?;
     future_into_py(py, async move {
         let (listener, notifications) = tokio::select! {
             biased;
@@ -115,7 +118,7 @@ enum Request {
 fn channel(value: &Bound<'_, PyAny>) -> PyResult<String> {
     value
         .extract::<String>()
-        .map_err(|_| ConstructionError::new_err("a channel name must be a str"))
+        .map_err(|_| PyTypeError::new_err("a channel name must be a str"))
 }
 
 // [spec:pgorm:req:bindings.listen+2]
@@ -318,7 +321,7 @@ pub(crate) fn notify<'py>(
     target.check(py)?;
     let (Ok(channel), Ok(payload)) = (channel.extract::<String>(), payload.extract::<String>())
     else {
-        return Err(ConstructionError::new_err(
+        return Err(PyTypeError::new_err(
             "notify takes a str channel and a str payload",
         ));
     };

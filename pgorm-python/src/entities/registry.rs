@@ -70,6 +70,43 @@ impl Registry {
 #[pyclass(name = "_Registry", module = "pgorm._native", frozen)]
 pub(crate) struct NativeRegistry(pub(crate) Registry);
 
+/// The names the module registers of one kind — entities, graph shapes or
+/// source tuples — in order.
+fn names(
+    module: &Bound<'_, PyModule>,
+    kind: impl Fn(&Registry) -> Vec<String>,
+) -> PyResult<Vec<String>> {
+    let registry_object = module.getattr("_registry")?;
+    let registry = registry_object.extract::<PyRef<'_, NativeRegistry>>()?;
+    Ok(kind(&registry.0))
+}
+
+/// `entities()`: the names of the entities this module registers.
+// [spec:pgorm:req:bindings.entities]
+#[pyfunction(pass_module)]
+pub(crate) fn entities(module: &Bound<'_, PyModule>) -> PyResult<Vec<String>> {
+    names(module, |registry| {
+        registry.entries.keys().cloned().collect()
+    })
+}
+
+/// `graphs()`: the names of the graph shapes this module registers.
+// [spec:pgorm:req:bindings.entities]
+#[pyfunction(pass_module)]
+pub(crate) fn graphs(module: &Bound<'_, PyModule>) -> PyResult<Vec<String>> {
+    names(module, |registry| registry.graphs.keys().cloned().collect())
+}
+
+/// `pipeline.source_tuples()`: the names of the source tuples this module
+/// registers.
+// [spec:pgorm:req:bindings.entities]
+#[pyfunction(pass_module)]
+pub(crate) fn pipeline_source_tuples(module: &Bound<'_, PyModule>) -> PyResult<Vec<String>> {
+    names(module, |registry| {
+        registry.sources.keys().cloned().collect()
+    })
+}
+
 #[pyfunction(pass_module)]
 pub(crate) fn entity(module: &Bound<'_, PyModule>, name: &str) -> PyResult<PyEntity> {
     let registry_object = module.getattr("_registry")?;

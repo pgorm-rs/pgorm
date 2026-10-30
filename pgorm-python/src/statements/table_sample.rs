@@ -2,6 +2,7 @@
 
 use pgorm::pgorm_query::{FromItem, NamedTable, SampleMethod, TableSample};
 use pyo3::{
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyFloat, PyInt},
 };
@@ -44,7 +45,7 @@ fn double(value: &Bound<'_, PyAny>, what: &str) -> PyResult<f64> {
         return value.extract();
     }
     if !value.is_exact_instance_of::<PyInt>() {
-        return Err(ConstructionError::new_err(format!(
+        return Err(PyTypeError::new_err(format!(
             "a sample {what} requires an int or float"
         )));
     }

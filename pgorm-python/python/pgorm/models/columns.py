@@ -60,7 +60,7 @@ class Column:
     def __post_init__(self) -> None:
         for flag in (self.nullable, self.primary_key, self.array):
             if type(flag) is not bool:
-                raise p.ConstructionError("column flags require exact booleans")
+                raise TypeError("column flags require exact booleans")
         if self.primary_key and self.nullable:
             raise p.ConstructionError("primary-key columns cannot be nullable")
         if self.name is not None:
@@ -76,7 +76,11 @@ class Column:
                 raise p.ConstructionError(
                     "created range columns require a schema-qualified CreatedRange"
                 )
-        elif type(self.kind) is not str or self.kind not in MODEL_KINDS:
+        elif type(self.kind) is not str and not isinstance(self.kind, p.CreatedMultirange):
+            raise TypeError(
+                "a column's kind is a kind name, a TypeName, a CreatedRange or a CreatedMultirange"
+            )
+        elif isinstance(self.kind, p.CreatedMultirange) or self.kind not in MODEL_KINDS:
             raise p.UnsupportedCapabilityError(
                 "column kind is not supported by the native Record decoder"
             )
@@ -132,7 +136,7 @@ class ModelColumn:
         if not isinstance(self.declaration, Column) or not isinstance(
             self.expression, p.Expr
         ):
-            raise p.ConstructionError("model columns require a Column and native Expr")
+            raise TypeError("model columns require a Column and native Expr")
         object.__setattr__(self, "field_name", p.Identifier(self.field_name).name)
 
     def expr(self) -> p.Expr:
@@ -206,7 +210,7 @@ class ModelColumn:
         if isinstance(values, p.Select):
             return values
         if type(values) not in (list, tuple):
-            raise p.ConstructionError("model IN requires a list or tuple, or a Select")
+            raise TypeError("model IN requires a list or tuple, or a Select")
         return [self._operand(value) for value in values]
 
     def asc(self, *, nulls: p.Nulls | None = None) -> p.OrderBy:

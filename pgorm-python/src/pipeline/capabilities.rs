@@ -36,6 +36,7 @@ pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
             "pipeline.select_sources",
             "Pipeline::select_sources / SelectedSources::{all,one,one_opt}",
         ),
+        ("pipeline.source_tuples", "SourceList"),
     ]
     .into_iter()
     .map(|(name, api)| {
@@ -45,7 +46,9 @@ pub(crate) fn operations() -> serde_json::Map<String, serde_json::Value> {
                 "rust_api": format!("pgorm::pipeline::{api}"), "features": [],
                 "registration_required": matches!(
                     name,
-                    "pipeline.select_sources" | "pipeline.registered_column"
+                    "pipeline.select_sources"
+                        | "pipeline.registered_column"
+                        | "pipeline.source_tuples"
                 )
             }),
         )

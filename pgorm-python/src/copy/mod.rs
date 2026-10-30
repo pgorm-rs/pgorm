@@ -69,7 +69,7 @@ pub(crate) use to::CopyTo;
 pub use to::PyCopyTo;
 
 use pgorm::pgorm_query::TableName;
-use pyo3::{prelude::*, types::PyTuple};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyTuple};
 use serde_json::{Map, Value, json};
 
 use crate::{errors::ConstructionError, identifiers::PyIdentifier, statements::PyTable};
@@ -87,7 +87,7 @@ fn format(value: &Bound<'_, PyAny>) -> PyResult<Format> {
         Ok("text") => Ok(Format::Text),
         Ok("csv") => Ok(Format::Csv),
         Ok("binary") => Ok(Format::Binary),
-        _ => Err(ConstructionError::new_err(
+        _ => Err(PyTypeError::new_err(
             "COPY format must be \"text\", \"csv\" or \"binary\"",
         )),
     }
@@ -107,7 +107,7 @@ fn table_name(table: &PyTable) -> PyResult<TableName> {
 fn text(value: &Bound<'_, PyAny>, option: &str) -> PyResult<String> {
     let text = value
         .extract::<String>()
-        .map_err(|_| ConstructionError::new_err(format!("{option} requires a string")))?;
+        .map_err(|_| PyTypeError::new_err(format!("{option} requires a string")))?;
     if text.contains('\0') {
         return Err(ConstructionError::new_err(format!(
             "{option} cannot contain NUL"
@@ -120,7 +120,9 @@ fn text(value: &Bound<'_, PyAny>, option: &str) -> PyResult<String> {
 fn character(value: &Bound<'_, PyAny>, option: &str) -> PyResult<char> {
     let refused =
         || ConstructionError::new_err(format!("{option} requires a one-character string"));
-    let text = value.extract::<String>().map_err(|_| refused())?;
+    let text = value
+        .extract::<String>()
+        .map_err(|_| PyTypeError::new_err(format!("{option} requires a string")))?;
     let mut characters = text.chars();
     match (characters.next(), characters.next()) {
         (Some(character), None) if character != '\0' => Ok(character),

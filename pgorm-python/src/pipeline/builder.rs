@@ -1,13 +1,13 @@
 use pgorm::pipeline as pl;
-use pyo3::{prelude::*, types::PyTuple};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyTuple};
 
 use super::{
     bound::{self, Stage},
     construct::integer,
     expression::PyPipelineExpr,
-    scope::callback,
+    scope::{Plan, callback},
     source::pipeline_source,
-    window::{PyOver, expressions},
+    window::{PyOver, plan},
 };
 use crate::{
     errors::ConstructionError, execution::Target, expressions::Compiled, results, statements::Join,
@@ -35,7 +35,7 @@ impl PyPipeline {
         let pipeline = match terminal {
             "all" => self.inner.clone(),
             "one" | "optional" => self.inner.clone().take(1),
-            _ => return Err(ConstructionError::new_err("unknown pipeline terminal")),
+            _ => return Err(PyTypeError::new_err("unknown pipeline terminal")),
         };
         let (sql, values) = pipeline
             .into_sql()
@@ -71,28 +71,22 @@ impl PyPipeline {
     }
 
     fn filter(&self, condition: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let plan = Plan::plain(vec![PyPipelineExpr::coerce(condition)?])?;
         Ok(Self {
-            inner: self
-                .inner
-                .clone()
-                .filter(PyPipelineExpr::coerce(condition)?.unbound()?),
+            inner: bound::filter(self.inner.clone(), plan)?,
         })
     }
 
     fn filter_with(&self, function: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let plan = callback(function, true)?;
         Ok(Self {
-            inner: self.inner.clone().filter_with(|binder| {
-                let [expression] = plan.lower(binder);
-                expression
-            }),
+            inner: bound::filter(self.inner.clone(), callback(function, true)?)?,
         })
     }
 
     #[pyo3(signature = (*columns))]
     fn derive(&self, columns: &Bound<'_, PyTuple>) -> PyResult<Self> {
         Ok(Self {
-            inner: self.inner.clone().derive(expressions(columns)?),
+            inner: bound::apply(self.inner.clone(), Stage::Derive, plan(columns)?)?,
         })
     }
 
@@ -109,7 +103,7 @@ impl PyPipeline {
     #[pyo3(signature = (*columns))]
     fn select(&self, columns: &Bound<'_, PyTuple>) -> PyResult<Self> {
         Ok(Self {
-            inner: self.inner.clone().select(expressions(columns)?),
+            inner: bound::apply(self.inner.clone(), Stage::Select, plan(columns)?)?,
         })
     }
 
@@ -126,7 +120,7 @@ impl PyPipeline {
     #[pyo3(signature = (*keys))]
     fn group(&self, keys: &Bound<'_, PyTuple>) -> PyResult<PyGrouped> {
         Ok(PyGrouped {
-            inner: self.inner.clone().group(expressions(keys)?),
+            inner: bound::grouped(self.inner.clone(), plan(keys)?)?,
         })
     }
 
@@ -139,10 +133,11 @@ impl PyPipeline {
     #[pyo3(signature = (*columns, over))]
     fn window(&self, columns: &Bound<'_, PyTuple>, over: PyRef<'_, PyOver>) -> PyResult<Self> {
         Ok(Self {
-            inner: self
-                .inner
-                .clone()
-                .window(expressions(columns)?, over.inner.clone()),
+            inner: bound::apply(
+                self.inner.clone(),
+                Stage::Window(over.inner.clone()),
+                plan(columns)?,
+            )?,
         })
     }
 
@@ -159,7 +154,7 @@ impl PyPipeline {
     #[pyo3(signature = (*keys))]
     fn sort(&self, keys: &Bound<'_, PyTuple>) -> PyResult<Self> {
         Ok(Self {
-            inner: self.inner.clone().sort(expressions(keys)?),
+            inner: bound::apply(self.inner.clone(), Stage::Sort, plan(keys)?)?,
         })
     }
 
@@ -186,12 +181,10 @@ impl PyPipeline {
 
     #[pyo3(signature = (source, on, *, kind=Join::Inner))]
     fn join(&self, source: &Bound<'_, PyAny>, on: &Bound<'_, PyAny>, kind: Join) -> PyResult<Self> {
+        let source = pipeline_source(source)?.source();
+        let plan = Plan::plain(vec![PyPipelineExpr::coerce(on)?])?;
         Ok(Self {
-            inner: self.inner.clone().join(
-                join_side(kind),
-                pipeline_source(source)?.source(),
-                PyPipelineExpr::coerce(on)?.unbound()?,
-            ),
+            inner: bound::join(self.inner.clone(), join_side(kind), source, plan)?,
         })
     }
 
@@ -205,13 +198,7 @@ impl PyPipeline {
         let source = pipeline_source(source)?.source();
         let plan = callback(function, true)?;
         Ok(Self {
-            inner: self
-                .inner
-                .clone()
-                .join_with(join_side(kind), source, |binder| {
-                    let [expression] = plan.lower(binder);
-                    expression
-                }),
+            inner: bound::join(self.inner.clone(), join_side(kind), source, plan)?,
         })
     }
 
@@ -303,7 +290,7 @@ impl PyGrouped {
     #[pyo3(signature = (*columns))]
     fn aggregate(&self, columns: &Bound<'_, PyTuple>) -> PyResult<PyPipeline> {
         Ok(PyPipeline {
-            inner: self.inner.clone().aggregate(expressions(columns)?),
+            inner: bound::aggregate(self.inner.clone(), plan(columns)?)?,
         })
     }
 

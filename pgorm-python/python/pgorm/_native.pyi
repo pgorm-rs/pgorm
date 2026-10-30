@@ -42,14 +42,15 @@ from ._pipeline_functions import (
     pipeline_alias as pipeline_alias, pipeline_col as pipeline_col,
     pipeline_role as pipeline_role, pipeline_function as pipeline_function,
     pipeline_case as pipeline_case, pipeline_sources as pipeline_sources,
+    pipeline_source_tuples as pipeline_source_tuples,
 )
 
 __version__: str
 __pgorm_version__: str
 
 class PgormError(Exception): ...
-class UnsupportedCapabilityError(PgormError): ...
 class ConstructionError(PgormError): ...
+class UnsupportedCapabilityError(ConstructionError): ...
 class ConnectionError(PgormError): ...
 class DatabaseError(PgormError):
     sqlstate: str | None
@@ -147,13 +148,13 @@ from ._json import (
     is_json as is_json, is_not_json as is_not_json,
 )
 from ._results import Record as Record, Field as Field
-from ._entities import Entity as Entity, EntityColumn as EntityColumn, EntityQuery as EntityQuery, entity as entity
+from ._entities import Entity as Entity, EntityColumn as EntityColumn, EntityQuery as EntityQuery, entity as entity, entities as entities
 from ._versions import (
     Change as Change, Upserted as Upserted, EntityUpdate as EntityUpdate,
     EntityUpdateMany as EntityUpdateMany, EntityInsert as EntityInsert,
     EntityInsertMany as EntityInsertMany,
 )
-from ._graphs import EntityGraph as EntityGraph, EntityGraphQuery as EntityGraphQuery, EntityGraphCursor as EntityGraphCursor, graph as graph
+from ._graphs import EntityGraph as EntityGraph, EntityGraphQuery as EntityGraphQuery, EntityGraphCursor as EntityGraphCursor, graph as graph, graphs as graphs
 from ._entity_models import EntityModel as EntityModel, ActiveModel as ActiveModel, ActiveValue as ActiveValue, ActiveState as ActiveState
 from ._writes import (
     Insert as Insert, Update as Update, Delete as Delete, RawSQL as RawSQL,

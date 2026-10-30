@@ -29,8 +29,11 @@ class ExpressionTests(unittest.TestCase):
         self.assertEqual(compiled.sql, 'SELECT "S"."T"."A""雪.%\\" = $1')
         self.assertEqual(compiled.params, [Value(value)])
         self.assertNotIn(value, compiled.sql)
-        for name in ["", "a" * 64, "雪" * 22, "a\0b", 1, Value("column")]:
+        for name in ["", "a" * 64, "雪" * 22, "a\0b"]:
             with self.assertRaises(ConstructionError):
+                col(name)
+        for name in [1, Value("column"), None]:
+            with self.assertRaises(TypeError):
                 col(name)
         with self.assertRaises(ConstructionError):
             col("x", schema="s")
@@ -69,9 +72,9 @@ class ExpressionTests(unittest.TestCase):
             expression and col("y") > 2
         with self.assertRaises(ConstructionError):
             1 < col("x") < 10
-        with self.assertRaises(ConstructionError):
+        with self.assertRaises(TypeError):
             expression & True
-        with self.assertRaises(ConstructionError):
+        with self.assertRaises(TypeError):
             Condition.any(True)
 
     def test_nested_conditions_keep_parameter_order(self):
@@ -99,7 +102,7 @@ class ExpressionTests(unittest.TestCase):
         self.assertEqual(expression.is_not_null().inspect().sql, 'SELECT "x" IS NOT NULL')
         self.assertEqual(expression.between(1, 3).inspect().params, [Value(1), Value(3)])
         self.assertIn("NOT BETWEEN", expression.not_between(1, 3).inspect().sql)
-        with self.assertRaises(ConstructionError):
+        with self.assertRaises(TypeError):
             expression.is_in("abc")
 
     def test_pattern_and_substring_semantics_are_distinct(self):
@@ -116,11 +119,14 @@ class ExpressionTests(unittest.TestCase):
             self.assertEqual(compiled.params, [Value(needle)])
             self.assertIn("LIKE", compiled.sql)
             self.assertIn("ESCAPE", compiled.sql)
-        with self.assertRaises(ConstructionError):
+        with self.assertRaises(TypeError):
             expression.like(needle)
-        for escape in ["xy", "\0", 1]:
+        for escape in ["xy", "\0"]:
             with self.assertRaises(ConstructionError):
                 LikePattern("pattern", escape=escape)
+        for pattern, escape in [(1, None), ("pattern", 1)]:
+            with self.assertRaises(TypeError):
+                LikePattern(pattern, escape=escape)
         compiled = expression.like(LikePattern(needle, escape="")).inspect()
         self.assertTrue(compiled.sql.endswith("ESCAPE ''"))
         self.assertEqual(compiled.params, [Value(needle)])

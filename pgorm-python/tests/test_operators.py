@@ -168,7 +168,7 @@ class OperatorTests(unittest.IsolatedAsyncioTestCase):
     def test_a_json_path_is_a_str(self):
         for path in [1, None, p.col("x"), b"$.a"]:
             with self.subTest(path=path):
-                with self.assertRaises(p.ConstructionError):
+                with self.assertRaises(TypeError):
                     self.c("doc").path_exists(path)
         self.assertEqual(self.c("doc").path_exists("$.a").inspect().params, [p.Value("$.a")])
 

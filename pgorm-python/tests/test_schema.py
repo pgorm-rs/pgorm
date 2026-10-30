@@ -32,7 +32,7 @@ class SchemaConstruction(unittest.TestCase):
         self.assertIn('"id" integer NOT NULL', built.inspect().sql)
         self.assertNotIn("NOT NULL", table.column(column).inspect().sql)
         self.assertEqual(built.inspect().params, [])
-        with self.assertRaises(p.UnsupportedCapabilityError):
+        with self.assertRaises(TypeError):
             s.from_entity(p.Model("test", {"id": p.Column("i32")}))
 
     # [spec:pgorm:req:bindings.schema/test]
@@ -57,11 +57,12 @@ class SchemaConstruction(unittest.TestCase):
         for action in (
             lambda: column.collate(""),
             lambda: column.collate("C", schema=""),
-            lambda: column.collate(1),
             lambda: column.collate("雪" * 22),
         ):
             with self.subTest(action=action), self.assertRaises(p.ConstructionError):
                 action()
+        with self.assertRaises(TypeError):
+            column.collate(1)
 
     # [spec:pgorm:req:bindings.schema/test]
     def test_invalid_options_and_unquoted_fragments_fail(self):
@@ -71,7 +72,6 @@ class SchemaConstruction(unittest.TestCase):
             lambda: s.DataType("numeric", scale=2),
             lambda: s.DataType("numeric", precision=0),
             lambda: s.DataType("numeric", precision=10, scale=1001),
-            lambda: s.DataType("varchar", length=True),
             lambda: s.DataType("varchar", length=0),
             lambda: s.DataType(p.TypeName("custom"), length=3),
             lambda: s.create_table(p.Table("test", alias="t")),
@@ -79,15 +79,22 @@ class SchemaConstruction(unittest.TestCase):
             lambda: s.drop_table(p.Table("test", alias="t")),
             lambda: s.create_index(p.Table("test"), "v").using("gin); SELECT 1 --"),
             lambda: s.ColumnDef("", "text"),
-            lambda: s.ColumnDef("v", "text").generated("raw SQL", "stored"),
-            lambda: s.ColumnDef("v", "integer").generated(p.col("id"), "persisted"),
             lambda: s.create_enum("mood", ["a\0b"]),
             lambda: s.create_enum("mood", ["雪" * 22]),
             lambda: s.add_enum_value("mood", "v", before="a", after="b"),
-            lambda: s.alter_constraint(p.Table("test"), "c", "deferrable"),
             lambda: s.add_not_null(p.Table("test", alias="t"), "c"),
         ):
             with self.subTest(action=action), self.assertRaises(p.PgormError):
+                action()
+        for action in (
+            lambda: s.DataType("varchar", length=True),
+            lambda: s.DataType(7),
+            lambda: s.ColumnDef("v", "text").generated("raw SQL", "stored"),
+            lambda: s.ColumnDef("v", "integer").generated(p.col("id"), "persisted"),
+            lambda: s.create_enum("mood", [1]),
+            lambda: s.alter_constraint(p.Table("test"), "c", "deferrable"),
+        ):
+            with self.subTest(action=action), self.assertRaises(TypeError):
                 action()
 
     # [spec:pgorm:req:python.truth-testing+3/test]    a domain's builder refuses truth testing too

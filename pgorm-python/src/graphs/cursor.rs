@@ -3,7 +3,7 @@ use crate::{
     entities::{metadata::ColumnInfo, query::bound},
     errors::ConstructionError,
 };
-use pyo3::{prelude::*, types::PyTuple};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyTuple};
 
 #[derive(Clone, Debug)]
 #[pyclass(name = "EntityGraphCursor", module = "pgorm", frozen, from_py_object)]
@@ -69,7 +69,7 @@ impl PyEntityGraphCursor {
 
     fn window(&self, last: bool, count: &Bound<'_, PyAny>) -> PyResult<Self> {
         let count = bound(Some(count))?
-            .ok_or_else(|| ConstructionError::new_err("cursor window requires a row count"))?;
+            .ok_or_else(|| PyTypeError::new_err("cursor window requires a row count"))?;
         let mut cursor = self.clone();
         cursor.plan.window = Some((last, count));
         Ok(cursor)

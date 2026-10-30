@@ -90,19 +90,23 @@ class DomainConstruction(unittest.TestCase):
         for action in (
             lambda: s.create_domain("", "integer"),
             lambda: s.create_domain("x" * 64, "integer"),
-            lambda: s.create_domain(p.Table("t"), "integer"),
-            lambda: s.create_domain("d", "integer").check("VALUE > 0"),
             lambda: s.create_domain("d", "integer").check(p.domain_value() > 0, name=""),
             lambda: s.create_domain("d", "text").collate(""),
             lambda: s.create_domain("d", "text").collate("C", schema="nul\0"),
-            lambda: s.add_domain_check("d", "VALUE > 0"),
             lambda: s.drop_domain_constraint("d", ""),
             lambda: s.rename_domain_constraint("d", "a", ""),
             lambda: s.validate_domain_constraint("", "a"),
             lambda: s.rename_domain("d", ""),
-            lambda: s.drop_domain("d", 3),
         ):
             with self.subTest(action=action), self.assertRaises(p.ConstructionError):
+                action()
+        for action in (
+            lambda: s.create_domain(p.Table("t"), "integer"),
+            lambda: s.create_domain("d", "integer").check("VALUE > 0"),
+            lambda: s.add_domain_check("d", "VALUE > 0"),
+            lambda: s.drop_domain("d", 3),
+        ):
+            with self.subTest(action=action), self.assertRaises(TypeError):
                 action()
         with self.assertRaises(p.UnsupportedCapabilityError):
             s.create_domain("d", "serial")

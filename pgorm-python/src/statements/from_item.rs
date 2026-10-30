@@ -1,5 +1,5 @@
 use pgorm::pgorm_query::{ColumnRef, Expr, FromItem};
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use super::table::PyTable;
 use crate::{errors::ConstructionError, expressions::PyExpr, identifiers::PyIdentifier};
@@ -58,7 +58,7 @@ pub(super) fn from_item(value: &Bound<'_, PyAny>) -> PyResult<FromItem> {
     } else if let Ok(item) = value.extract::<PyRef<'_, PyFromItem>>() {
         Ok(item.inner.clone())
     } else {
-        Err(ConstructionError::new_err(
+        Err(PyTypeError::new_err(
             "a FROM item requires a Table or FromItem",
         ))
     }

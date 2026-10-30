@@ -2,20 +2,23 @@
 //! `TableFunction`.
 
 use pgorm::pgorm_query::{FunctionCall, SimpleExpr, TableFunction};
-use pyo3::{prelude::*, types::PyTuple};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyTuple};
 
 use super::from_item::PyFromItem;
 use crate::{
     errors::ConstructionError, expressions::PyExpr, identifiers::PyIdentifier, schema::PyDataType,
 };
 
-/// The call an expression holds; anything else cannot stand in FROM.
+/// The call an expression holds; any other expression cannot stand in FROM,
+/// and anything but an expression is of another type.
 fn function_call(value: &Bound<'_, PyAny>) -> PyResult<FunctionCall> {
-    let expr = value.extract::<PyRef<'_, PyExpr>>().ok();
-    match expr.as_deref().map(|expr| &expr.inner) {
-        Some(SimpleExpr::FunctionCall(call)) => Ok(call.clone()),
+    let expr = value.extract::<PyRef<'_, PyExpr>>().map_err(|_| {
+        PyTypeError::new_err("a table function requires a function call built by call()")
+    })?;
+    match &expr.inner {
+        SimpleExpr::FunctionCall(call) => Ok(call.clone()),
         _ => Err(ConstructionError::new_err(
-            "a table function requires a function call built by call()",
+            "a table function reads a function call built by call(), not another expression",
         )),
     }
 }

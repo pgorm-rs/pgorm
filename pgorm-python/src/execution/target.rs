@@ -1,13 +1,13 @@
 use super::Database;
 use crate::{
-    errors::{ConstructionError, LifecycleError, database_error},
+    errors::{LifecycleError, database_error},
     runtime::{ConnectionState, NativeConnection, Operation},
     transactions::{
         NativeTransaction, State,
         work::{Output, Work},
     },
 };
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 use std::sync::Arc;
 
 pub(crate) enum Target {
@@ -23,7 +23,7 @@ impl Target {
         } else if let Ok(transaction) = native.extract::<PyRef<'_, NativeTransaction>>() {
             Self::Transaction(transaction.state.clone())
         } else {
-            return Err(ConstructionError::new_err(
+            return Err(PyTypeError::new_err(
                 "execution requires an acquired pgorm Connection or Transaction",
             ));
         };

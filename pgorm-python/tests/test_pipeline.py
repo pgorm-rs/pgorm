@@ -18,7 +18,9 @@ class PipelineConstruction(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIsInstance(query.inspect(), p.Compiled)
         query = cases["repeated"].inspect()
-        self.assertEqual([(v.kind, v.value) for v in query.params], [("i32", 2)])
+        self.assertEqual(
+            [(v.kind, v.value) for v in query.params], [("i32", 2), ("i64", 10)]
+        )
         self.assertEqual(query.sql.count("$1"), 2)
         self.assertEqual(cases["append"].inspect().params[1].value, 8)
         self.assertEqual(
@@ -88,18 +90,21 @@ class PipelineConstruction(unittest.TestCase):
         self.assertIsInstance(base.derive_with(lambda b: []), pl.Pipeline)
         full = base.select_with(lambda b: [b.bind(i).as_(f"x{i}") for i in range(32)])
         self.assertEqual(len(full.inspect().params), 32)
-        with self.assertRaises(p.UnsupportedCapabilityError):
-            base.select_with(lambda b: [b.bind(i) for i in range(33)])
+        key = pl.col("items", "id")
+        for operation in (
+            lambda: base.select_with(lambda b: [b.bind(i) for i in range(33)]),
+            lambda: base.select(*((key + i).as_(f"x{i}") for i in range(33))),
+        ):
+            with self.assertRaises(p.ConstructionError):
+                operation()
         self.assertIsInstance(
             base.select(*(pl.literal(i).as_(f"x{i}") for i in range(33))).inspect(),
             p.Compiled,
         )
         for operation in (
-            lambda: base.take(True),
             lambda: base.take(2**64),
             lambda: pl.alias(""),
             lambda: pl.col("items", "bad\0name"),
-            lambda: base.select_with(lambda b: "bad"),
             lambda: pl.literal(pl.col("items", "id")),
             lambda: bool(base),
             lambda: bool(pl.col("items", "id")),
@@ -107,15 +112,74 @@ class PipelineConstruction(unittest.TestCase):
         ):
             with self.assertRaises(p.ConstructionError):
                 operation()
-        for value in (float("inf"), p.Value(2, "i16"), p.Value.null("i32")):
-            with self.assertRaises(p.UnsupportedCapabilityError):
+        for operation in (
+            lambda: base.take(True),
+            lambda: base.select_with(lambda b: "bad"),
+            lambda: key.in_array({1, 2}),
+            lambda: pl.case([(key > 1,)], "no"),
+            lambda: pl.alias(key),
+        ):
+            with self.assertRaises(TypeError):
+                operation()
+        for value in (
+            float("inf"), 2**63, b"bytes", p.Value(2, "i16"), p.Value.null("i32")
+        ):
+            with self.assertRaises(p.ConstructionError):
                 pl.literal(value)
-        with self.assertRaises(p.UnsupportedCapabilityError):
-            base.filter_with(
-                lambda b: b.bind(p.Value("calm", p.TypeName("Mood", schema="app")))
-            )
+        enum = p.Value("calm", p.TypeName("Mood", schema="app"))
+        for operation in (
+            lambda: base.filter_with(lambda b: b.bind(enum)),
+            lambda: base.filter(key == enum),
+            lambda: base.filter(key == None),  # noqa: E711
+            lambda: base.filter_with(lambda b: b.bind(None)),
+        ):
+            with self.assertRaises(p.ConstructionError):
+                operation()
         with self.assertRaises(p.ConstructionError):
             base.select(pl.literal(1).as_("sum")).inspect()
+
+    # [spec:pgorm:req:bindings.pipeline-binder/test]
+    # [spec:pgorm:req:python.pipeline-operands+2/test]
+    def test_plain_operands_bind_through_their_stage(self):
+        base = pl.from_(p.Table("items"))
+        key, amount = pl.col("items", "id"), pl.col("items", "amount")
+        cases = {
+            "filter": base.filter(key > 2),
+            "derive": base.derive((amount + 2).as_("more")),
+            "select": base.select(pl.sum(5).as_("five")),
+            "sort": base.sort(key + 1),
+            "group": base.group(amount.coalesce(0)).aggregate(pl.count_rows()),
+            "aggregate": base.group(key).aggregate((pl.sum(amount) + 1).as_("t")),
+            "window": base.window((pl.sum(amount) + 3).as_("t"), over=pl.over()),
+            "join": base.join(
+                pl.source(p.Table("items")).named("peer"),
+                (key == pl.col("peer", "id")) & (pl.col("peer", "amount") > 1),
+            ),
+            "case": base.select(pl.case([(key > 1, "yes")], "no").as_("a")),
+            "in_array": base.filter(key.in_array([1, 2])),
+        }
+        for name, query in cases.items():
+            with self.subTest(name=name):
+                compiled = query.inspect()
+                self.assertIn("$1", compiled.sql)
+                self.assertTrue(compiled.params)
+        query = base.filter(key > 2).inspect()
+        self.assertEqual([(v.kind, v.value) for v in query.params], [("i64", 2)])
+        self.assertEqual(
+            base.filter(key > pl.literal(2)).inspect().params, []
+        )
+        mixed = base.filter_with(lambda b: (key > b.bind(1)) & (key < 9)).inspect()
+        self.assertEqual([v.value for v in mixed.params], [1, 9])
+        typed = base.filter(key == p.Value(3, "i16")).inspect()
+        self.assertEqual([v.kind for v in typed.params], ["i16"])
+        self.assertEqual(pl.null().__class__, pl.PipelineExpr)
+        self.assertEqual(base.filter(key.is_null() | (key == pl.null())).inspect().params, [])
+        for keys in ((key + 1,), (pl.literal(1), amount * 2)):
+            with self.subTest(keys=len(keys)), self.assertRaises(p.ConstructionError):
+                pl.over().by(*keys)
+            with self.subTest(keys=len(keys)), self.assertRaises(p.ConstructionError):
+                pl.over().sort_by(*keys)
+        self.assertIsInstance(pl.over().by(pl.literal(1), key), pl.Over)
 
     # [spec:pgorm:req:bindings.pipeline/test]
     # [spec:pgorm:req:pipeline.errors+4/test]
@@ -176,11 +240,11 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
         query = pl.from_(model).sort(pl.col("items", "id"))
         self.assertEqual((await query.one(self.connection))["id"], 1)
         self.assertIn("LIMIT 1", query.inspect(terminal="one").sql)
-        with self.assertRaises(p.DatabaseError):
+        with self.assertRaises(p.DecodeError):
             await self.connection.one(query)
         empty = query.filter(pl.col("items", "id") < 0)
         self.assertIsNone(await empty.optional(self.connection))
-        with self.assertRaises(p.DatabaseError):
+        with self.assertRaises(p.DecodeError):
             await empty.one(self.connection)
         async with await self.connection.stream(query) as rows:
             found = [row["id"] async for row in rows]
@@ -239,11 +303,14 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
         )
         base = pl.from_(p.Table("items"))
         key = pl.col("items", "category")
-        literal = base.filter(key == payload)
+        literal = base.filter(key == pl.literal(payload))
+        plain = base.filter(key == payload)
         bound = base.filter_with(lambda b: key == b.bind(payload))
         self.assertEqual(literal.inspect().params, [])
-        self.assertNotIn(payload, bound.inspect().sql)
-        for query in (literal, bound):
+        for query in (plain, bound):
+            self.assertNotIn(payload, query.inspect().sql)
+            self.assertEqual([v.value for v in query.inspect().params], [payload])
+        for query in (literal, plain, bound):
             row = await query.one(self.connection)
             self.assertEqual((row["id"], row["category"]), (5, payload))
         self.assertEqual(len(await base.all(self.connection)), 5)
@@ -336,10 +403,15 @@ class PipelineDomainEnums(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(operations["pipeline.registered_column"]["registration_required"])
         named = pl.alias("named")
         self.assertEqual(
-            base.filter(typed == "glad").inspect().sql,
+            base.filter(typed == pl.literal("glad")).inspect().sql,
             'SELECT * FROM pipeline_enums.lines WHERE CAST(mood AS pipeline_enums."Mood") = \'glad\'',
         )
+        self.assertEqual(
+            base.filter(typed == "glad").inspect().sql,
+            'SELECT * FROM pipeline_enums.lines WHERE CAST(mood AS pipeline_enums."Mood") = $1',
+        )
         for query, expected in (
+            (base.filter(typed == pl.literal("glad")), [2, 4]),
             (base.filter(typed == "glad"), [2, 4]),
             (base.filter_with(lambda binder: typed == binder.bind("glad")), [2, 4]),
             (base.filter(typed.in_array(["calm"])), [1, 3]),
@@ -355,6 +427,7 @@ class PipelineDomainEnums(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(highest["highest"], "glad")
         for query in (
+            base.filter(mood == pl.literal("glad")),
             base.filter(mood == "glad"),
             base.filter_with(lambda binder: mood == binder.bind("glad")),
             base.derive(mood.as_(named)).filter(named == "glad"),

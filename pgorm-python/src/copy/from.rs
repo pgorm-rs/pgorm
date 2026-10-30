@@ -7,6 +7,7 @@ use pgorm::pgorm_query::{
     Values,
 };
 use pyo3::{
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyDict, PyInt, PyTuple},
 };
@@ -165,10 +166,13 @@ impl PyCopyFrom {
         let reject_limit = reject_limit
             .filter(|limit| !limit.is_none())
             .map(|limit| {
+                if !limit.is_exact_instance_of::<PyInt>() {
+                    return Err(PyTypeError::new_err("reject_limit is an int"));
+                }
                 limit
-                    .is_exact_instance_of::<PyInt>()
-                    .then(|| limit.extract::<u32>().ok().and_then(NonZeroU32::new))
-                    .flatten()
+                    .extract::<u32>()
+                    .ok()
+                    .and_then(NonZeroU32::new)
                     .ok_or_else(|| {
                         ConstructionError::new_err(
                             "reject_limit requires a positive integer that fits u32",
@@ -181,7 +185,7 @@ impl PyCopyFrom {
             .map(|verbosity| match verbosity.extract::<String>().as_deref() {
                 Ok("verbose") => Ok(CopyLogVerbosity::Verbose),
                 Ok("silent") => Ok(CopyLogVerbosity::Silent),
-                _ => Err(ConstructionError::new_err(
+                _ => Err(PyTypeError::new_err(
                     "log_verbosity must be \"verbose\" or \"silent\"",
                 )),
             })

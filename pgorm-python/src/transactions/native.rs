@@ -5,7 +5,7 @@ use crate::{
     results,
 };
 use pgorm::{IsolationLevel, TransactionMode};
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 use pyo3_async_runtimes::tokio::future_into_py;
 use std::{fmt, sync::Arc};
 
@@ -16,7 +16,7 @@ pub(crate) fn mode(mode: &str, isolation: Option<&str>) -> PyResult<TransactionM
             "read_committed" => Ok(IsolationLevel::ReadCommitted),
             "repeatable_read" => Ok(IsolationLevel::RepeatableRead),
             "serializable" => Ok(IsolationLevel::Serializable),
-            _ => Err(ConstructionError::new_err(
+            _ => Err(PyTypeError::new_err(
                 "unsupported transaction isolation level",
             )),
         })
@@ -26,8 +26,11 @@ pub(crate) fn mode(mode: &str, isolation: Option<&str>) -> PyResult<TransactionM
         ("read_write", isolation) => Ok(TransactionMode::ReadWrite { isolation }),
         ("read_only", isolation) => Ok(TransactionMode::ReadOnly { isolation }),
         ("deferrable", None) => Ok(TransactionMode::DeferrableSnapshot),
-        _ => Err(ConstructionError::new_err(
+        ("default" | "deferrable", Some(_)) => Err(ConstructionError::new_err(
             "default and deferrable modes take no isolation override; choose read_write or read_only",
+        )),
+        _ => Err(PyTypeError::new_err(
+            "a transaction's mode is default, read_write, read_only or deferrable",
         )),
     }
 }

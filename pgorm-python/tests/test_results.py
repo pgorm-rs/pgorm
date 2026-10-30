@@ -23,15 +23,13 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
         empty = p.Select(p.literal(1).as_("n")).where(p.literal(False))
         self.assertEqual(await self.pool.query(empty), [])
         self.assertIsNone(await self.pool.optional(empty))
-        with self.assertRaises(p.DatabaseError) as missing:
+        with self.assertRaises(p.DecodeError) as missing:
             await self.pool.one(empty)
-        self.assertIsNone(missing.exception.sqlstate)
-        self.assertIsNone(missing.exception.message)
-        self.assertIsNone(missing.exception.constraint)
+        self.assertNotIsInstance(missing.exception, p.DatabaseError)
         self.assertIn("expected exactly one row", str(missing.exception))
         two = p.RawSQL("SELECT generate_series(1, 2) AS n")
         for terminal in (self.pool.one, self.pool.optional):
-            with self.assertRaises(p.DatabaseError):
+            with self.assertRaises(p.DecodeError):
                 await terminal(two)
         with self.assertRaises(p.DatabaseError) as caught:
             await self.pool.optional(p.RawSQL("SELECT 1 / 0 AS n"))
@@ -244,7 +242,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
 
     # [spec:pgorm:req:python.raw/test]
     async def test_execution_requires_an_explicit_query_object(self):
-        with self.assertRaises(p.ConstructionError):
+        with self.assertRaises(TypeError):
             await self.pool.query("SELECT 1")
         row = await self.pool.one(p.Select(p.literal("O'Brien").as_("value")).inspect())
         self.assertEqual(row["value"], "O'Brien")

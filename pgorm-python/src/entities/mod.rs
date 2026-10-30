@@ -110,12 +110,16 @@ pub(crate) fn install(module: &Bound<'_, PyModule>, registry: Registry) -> PyRes
     module.add_class::<PyEntityInsertMany>()?;
     module.add("_registry", registry::NativeRegistry(registry))?;
     module.add_function(wrap_pyfunction!(registry::entity, module)?)?;
+    module.add_function(wrap_pyfunction!(registry::entities, module)?)?;
+    module.add_function(wrap_pyfunction!(registry::graphs, module)?)?;
+    module.add_function(wrap_pyfunction!(registry::pipeline_source_tuples, module)?)?;
     Ok(())
 }
 
 pub(crate) fn capabilities() -> serde_json::Map<String, serde_json::Value> {
     [
         ("entity", "pgorm_python::entities::Registry"),
+        ("entities", "pgorm_python::entities::Registry"),
         ("entity.find", "pgorm::EntityTrait::find"),
         ("entity.column", "pgorm::ColumnTrait"),
         ("entity.all", "pgorm::Select<E>::all"),

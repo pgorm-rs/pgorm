@@ -53,6 +53,18 @@ fn refused(py: Python<'_>, globals: &Bound<'_, PyDict>, source: &str, message: &
     assert!(error.to_string().contains(message), "{source}: {error}");
 }
 
+/// `source` refused as an argument of a type its call does not take.
+fn mistyped(py: Python<'_>, globals: &Bound<'_, PyDict>, source: &str, message: &str) {
+    let error = py
+        .eval(&CString::new(source).unwrap(), Some(globals), None)
+        .expect_err(source);
+    assert!(
+        error.is_instance_of::<pyo3::exceptions::PyTypeError>(py),
+        "{source}: {error}"
+    );
+    assert!(error.to_string().contains(message), "{source}: {error}");
+}
+
 fn doc() -> Expr {
     Expr::col(Name::runtime("doc"))
 }
@@ -270,6 +282,18 @@ fn unrepresentable_choices_are_refused() -> PyResult<()> {
                 "bug #19695",
             ),
             (
+                "p.json_arrayagg(p.col('id'), order_by=[p.col('id').asc(nulls=p.Nulls.Last)])",
+                "NULLS FIRST or NULLS LAST",
+            ),
+            (
+                "p.JsonDefault(p.Value('calm', p.TypeName('Mood')))",
+                "created range's cast",
+            ),
+        ] {
+            refused(py, &globals, source, message);
+        }
+        for (source, message) in [
+            (
                 "p.json_query(p.col('doc'), '$.a', shaping='keep_quotes')",
                 "shaping requires",
             ),
@@ -282,21 +306,13 @@ fn unrepresentable_choices_are_refused() -> PyResult<()> {
                 "JsonQueryBehavior or JsonDefault",
             ),
             (
-                "p.json_arrayagg(p.col('id'), order_by=[p.col('id').asc(nulls=p.Nulls.Last)])",
-                "NULLS FIRST or NULLS LAST",
-            ),
-            (
                 "p.json_arrayagg(p.col('id'), order_by=p.col('id').asc())",
                 "list or tuple of orderings",
             ),
             ("p.json_object({'a'})", "dict or a list or tuple"),
             ("p.json_object([('a', 1, 2)])", "(key, value) tuples"),
-            (
-                "p.JsonDefault(p.Value('calm', p.TypeName('Mood')))",
-                "created range's cast",
-            ),
         ] {
-            refused(py, &globals, source, message);
+            mistyped(py, &globals, source, message);
         }
         Ok(())
     })
@@ -444,6 +460,12 @@ fn json_table_refuses_what_its_builder_cannot_take() -> PyResult<()> {
     Python::initialize();
     Python::attach(|py| {
         let globals = module(py)?;
+        refused(
+            py,
+            &globals,
+            "p.json_table(p.col('doc'), '$', p.JsonTableColumn.ordinality(''), alias='t')",
+            "identifier parts",
+        );
         for (source, message) in [
             (
                 "p.JsonTableColumn.value('v', 'integer', on_empty=p.JsonQueryBehavior.EmptyArray)",
@@ -470,12 +492,8 @@ fn json_table_refuses_what_its_builder_cannot_take() -> PyResult<()> {
                 "p.Select().from_(p.Table('a')).join(p.col('b'), p.literal(True))",
                 "requires a Table or FromItem",
             ),
-            (
-                "p.json_table(p.col('doc'), '$', p.JsonTableColumn.ordinality(''), alias='t')",
-                "identifier parts",
-            ),
         ] {
-            refused(py, &globals, source, message);
+            mistyped(py, &globals, source, message);
         }
         for source in [
             "p.json_table(p.col('doc'), '$', alias='t')",

@@ -56,9 +56,10 @@ qualification syntax: `col("a.b")` is one column name; use `table="a"` to
 qualify column `b`. Type names are separate objects. Case, quotes, percent
 signs, backslashes and Unicode reach the Rust builders unchanged.
 
-Ordinary scalar operands are converted through `Value` and bound by default.
-Use `literal(...)` to retain a literal node within an otherwise parameterized
-expression. `bind` on an enum value carries its qualified Rust cast; enum
+Ordinary operands are converted through `Value` and bound: a scalar, a `list`
+as an array of the one kind its items infer as, and a `dict` as JSON. Use
+`literal(...)`, the one way to write a value into the SQL text, to retain a
+literal node within an otherwise parameterized expression. `bind` on an enum value carries its qualified Rust cast; enum
 arrays carry the corresponding array cast. Explicit casts keep Rust's
 source-typed parameter pins, such as `$1::text`, where the renderer uses them.
 

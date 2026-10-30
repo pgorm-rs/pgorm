@@ -40,7 +40,6 @@ impl Redactions {
 }
 
 // [spec:pgorm:req:bindings.errors+2]
-// [spec:pgorm:req:python.row-count+2]
 pub(crate) fn database_error(error: pgorm::Error, secrets: &Redactions) -> PyErr {
     let mut source: &(dyn std::error::Error + 'static) = &error;
     loop {
@@ -59,8 +58,22 @@ pub(crate) fn database_error(error: pgorm::Error, secrets: &Redactions) -> PyErr
             ConstructionError::new_err(secrets.apply(&error.to_string()))
         }
         pgorm::Error::Listen(_) => ConnectionError::new_err(secrets.apply(&error.to_string())),
-        pgorm::Error::Conversion { .. } | pgorm::Error::Type(_) | pgorm::Error::Json(_) => {
-            DecodeError::new_err(secrets.apply(&error.to_string()))
+        // A result that is not the row or rows asked for, a `one` finding none
+        // among them, cannot become the record asked for.
+        // [spec:pgorm:req:python.row-count+2]
+        pgorm::Error::Conversion { .. }
+        | pgorm::Error::Type(_)
+        | pgorm::Error::Json(_)
+        | pgorm::Error::RecordNotFound
+        | pgorm::Error::RecordNotInserted
+        | pgorm::Error::UnpackInsertId
+        | pgorm::Error::Verify(_) => DecodeError::new_err(secrets.apply(&error.to_string())),
+        // A write pgorm refuses to build from what it was given.
+        pgorm::Error::NothingToSet
+        | pgorm::Error::PrimaryKeyNotSet
+        | pgorm::Error::AttrNotSet(_)
+        | pgorm::Error::QueryBuilder(_) => {
+            ConstructionError::new_err(secrets.apply(&error.to_string()))
         }
         _ => DatabaseError::new_err(secrets.apply(&error.to_string())),
     }
@@ -125,8 +138,8 @@ fn client_error(error: &tokio_postgres::Error, secrets: &Redactions) -> PyErr {
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     let py = module.py();
-    // Client-side cardinality errors have no server diagnostics. Keep the
-    // documented optional fields present for every DatabaseError instance.
+    // A DatabaseError raised without the server's answer has no diagnostics.
+    // Keep the documented optional fields present on every instance.
     let database_error = py.get_type::<DatabaseError>();
     for field in [
         "sqlstate",

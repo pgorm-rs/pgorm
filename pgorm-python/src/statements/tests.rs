@@ -504,9 +504,6 @@ fn windows_refuse_what_the_grammar_refuses() -> PyResult<()> {
             "(p.col('weight') + 1).over(p.Window())",
             "p.call('sum', p.col('weight')).cast(p.TypeName('numeric')).over(p.Window())",
             "p.json_value(p.col('doc'), '$.a').over(p.Window())",
-            "p.Window().frame(p.FrameType.Rows.following(1))",
-            "p.Window().frame(p.col('id'))",
-            "p.Window().partition_by(1)",
             "p.call('sum', p.col('weight')).over(p.Window()).as_('')",
         ] {
             let error = py
@@ -514,6 +511,19 @@ fn windows_refuse_what_the_grammar_refuses() -> PyResult<()> {
                 .expect_err(source);
             assert!(
                 error.is_instance_of::<crate::errors::ConstructionError>(py),
+                "{source}: {error}"
+            );
+        }
+        for source in [
+            "p.Window().frame(p.FrameType.Rows.following(1))",
+            "p.Window().frame(p.col('id'))",
+            "p.Window().partition_by(1)",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<pyo3::exceptions::PyTypeError>(py),
                 "{source}: {error}"
             );
         }
@@ -801,9 +811,6 @@ fn tie_limits_without_order_are_refused() -> PyResult<()> {
         )?;
         for source in [
             "p.Select().limit_with_ties(-1)",
-            "p.Select().limit_with_ties(True)",
-            "p.Select().limit_with_ties(1.5)",
-            "p.Select().limit_with_ties(None)",
             "p.Select().limit_with_ties(2 ** 63)",
         ] {
             let error = py
@@ -811,6 +818,19 @@ fn tie_limits_without_order_are_refused() -> PyResult<()> {
                 .expect_err(source);
             assert!(
                 error.is_instance_of::<crate::errors::ConstructionError>(py),
+                "{source}: {error}"
+            );
+        }
+        for source in [
+            "p.Select().limit_with_ties(True)",
+            "p.Select().limit_with_ties(1.5)",
+            "p.Select().limit_with_ties(None)",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<pyo3::exceptions::PyTypeError>(py),
                 "{source}: {error}"
             );
         }
@@ -877,7 +897,7 @@ fn grouping_elements_match_rust_builders() -> PyResult<()> {
                 .eval(&CString::new(source)?, Some(&globals), None)
                 .expect_err(source);
             assert!(
-                error.is_instance_of::<crate::errors::ConstructionError>(py),
+                error.is_instance_of::<pyo3::exceptions::PyTypeError>(py),
                 "{source}: {error}"
             );
         }
@@ -960,8 +980,6 @@ fn table_functions_match_rust_builders() -> PyResult<()> {
         for source in [
             "T(p.col('x'))",
             "T(p.col('x') + 1)",
-            "T(1)",
-            "T(p.Table('t'))",
             "T.rows_from(p.literal(1))",
             "T(series).and_(p.col('y'))",
             "T(series).columns('')",
@@ -972,6 +990,15 @@ fn table_functions_match_rust_builders() -> PyResult<()> {
                 .expect_err(source);
             assert!(
                 error.is_instance_of::<crate::errors::ConstructionError>(py),
+                "{source}: {error}"
+            );
+        }
+        for source in ["T(1)", "T(p.Table('t'))"] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<pyo3::exceptions::PyTypeError>(py),
                 "{source}: {error}"
             );
         }
@@ -1025,11 +1052,7 @@ fn table_samples_match_rust_builders() -> PyResult<()> {
         )?;
         assert_eq!(star.extract::<String>()?, r#"SELECT "glyph"."id""#);
         for source in [
-            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, True)",
-            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, '10')",
-            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, None)",
             "p.Table('t').tablesample(p.SampleMethod.Bernoulli, 2 ** 53 + 1)",
-            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, 10, repeatable=False)",
             "p.Table('t').tablesample(p.SampleMethod.Bernoulli, 10, repeatable=10 ** 400)",
         ] {
             let error = py
@@ -1037,6 +1060,20 @@ fn table_samples_match_rust_builders() -> PyResult<()> {
                 .expect_err(source);
             assert!(
                 error.is_instance_of::<crate::errors::ConstructionError>(py),
+                "{source}: {error}"
+            );
+        }
+        for source in [
+            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, True)",
+            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, '10')",
+            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, None)",
+            "p.Table('t').tablesample(p.SampleMethod.Bernoulli, 10, repeatable=False)",
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            assert!(
+                error.is_instance_of::<pyo3::exceptions::PyTypeError>(py),
                 "{source}: {error}"
             );
         }
@@ -1275,7 +1312,7 @@ fn subquery_expressions_match_rust_builders() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "(lambda ids, i: p.Select().from_(p.Table('t')).where(p.Condition.all(p.exists(ids('u')), i == p.scalar(ids('v')), i.is_in(ids('w')), i.is_not_in(ids('x')), i == p.any_(p.Value.array('i64', [1, 2])), i.ne(p.all_(p.array(ids('y')))), i > p.all_(ids('z')), i.lte(p.any_(ids('u'))), p.col('a') >= p.any_(p.col('b')))))(lambda name: p.Select(p.col('id')).from_(p.Table(name)), p.col('id'))",
+            "(lambda ids, i: p.Select().from_(p.Table('t')).where(p.Condition.all(p.exists(ids('u')), i == p.scalar(ids('v')), i.is_in(ids('w')), i.is_not_in(ids('x')), i == p.any_([1, 2]), i.ne(p.all_(p.array(ids('y')))), i > p.all_(ids('z')), i.lte(p.any_(ids('u'))), p.col('a') >= p.any_(p.col('b')))))(lambda name: p.Select(p.col('id')).from_(p.Table(name)), p.col('id'))",
             expected,
         )?;
         for refused in [
@@ -1283,7 +1320,6 @@ fn subquery_expressions_match_rust_builders() -> PyResult<()> {
             "p.col('id').is_distinct_from(p.all_(p.col('b')))",
             "p.col('id').is_in([p.any_(p.col('b'))])",
             "p.bind(p.any_(p.col('b')))",
-            "p.any_([1, 2])",
             "p.exists(p.Select(p.col('id')).from_(p.Table('t')).limit_with_ties(1))",
             "p.any_(p.Select(p.col('id')).from_(p.Table('t')).limit_with_ties(1))",
             "bool(p.any_(p.col('b')))",

@@ -288,7 +288,7 @@ class Reference:
         ):
             qualifier = "exactly one" if mode == "one" else "at most one"
             raise Rejection(
-                "DatabaseError", f"expected {qualifier} row, received {len(records)}"
+                "DecodeError", f"expected {qualifier} row, received {len(records)}"
             )
         records = reshape(records, shape)
         if "cursor" in shape and shape["cursor"]["side"] == "last":

@@ -25,7 +25,7 @@ class ModelView(Mapping[str, Any], Generic[A]):
 
     def __init__(self, model: native_types.EntityModel):
         if not isinstance(model, native_types.EntityModel):
-            raise native_types.ConstructionError("model view requires a native EntityModel")
+            raise TypeError("model view requires a native EntityModel")
         if model.entity_name != self._entity_name:
             raise native_types.LifecycleError("model belongs to another entity registration")
         self._model = model
@@ -64,7 +64,7 @@ class ActiveView(Generic[M]):
 
     def __init__(self, active: native_types.ActiveModel):
         if not isinstance(active, native_types.ActiveModel):
-            raise native_types.ConstructionError("active view requires a native ActiveModel")
+            raise TypeError("active view requires a native ActiveModel")
         if active.entity_name != self._entity_name:
             raise native_types.LifecycleError(
                 "ActiveModel belongs to another entity registration"

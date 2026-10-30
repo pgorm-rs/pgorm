@@ -6,6 +6,7 @@ def programs(n):
     base = n.Pipeline(table)
     col = n.pipeline_col
     alias = n.pipeline_alias
+    literal = n.pipeline_literal
     call = n.pipeline_function
     key, category, amount = (
         col("items", name) for name in ("id", "category", "amount")
@@ -24,9 +25,12 @@ def programs(n):
         key, category, amount
     )
     return {
-        "literal": base.filter(key > 2).select(key, amount).sort(key.desc()).take(3),
+        "literal": base.filter(key > literal(2))
+        .select(key, amount)
+        .sort(key.desc())
+        .take(3),
         "repeated": base.filter_with(repeated),
-        "literal_string": base.filter(category == "O'Brien; -- 雪"),
+        "literal_string": base.filter(category == literal("O'Brien; -- 雪")),
         "derive": base.derive((amount + 2).as_(total)).filter(total > 5),
         "derive_with": base.derive_with(lambda b: [(amount + b.bind(2)).as_(total)]),
         "select_with": base.select_with(

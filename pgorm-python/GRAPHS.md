@@ -39,6 +39,7 @@ The binding supports Rust's slotless shape and tuples of one through six slots
 (one through seven decoded sources). Each source must satisfy the same model
 and ActiveModel bounds as an entity registration. Missing source registrations,
 duplicate graph names, and unknown Python graph names are explicit errors.
+`pgorm.graphs()` lists the installed graph names, and
 `capabilities()["registrations"]["graphs"]` reports the actual installed
 shapes, source kinds and supported terminals. A standalone wheel has none.
 

@@ -35,12 +35,16 @@ class SchemaConstruction(unittest.TestCase):
             lambda: s.create_schema(""),
             lambda: s.create_schema("x" * 64),
             lambda: s.create_schema("nul\0"),
-            lambda: s.create_schema(p.Table("t")),
             lambda: s.drop_schema("a", ""),
-            lambda: s.drop_schema("a", 3),
             lambda: s.rename_schema("a", ""),
         ):
             with self.subTest(action=action), self.assertRaises(p.ConstructionError):
+                action()
+        for action in (
+            lambda: s.create_schema(p.Table("t")),
+            lambda: s.drop_schema("a", 3),
+        ):
+            with self.subTest(action=action), self.assertRaises(TypeError):
                 action()
         with self.assertRaises(TypeError):
             s.drop_schema()

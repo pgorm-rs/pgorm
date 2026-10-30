@@ -2,7 +2,7 @@ use pgorm::{
     pgorm_query::{IntoNamedTable, NamedTable},
     pipeline::{self as pl, IntoSource},
 };
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use super::{builder::PyPipeline, expression::alias_name};
 use crate::{entities::PyEntity, errors::ConstructionError, statements::PyTable};
@@ -114,7 +114,7 @@ pub(super) fn pipeline_source(value: &Bound<'_, PyAny>) -> PyResult<PySource> {
             alias: None,
         });
     }
-    Err(ConstructionError::new_err(
+    Err(PyTypeError::new_err(
         "pipeline source requires a Table, Entity, Pipeline or named Source",
     ))
 }

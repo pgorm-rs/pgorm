@@ -36,7 +36,9 @@ class Model:
             native = table
         else:
             native = p.Table(table, schema=schema)
-        if not isinstance(columns, Mapping) or not columns:
+        if not isinstance(columns, Mapping):
+            raise TypeError("model columns are a mapping of fields to Column declarations")
+        if not columns:
             raise p.ConstructionError("model columns require a non-empty mapping")
         declarations = {}
         physical = set()
@@ -45,9 +47,7 @@ class Model:
             if identity in declarations:
                 raise p.ConstructionError("duplicate model field identity")
             if not isinstance(column, Column):
-                raise p.ConstructionError(
-                    "each model field requires a Column declaration"
-                )
+                raise TypeError("each model field requires a Column declaration")
             column = replace(
                 column, name=identity if column.name is None else column.name
             )
@@ -99,7 +99,9 @@ class Model:
     def key(self, values: Mapping[str, Any]) -> p.Condition:
         if not self.primary_key:
             raise p.ConstructionError("model has no declared primary key")
-        if not isinstance(values, Mapping) or set(values) != set(self.primary_key):
+        if not isinstance(values, Mapping):
+            raise TypeError("key lookup takes a mapping of primary-key fields to values")
+        if set(values) != set(self.primary_key):
             raise p.ConstructionError(
                 "key lookup requires every declared primary-key field and no others"
             )
@@ -111,7 +113,7 @@ class Model:
         self, values: Mapping[str, Any]
     ) -> tuple[tuple[str, p.Value], ...]:
         if not isinstance(values, Mapping):
-            raise p.ConstructionError("model writes require a field mapping")
+            raise TypeError("model writes require a field mapping")
         for name in values:
             self.col(name)
         # Use declaration order so mapping order cannot change SQL/parameter layout.

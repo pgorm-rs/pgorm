@@ -3,6 +3,7 @@ use pgorm::pgorm_query::{
     SelectStatement, Values,
 };
 use pyo3::{
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyInt, PyTuple},
 };
@@ -42,7 +43,7 @@ pub(super) fn order<S: OrderedStatement>(
     for ordering in orderings.iter() {
         let ordering = ordering
             .extract::<PyRef<'_, OrderBy>>()
-            .map_err(|_| ConstructionError::new_err("order_by requires OrderBy expressions"))?;
+            .map_err(|_| PyTypeError::new_err("order_by requires OrderBy expressions"))?;
         match &ordering.nulls {
             Some(nulls) => statement.order_by_expr_with_nulls(
                 ordering.expr.inner.clone(),
@@ -58,9 +59,7 @@ pub(super) fn order<S: OrderedStatement>(
 
 pub(super) fn unsigned(value: &Bound<'_, PyAny>) -> PyResult<u64> {
     if !value.is_exact_instance_of::<PyInt>() {
-        return Err(ConstructionError::new_err(
-            "limit/offset requires an integer",
-        ));
+        return Err(PyTypeError::new_err("limit/offset requires an integer"));
     }
     let value: u64 = value
         .extract()

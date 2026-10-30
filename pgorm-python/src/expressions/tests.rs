@@ -413,7 +413,7 @@ fn similar_to_takes_like_patterns() -> PyResult<()> {
         let error = py
             .eval(c"p.col('text').similar_to('a%')", Some(&globals), None)
             .expect_err("a plain string is not a pattern");
-        assert!(error.is_instance_of::<crate::errors::ConstructionError>(py));
+        assert!(error.is_instance_of::<pyo3::exceptions::PyTypeError>(py));
         Ok(())
     })
 }
@@ -498,7 +498,6 @@ fn collations_lower_into_rust_collate() -> PyResult<()> {
         for source in [
             "p.col('name').collate('')",
             "p.col('name').collate('C', schema='')",
-            "p.col('name').collate(1)",
             "p.col('name').collate('雪' * 22)",
         ] {
             let error = py
@@ -509,6 +508,13 @@ fn collations_lower_into_rust_collate() -> PyResult<()> {
                 "{source}: {error}"
             );
         }
+        let error = py
+            .eval(c"p.col('name').collate(1)", Some(&globals), None)
+            .expect_err("a collation's name is a str");
+        assert!(
+            error.is_instance_of::<pyo3::exceptions::PyTypeError>(py),
+            "{error}"
+        );
         Ok(())
     })
 }

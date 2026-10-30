@@ -5,7 +5,7 @@ use crate::{
     identifiers::{PyIdentifier, collation},
 };
 use pgorm::pgorm_query::{Check, ColumnDef, Enforcement, GeneratedKind};
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 #[derive(Clone, Debug)]
 #[pyclass(name = "ColumnDef", module = "pgorm.schema", frozen, from_py_object)]
@@ -95,7 +95,7 @@ impl PyColumnDef {
             "stored" => GeneratedKind::Stored,
             "virtual" => GeneratedKind::Virtual,
             _ => {
-                return Err(ConstructionError::new_err(
+                return Err(PyTypeError::new_err(
                     "a generated column is 'stored' or 'virtual'",
                 ));
             }

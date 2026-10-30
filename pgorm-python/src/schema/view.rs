@@ -20,7 +20,7 @@ use crate::{
     statements::{PySelect, PyTable},
 };
 use pgorm::pgorm_query::{MaterializedView, Name, Table, View, ViewCheckOption};
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 fn column_names(columns: &[Bound<'_, PyAny>]) -> PyResult<Vec<Name>> {
     columns
@@ -35,7 +35,7 @@ fn check_option(option: &str) -> PyResult<ViewCheckOption> {
     match option {
         "local" => Ok(ViewCheckOption::Local),
         "cascaded" => Ok(ViewCheckOption::Cascaded),
-        _ => Err(ConstructionError::new_err(
+        _ => Err(PyTypeError::new_err(
             "a view's check option is \"local\" or \"cascaded\"",
         )),
     }

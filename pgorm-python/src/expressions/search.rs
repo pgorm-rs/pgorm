@@ -2,10 +2,9 @@
 //! `@@`, which is both full-text search and a `jsonpath` predicate.
 
 use pgorm::pgorm_query::{BinOper, Expr};
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use super::PyExpr;
-use crate::errors::ConstructionError;
 
 // [spec:pgorm:req:bindings.expressions]
 #[pymethods]
@@ -16,7 +15,7 @@ impl PyExpr {
     fn path_exists(&self, path: &Bound<'_, PyAny>) -> PyResult<Self> {
         let path: String = path
             .extract()
-            .map_err(|_| ConstructionError::new_err("a JSON path is a str"))?;
+            .map_err(|_| PyTypeError::new_err("a JSON path is a str"))?;
         Ok(Self::from_rust(
             Expr::expr(self.inner.clone()).json_path_exists(path),
         ))

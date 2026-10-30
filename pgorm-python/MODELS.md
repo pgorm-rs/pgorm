@@ -101,7 +101,7 @@ Mutable values returned by record lookup are independent copies.
 Output names, native Value types, enum qualifications and nullability must
 match the declaration. A mismatch raises `DecodeError`; it is never interpreted
 as an absent row. Dynamic `one` requires exactly one row and `optional` at most
-one, so multiple rows raise `DatabaseError`. Use explicit `limit(1)` to select
+one, so any other count raises `DecodeError`. Use explicit `limit(1)` to select
 a first row. Errors do not imply rollback of a write already executed.
 
 Supported scalar kinds match the native Record decoder: `bool`, `i8`, `i16`,

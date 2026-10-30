@@ -51,7 +51,10 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
                 let value = b.bind(2i32);
                 pl::col(Name::runtime("items"), Name::runtime("id"))
                     .gt(value.clone())
-                    .and(pl::col(Name::runtime("items"), Name::runtime("id")).lt(value.add(10i64)))
+                    .and(
+                        pl::col(Name::runtime("items"), Name::runtime("id"))
+                            .lt(value.add(b.bind(10i64))),
+                    )
             }),
         ),
         (
@@ -63,12 +66,12 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
         (
             "derive",
             base.clone()
-                .derive(
-                    pl::col(Name::runtime("items"), Name::runtime("amount"))
-                        .add(2i64)
-                        .as_(total),
-                )
-                .filter(total.gt(5i64)),
+                .derive_with(|b| {
+                    [pl::col(Name::runtime("items"), Name::runtime("amount"))
+                        .add(b.bind(2i64))
+                        .as_(total)]
+                })
+                .filter_with(|b| total.gt(b.bind(5i64))),
         ),
         (
             "derive_with",
@@ -94,7 +97,7 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
                 .aggregate(
                     pl::sum(pl::col(Name::runtime("items"), Name::runtime("amount"))).as_(total),
                 )
-                .filter(total.gt(3i64)),
+                .filter_with(|b| total.gt(b.bind(3i64))),
         ),
         (
             "group_with",
@@ -121,7 +124,7 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
                         .sort_by(pl::col(Name::runtime("items"), Name::runtime("id")))
                         .rows(None, Some(0)),
                 )
-                .filter(rank.lte(2i64)),
+                .filter_with(|b| rank.lte(b.bind(2i64))),
         ),
         (
             "window_with",
@@ -176,16 +179,16 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
         ("distinct", base.clone().select(category).distinct()),
         (
             "case",
-            base.clone().select(
-                pl::case(
+            base.clone().select_with(|b| {
+                [pl::case(
                     [(
-                        pl::col(Name::runtime("items"), Name::runtime("id")).gt(1i64),
-                        "yes",
+                        pl::col(Name::runtime("items"), Name::runtime("id")).gt(b.bind(1i64)),
+                        b.bind("yes"),
                     )],
-                    "no",
+                    b.bind("no"),
                 )
-                .as_("answer"),
-            ),
+                .as_("answer")]
+            }),
         ),
         (
             "in_array",
@@ -213,7 +216,7 @@ fn programs() -> BTreeMap<&'static str, Pipeline> {
             Pipeline::from(Name::runtime("items")).filter_with(|b| {
                 pl::col(Name::runtime("items"), Name::runtime("category"))
                     .compares_as(TypeName::new(Name::runtime("Mood")).schema(Name::runtime("app")))
-                    .in_array([b.bind("glad"), "calm".into()])
+                    .in_array([b.bind("glad"), b.bind("calm")])
             }),
         ),
     ])
