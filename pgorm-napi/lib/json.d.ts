@@ -79,11 +79,13 @@ export type JsonOperand = Operand | JsonInput;
 
 /** An operand marked as JSON text, `FORMAT JSON`, accepted only where SQL/JSON reads JSON. */
 export declare class JsonInput {
+  #private;
   private constructor();
 }
 
 /** `DEFAULT value` for ON EMPTY or ON ERROR, written as an escaped literal. */
 export declare class JsonDefault {
+  #private;
   private constructor();
 }
 

@@ -154,16 +154,19 @@ export declare class Expr extends Builder {
  * or `gte`, the one place PostgreSQL reads it, and no expression of its own.
  */
 export declare class Quantified {
+  #private;
   private constructor();
 }
 
 /** An expression and the output column name it takes in a projection. */
 export declare class Aliased extends Builder {
+  #private;
   private constructor();
 }
 
 /** An ORDER BY item, from `expr.asc()` or `expr.desc()`. */
 export declare class OrderBy extends Builder {
+  #private;
   private constructor();
 }
 

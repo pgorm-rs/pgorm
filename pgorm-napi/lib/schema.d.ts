@@ -189,6 +189,7 @@ export interface AlterTableActions {
  * `ConstructionError`.
  */
 export declare class PendingAlterTable {
+  #private;
   private constructor();
 }
 export interface PendingAlterTable extends AlterTableActions {}

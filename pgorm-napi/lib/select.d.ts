@@ -139,6 +139,7 @@ export declare function select(...items: Projection[]): Select;
  * of grouping sets, and the list groups by every combination of its items'.
  */
 export declare class GroupingElement {
+  #private;
   private constructor();
 }
 
