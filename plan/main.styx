@@ -15191,4 +15191,103 @@ children (
             }
         )
     }
+
+    {
+        id security-remediation-2026-10-31
+        title "Close the 2026-10-31 security assessment"
+        kind @fix
+        children (
+            {
+                id security-remediation-2026-10-31.advisories
+                title "Patch every locked dependency covered by the current RustSec advisories"
+                kind @fix
+                sealed true
+                log (
+                    {
+                        at 2026-10-31T18:30:18.834594Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Acceptance: every tracked Cargo.lock resolves rustls-webpki >=0.103.16, ctutils >=0.4.4 and tokio >=1.53.3 where present; the all-workspace cargo-deny audit and relevant TLS/authentication tests pass."
+                    }
+
+                    {
+                        at 2026-10-31T18:30:19.998209Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-31T18:38:37.536743Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id security-remediation-2026-10-31.campaign-evidence
+                title "Restore trustworthy generative and sqlmap security evidence"
+                kind @test
+                deps (security-remediation-2026-10-31.advisories)
+                log (
+                    {
+                        at 2026-10-31T18:30:18.938233Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Acceptance: the generative invalid-input oracle treats the intentional constraint subclasses as compatible with their generic reference errors without weakening SQLSTATE or cause checks; the complete campaign and the full sqlmap plus identifier profiles pass on the final source state; security.sqlmap rules have explicit verification claims."
+                    }
+                )
+            }
+
+            {
+                id security-remediation-2026-10-31.automation
+                title "Run code scanning and security campaigns on every relevant main push"
+                kind @ci
+                log (
+                    {
+                        at 2026-10-31T18:30:19.036839Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Acceptance: CodeQL scans Rust, Python and JavaScript where GitHub supports them; sqlmap and the generative campaign run on relevant pushes to main as well as their existing triggers; workflow permissions remain minimal and actions remain commit-pinned."
+                    }
+                )
+            }
+
+            {
+                id security-remediation-2026-10-31.disclosure
+                title "Publish the project's security disclosure policy"
+                kind @docs
+                log (
+                    {
+                        at 2026-10-31T18:30:19.12892Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Acceptance: SECURITY.md states supported versions, private reporting instructions, response expectations and what a useful report contains."
+                    }
+                )
+            }
+
+            {
+                id security-remediation-2026-10-31.github-enforcement
+                title "Enable GitHub security features and protect main with required checks"
+                kind @chore
+                deps (
+                    security-remediation-2026-10-31.advisories
+                    security-remediation-2026-10-31.campaign-evidence
+                    security-remediation-2026-10-31.automation
+                    security-remediation-2026-10-31.disclosure
+                )
+                log (
+                    {
+                        at 2026-10-31T18:30:19.22074Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Acceptance: GitHub secret scanning and push protection are enabled where the repository plan supports them; main is protected against force-push and deletion and requires the repository's stable security checks. Apply enforcement only after those checks are green and their exact check names are known."
+                    }
+                )
+            }
+        )
+    }
 )

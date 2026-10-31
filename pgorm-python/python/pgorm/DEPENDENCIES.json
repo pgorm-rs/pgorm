@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Locked Cargo graph, including build and platform-conditional dependencies; a superset of any one wheel",
-  "cargo_lock_sha256": "ee03ffa429626830f8fcc8921573c221ab6ce20b37e7ac562422e00eba178cae",
+  "cargo_lock_sha256": "84b907fb123f26f1cd96d77277e60794e0ac209c0f9841b88edcb22671f539c7",
   "python_runtime_dependencies": [],
   "packages": [
     {
@@ -755,7 +755,7 @@
     },
     {
       "name": "ctutils",
-      "version": "0.4.3",
+      "version": "0.4.4",
       "license": "Apache-2.0 OR MIT",
       "repository": "https://github.com/RustCrypto/utils",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -3610,7 +3610,7 @@
     },
     {
       "name": "rustls-webpki",
-      "version": "0.103.15",
+      "version": "0.103.16",
       "license": "ISC",
       "repository": "https://github.com/rustls/webpki",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
@@ -4399,7 +4399,7 @@
     },
     {
       "name": "tokio",
-      "version": "1.53.2",
+      "version": "1.53.3",
       "license": "MIT",
       "repository": "https://github.com/tokio-rs/tokio",
       "source": "registry+https://github.com/rust-lang/crates.io-index",
