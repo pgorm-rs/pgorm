@@ -15163,4 +15163,32 @@ children (
             }
         )
     }
+
+    {
+        id python-hook-refusal-class
+        title "Python reports an application hook's refusal as a ConstructionError, as bindings.entity-writes and JavaScript do"
+        kind @fix
+        log (
+            {
+                at 2026-10-31T17:06:51.520168Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by python-binding-decisions (merged 70cbc894). pgorm's Error::Custom, which an ActiveModelBehavior hook's refusal arrives as, still maps to DatabaseError in pgorm-python/src/errors.rs, while bindings.entity-writes says a hook's refusal is a ConstructionError and JavaScript's entity_failure maps it so. Python's transaction task uses the same Custom variant internally, so mapping every Custom to ConstructionError would misreport those; give the internal uses a variant or a typed error of their own first, then map the hook's refusal, with a live test of each."
+            }
+        )
+    }
+
+    {
+        id python-model-created-multirange
+        title "Python's declared models decode a created multirange column, as bindings.models lists it"
+        kind @feat
+        log (
+            {
+                at 2026-10-31T17:06:51.690259Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by python-model-gaps (merged 0d1442b5). bindings.models lists a CreatedMultirange as a column kind, but a Python model column of one is refused with UnsupportedCapabilityError: Python's record decoder refuses created multiranges, which the existing created-range tests require. JavaScript's models decode them. Teach the record decoder a created multirange (its type and the range's subtype, as a created range is), lift the refusal, and add live tests of a model reading and writing one."
+            }
+        )
+    }
 )
