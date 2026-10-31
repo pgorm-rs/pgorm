@@ -13,12 +13,6 @@ on:
       - 'pgorm-napi/**'
       - '.github/workflows/napi.yml'
   pull_request:
-    paths:
-      - '**/*.rs'
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-      - 'pgorm-napi/**'
-      - '.github/workflows/napi.yml'
   schedule:
     - cron: '41 3 * * 4'
   workflow_dispatch:
@@ -330,3 +324,15 @@ jobs:
       - name: PostgreSQL log
         if: failure()
         run: cat "$RUNNER_TEMP/postgres.log"
+
+  gate:
+    name: Node-API binding
+    if: always()
+    needs: [runtimes, install]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require runtime and distribution checks
+        env:
+          RUNTIMES_RESULT: ${{ needs.runtimes.result }}
+          INSTALL_RESULT: ${{ needs.install.result }}
+        run: test "$RUNTIMES_RESULT" = success && test "$INSTALL_RESULT" = success

@@ -12,14 +12,6 @@ on:
       - '.github/workflows/generative*.yml'
       - '.config/nspec/config.styx'
   pull_request:
-    paths:
-      - '**/*.rs'
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-      - 'security/generative/**'
-      - 'pgorm-python/**'
-      - '.github/workflows/generative*.yml'
-      - '.config/nspec/config.styx'
   schedule:
     - cron: '41 3 * * 2'
   workflow_dispatch:
@@ -46,3 +38,13 @@ jobs:
     uses: ./.github/workflows/generative-run.yml
     with:
       profile: full
+  gate:
+    name: Generative security
+    if: always() && (github.event_name == 'pull_request' || github.event_name == 'push')
+    needs: smoke
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require the smoke campaign
+        env:
+          SMOKE_RESULT: ${{ needs.smoke.result }}
+        run: test "$SMOKE_RESULT" = success

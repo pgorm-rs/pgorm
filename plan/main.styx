@@ -15498,6 +15498,22 @@ children (
                 title "Give every security and binding workflow a stable pull-request gate"
                 kind @ci
                 deps (security-enforcement-followup-2026-10-31.supply-chain)
+                sealed true
+                log (
+                    {
+                        at 2026-10-31T22:39:44.245591Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-31T22:40:17.547216Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
 
             {
