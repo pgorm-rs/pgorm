@@ -879,7 +879,7 @@ decode into records of its fields, and its relations, graphs, cursors and
 pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 `Paginator`.
 
-> [spec:pgorm:req:bindings.models+2]
+> [spec:pgorm:req:bindings.models+3]
 > `model(name, columns, schema)` MUST declare a model of a table,
 > schema-qualified when a schema is given, from a mapping of fields, each a
 > `Column(kind, options)`. The kind is one every result decodes as — any
@@ -899,6 +899,13 @@ pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 > never change; `as(alias)` gives another model reading the table under an
 > alias. Its columns are qualified as pgorm qualifies an entity's, by the
 > table's alias or else its name, never its schema.
+>
+> A `Column` is a declaration and has no method: the model converts a value
+> through the field's column where it takes one, and `Value(data, kind)`
+> (`bindings.value-tags`) is the conversion a program calls. `describe()`
+> MUST report the model as data: its table's schema, name and alias, its
+> primary key, and each field's SQL column, kind, nullability, key
+> membership, default, generation and an enum's values.
 
 > [spec:pgorm:req:bindings.model-columns+1]
 > `col(field)` MUST be a model field's column, qualified as the model's
@@ -909,7 +916,7 @@ pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 > `all(..)` beside a comparison, is taken as written; a `Value` only of the
 > field's own kind; and null never, which `is_null()` tests.
 
-> [spec:pgorm:req:bindings.column-operators]
+> [spec:pgorm:req:bindings.column-operators+1]
 > A model's column and a registered entity's column MUST each be an
 > expression: every expression method applies to it, reading the column as
 > written, and it goes wherever an expression goes. A model column's other
@@ -920,7 +927,10 @@ pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 > convert their values as the column's comparisons do
 > (`bindings.model-columns`). Every other method takes its operands as
 > `bindings.expressions` does, and a registered column's comparisons are
-> those `bindings.entity-reads` names.
+> those `bindings.entity-reads` names. Neither column describes itself: a
+> model column's declaration is read through its model's `describe()`
+> (`bindings.models`), and a registered column's through its registration's
+> (`bindings.entities`).
 
 > [spec:pgorm:req:bindings.model-records]
 > A model's terminals MUST decode each row into a record keyed by field, in
@@ -947,15 +957,23 @@ pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 > model's rows stream from a pool or a connection as records, through the
 > same decode.
 
-> [spec:pgorm:req:bindings.model-writes]
-> `insert(values)`, `insert_many(rows)`, `update(values)` and `delete()` MUST
-> build pgorm-query's INSERT, UPDATE and DELETE of a model's table. A field
-> left out of `values` MUST stay out of the statement — an insert takes the
+> [spec:pgorm:req:bindings.model-writes+1]
+> `insert(values)` and `insert_many(rows)` MUST give a `ModelInsert`,
+> `update(values)` a `ModelUpdate` and `delete()` a `ModelDelete`, building
+> pgorm-query's INSERT, UPDATE and DELETE of a model's table. A field left
+> out of `values` MUST stay out of the statement — an insert takes the
 > table's default, an update leaves the column as it is — and a field set to
 > null MUST be written as SQL NULL, which only a nullable field takes. Each
 > value converts through its field's declared kind as a comparison's does, and
 > the fields set are written in declaration order whatever order the values
 > name them in.
+>
+> Each write MUST have only its own statement's methods. All three have
+> `returning`, `execute` and `inspect`; an insert also has `on_conflict` and
+> the upsert terminals, an update `where`, `all_rows()` and the change
+> terminals, and a delete `where` and `all_rows()`. A method of another kind
+> is one the write lacks, so a type checker refuses the call before anything
+> runs.
 >
 > An unknown field, an undefined value, a field generated always, an insert
 > leaving out a field neither nullable, defaulted nor generated, an update

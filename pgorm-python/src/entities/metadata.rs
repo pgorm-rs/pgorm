@@ -178,7 +178,7 @@ pub(crate) struct ColumnInfo {
 }
 
 impl ColumnInfo {
-    pub(crate) fn describe(&self) -> PyResult<Json> {
+    fn describe(&self) -> PyResult<Json> {
         Ok(
             json!({"name": self.name, "json_key": self.json_key, "sql_type": self.sql_type,
             "rust_decode_type": self.rust_decode_type,

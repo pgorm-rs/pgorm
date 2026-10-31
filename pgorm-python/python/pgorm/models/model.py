@@ -12,11 +12,12 @@ from .columns import Column, ModelColumn
 
 if TYPE_CHECKING:
     from .graphs import Graph
-    from .queries import ModelQuery, ModelWrite
+    from .queries import ModelQuery
     from .relations import Relation
+    from .writes import ModelDelete, ModelInsert, ModelUpdate
 
 
-# [spec:pgorm:req:bindings.models+2]
+# [spec:pgorm:req:bindings.models+3]
 @dataclass(frozen=True, eq=False, slots=True, init=False)
 class Model:
     table: p.Table
@@ -125,29 +126,31 @@ class Model:
             *(self.col(name).eq(values[name]) for name in self.primary_key)
         )
 
-    def insert(self, values: Mapping[str, Any]) -> ModelWrite:
+    def insert(self, values: Mapping[str, Any]) -> ModelInsert:
         from .writes import inserted
 
-        return inserted(self, [values], many=False)
+        return inserted(self, [values])
 
-    def insert_many(self, rows: Sequence[Mapping[str, Any]]) -> ModelWrite:
+    def insert_many(self, rows: Sequence[Mapping[str, Any]]) -> ModelInsert:
         """An INSERT of rows that each set the same fields; no rows writes
         nothing and sends nothing."""
         from .writes import inserted
 
         if not isinstance(rows, (list, tuple)):
             raise TypeError("insert_many takes a list or tuple of rows")
-        return inserted(self, rows, many=True)
+        return inserted(self, rows)
 
-    def update(self, values: Mapping[str, Any]) -> ModelWrite:
+    def update(self, values: Mapping[str, Any]) -> ModelUpdate:
         from .writes import updated
 
         return updated(self, values)
 
-    def delete(self) -> ModelWrite:
-        from .queries import ModelWrite
+    def delete(self) -> ModelDelete:
+        """A DELETE, which needs a ``where`` or ``all_rows()`` before it
+        runs."""
+        from .writes import ModelDelete
 
-        return ModelWrite(self, p.Delete(self.table))
+        return ModelDelete(self, p.Delete(self.table))
 
     def belongs_to(
         self, target: Model, *, from_: str | Sequence[str], to: str | Sequence[str]
@@ -181,12 +184,23 @@ class Model:
         return Graph(State((Table(self, self.qualifier, "root", False),)))
 
     def describe(self) -> dict[str, Any]:
+        """The declaration as data: the table, its primary key, and each
+        field's column with every option it was declared with."""
         return {
             "schema": self.table.schema,
             "table": self.table.name,
             "alias": self.table.alias,
             "columns": {
-                name: column.describe() for name, column in self.columns.items()
+                name: {
+                    "column": column.name,
+                    "type": column._null.snapshot()["type"],
+                    "nullable": column.nullable,
+                    "primary_key": column.primary_key,
+                    "default": column.default,
+                    "generated": column.generated,
+                    "values": None if column.values is None else list(column.values),
+                }
+                for name, column in self.columns.items()
             },
             "primary_key": list(self.primary_key),
             "path": "runtime statements",

@@ -1,4 +1,4 @@
-"""Runtime model reads and guarded writes using native SQL statements."""
+"""Runtime model reads, and the rows a write returns, using native SQL statements."""
 
 from __future__ import annotations
 
@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from .cursors import Cursor, Paginator
     from .model import Model
     from .relations import Relation
-    from .._registered.versions import Change, Inserted, Updated
 
 
 def predicate_of(predicate: object) -> p.Expr | p.Condition:
@@ -243,7 +242,7 @@ class ModelRows:
         )
 
     def inspect(self) -> p.Compiled:
-        return _written(self.statement).inspect()
+        return written(self.statement).inspect()
 
     async def all(self, db: Database) -> list[ModelRecord]:
         if self.statement is None:
@@ -267,116 +266,8 @@ class ModelRows:
         raise p.ConstructionError("model queries cannot be tested as Python booleans")
 
 
-def _written(
-    statement: p.Insert | p.Update | p.Delete | None,
-) -> p.Insert | p.Update | p.Delete:
+def written[S: p.Insert | p.Update | p.Delete](statement: S | None) -> S:
+    """The statement a write runs; an insert of no rows has none."""
     if statement is None:
         raise p.ConstructionError("an insert of no rows writes nothing and has no statement")
     return statement
-
-
-# [spec:pgorm:req:bindings.model-writes]
-@dataclass(frozen=True, eq=False, slots=True)
-class ModelWrite:
-    """A model's INSERT, UPDATE or DELETE; an insert of no rows has no
-    statement and sends nothing."""
-
-    model: Model
-    statement: p.Insert | p.Update | p.Delete | None
-
-    def __post_init__(self) -> None:
-        from .model import Model
-
-        if not isinstance(self.model, Model) or not isinstance(
-            self.statement, (p.Insert, p.Update, p.Delete, type(None))
-        ):
-            raise TypeError("a model write is a model's native write statement")
-
-    def where(self, predicate: p.Expr | p.Condition) -> ModelWrite:
-        if isinstance(self.statement, (p.Insert, type(None))):
-            raise p.UnsupportedCapabilityError(
-                "model insert does not support a WHERE clause"
-            )
-        return replace(self, statement=self.statement.where(predicate_of(predicate)))
-
-    def all_rows(self) -> ModelWrite:
-        if isinstance(self.statement, (p.Insert, type(None))):
-            raise p.UnsupportedCapabilityError(
-                "model insert does not support an all-rows write guard"
-            )
-        return replace(self, statement=self.statement.all_rows())
-
-    def on_conflict(self, action: p.Conflict | p.ConflictUpdate) -> ModelWrite:
-        """What an insert's conflict does, the statement builders' ``Conflict``
-        naming SQL columns."""
-        if not isinstance(action, (p.Conflict, p.ConflictUpdate)):
-            raise TypeError(
-                "a conflict's action is Conflict.do_nothing(), or a target's do_nothing() or update(..)"
-            )
-        statement = _written(self.statement)
-        if not isinstance(statement, p.Insert):
-            raise p.UnsupportedCapabilityError("only a model insert has a conflict clause")
-        return replace(self, statement=statement.on_conflict(action))
-
-    def returning(self, *fields: str) -> ModelRows:
-        selected = self.model._selection(fields)
-        if self.statement is None:
-            return ModelRows(self.model, None, selected)
-        columns = (self.model._projected(name, p.col(self.model._sql(name))) for name in selected)
-        return ModelRows(self.model, self.statement.returning(*columns), selected)
-
-    def inspect(self, *, terminal: str | None = None) -> p.Compiled:
-        """The SQL and values the write runs, or the ones a terminal reading
-        each written row's two versions runs."""
-        from .writes import versions
-
-        if terminal is None:
-            return _written(self.statement).inspect()
-        return _written(versions(self, terminal)[0]).inspect()
-
-    async def execute(self, db: Database) -> int:
-        if self.statement is None:
-            return 0
-        return await db.execute(self.statement)
-
-    async def returning_change(self, db: Database) -> Change[ModelRecord]:
-        """The one row the update wrote, before and after."""
-        from .writes import change, versions
-
-        statement, sources = versions(self, "returning_change")
-        return change(await decode_single(db, statement, sources, optional=False))
-
-    async def returning_changes(self, db: Database) -> list[Change[ModelRecord]]:
-        """Every row the update wrote, before and after."""
-        from .writes import change, versions
-
-        statement, sources = versions(self, "returning_changes")
-        return [change(pair) for pair in await decode_all(db, statement, sources)]
-
-    async def returning_upsert(
-        self, db: Database
-    ) -> Inserted[ModelRecord] | Updated[ModelRecord] | None:
-        """What the insert did with its one row, or None where its conflict
-        clause wrote nothing."""
-        from .writes import upserted, versions
-
-        statement, sources = versions(self, "returning_upsert")
-        if statement is None:
-            return None
-        pair = await decode_single(db, statement, sources, optional=True)
-        return None if pair is None else upserted(pair)
-
-    async def returning_upserts(
-        self, db: Database
-    ) -> list[Inserted[ModelRecord] | Updated[ModelRecord]]:
-        """What the insert did with each row it wrote; a row its conflict
-        clause held back is left out."""
-        from .writes import upserted, versions
-
-        statement, sources = versions(self, "returning_upserts")
-        if statement is None:
-            return []
-        return [upserted(pair) for pair in await decode_all(db, statement, sources)]
-
-    def __bool__(self) -> bool:
-        raise p.ConstructionError("model writes cannot be tested as Python booleans")

@@ -311,7 +311,7 @@ class ModelGraphs(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(TypeError):
                 await Account.find().stream(transaction)
 
-    # [spec:pgorm:req:bindings.model-writes/test]
+    # [spec:pgorm:req:bindings.model-writes+1/test]
     async def test_writes_read_each_rows_two_versions(self):
         changes = await Account.update({"visits": 4}).where(Account.col("id").gte(2)).returning_changes(self.pool)
         self.assertEqual([(c.old["visits"], c.new["visits"], c.new["seq"]) for c in changes], [(0, 4, 5), (0, 4, 5)])
@@ -339,18 +339,49 @@ class ModelGraphs(unittest.IsolatedAsyncioTestCase):
         )
         with self.assertRaises(p.ConstructionError):
             empty.inspect()
-        with self.assertRaises(p.UnsupportedCapabilityError):
-            await empty.returning_changes(self.pool)
+        with self.assertRaises(p.ConstructionError):
+            empty.on_conflict(p.Conflict.do_nothing())
         with self.assertRaises(p.ConstructionError):
             Account.update({"seq": 1})
-        with self.assertRaises(p.UnsupportedCapabilityError):
-            Account.delete().all_rows().inspect(terminal="returning_change")
-        with self.assertRaises(p.UnsupportedCapabilityError):
-            Account.update({"name": "x"}).all_rows().on_conflict(p.Conflict.do_nothing())
         with self.assertRaises(TypeError):
             Account.insert({"name": "x"}).on_conflict("nothing")
+        for write, terminal in (
+            (Account.insert({"name": "x"}), "returning"),
+            (Account.insert({"name": "x"}), "returning_change"),
+            (Account.update({"name": "x"}).all_rows(), "returning_upsert"),
+        ):
+            with self.subTest(terminal=terminal), self.assertRaises(TypeError):
+                write.inspect(terminal=terminal)
+
+    # [spec:pgorm:req:bindings.model-writes+1/test]
+    def test_each_write_has_only_its_own_methods(self):
+        insert = Account.insert({"name": "x"})
+        update = Account.update({"name": "x"})
+        delete = Account.delete()
+        writes = (
+            insert, Account.insert_many([]), update, update.where(Account.col("id") == 1),
+            delete, delete.all_rows(),
+        )
+        self.assertEqual(
+            [type(write) for write in writes],
+            [p.ModelInsert, p.ModelInsert, p.ModelUpdate, p.ModelUpdate, p.ModelDelete, p.ModelDelete],
+        )
+        upserts = ("on_conflict", "returning_upsert", "returning_upserts")
+        guards = ("where", "all_rows")
+        changes = ("returning_change", "returning_changes")
+        for write, absent in ((insert, guards + changes), (update, upserts), (delete, upserts + changes)):
+            for name in absent:
+                with self.subTest(write=type(write).__name__, method=name):
+                    self.assertFalse(hasattr(write, name))
         with self.assertRaises(TypeError):
-            Account.insert({"name": "x"}).inspect(terminal="returning")
+            delete.all_rows().inspect(terminal="returning_change")
+        for kind, statement in (
+            (p.ModelInsert, p.Update(Account.table)),
+            (p.ModelUpdate, p.Delete(Account.table)),
+            (p.ModelDelete, None),
+        ):
+            with self.subTest(kind=kind.__name__), self.assertRaises(TypeError):
+                kind(Account, statement)
 
 
 if __name__ == "__main__":

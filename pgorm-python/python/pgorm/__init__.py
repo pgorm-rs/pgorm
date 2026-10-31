@@ -135,7 +135,8 @@ from ._native import (
 from .runtime import STATEMENT_CACHE_CHANNEL, Connection, Pool, PoolStatus, connect
 from .results import Record, Field, RowStream, Query
 from .models import (
-    Column, ModelColumn, Model, ModelRecord, ModelQuery, ModelRows, ModelWrite, Relation, Graph,
+    Column, ModelColumn, Model, ModelRecord, ModelQuery, ModelRows, ModelInsert, ModelUpdate,
+    ModelDelete, Relation, Graph,
     Cursor, Paginator,
 )
 from .transactions import Transaction, TransactionMode, IsolationLevel
@@ -182,7 +183,9 @@ __all__ = [
     "ModelRecord",
     "ModelQuery",
     "ModelRows",
-    "ModelWrite",
+    "ModelInsert",
+    "ModelUpdate",
+    "ModelDelete",
     "Relation",
     "Graph",
     "Cursor",

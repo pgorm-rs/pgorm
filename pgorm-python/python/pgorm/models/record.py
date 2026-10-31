@@ -61,7 +61,7 @@ class ModelRecord(Mapping[str, Any]):
                 if name not in native:
                     raise p.DecodeError(f"the result has no column {name!r}")
         for name, column in zip(fields, names):
-            model.columns[name].validate(native.tagged(column), decoding=True)
+            model.columns[name]._validate(native.tagged(column), decoding=True)
         object.__setattr__(self, "model", model)
         object.__setattr__(self, "native", native)
         object.__setattr__(self, "selected", fields)
