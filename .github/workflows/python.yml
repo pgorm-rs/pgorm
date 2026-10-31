@@ -13,13 +13,6 @@ on:
       - '.github/workflows/python.yml'
       - '.config/nspec/config.styx'
   pull_request:
-    paths:
-      - '**/*.rs'
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-      - 'pgorm-python/**'
-      - '.github/workflows/python.yml'
-      - '.config/nspec/config.styx'
   schedule:
     - cron: '29 3 * * 4'
   workflow_dispatch:
@@ -152,3 +145,15 @@ jobs:
           path: target/python-entities/
           if-no-files-found: error
           retention-days: 14
+
+  gate:
+    name: Python distributions
+    if: always()
+    needs: [distribution, application]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require distribution and application checks
+        env:
+          DISTRIBUTION_RESULT: ${{ needs.distribution.result }}
+          APPLICATION_RESULT: ${{ needs.application.result }}
+        run: test "$DISTRIBUTION_RESULT" = success && test "$APPLICATION_RESULT" = success

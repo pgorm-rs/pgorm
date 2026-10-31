@@ -1262,6 +1262,9 @@ assertions (
     {id seaography-feature-build, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:08.718488Z}
     {id seaquery-doc-branding, kind @complete, author "brendan@necessary.nu", at 2026-09-06T10:57:15.3319Z}
     {id searched-case-needs-arm, kind @complete, author "brendan@necessary.nu", at 2026-09-25T03:10:12.098266Z}
+    {id security-enforcement-followup-2026-10-31.github-enforcement, kind @complete, author "brendan@necessary.nu", at 2026-10-31T22:58:21.723429Z}
+    {id security-enforcement-followup-2026-10-31.stable-checks, kind @complete, author "brendan@necessary.nu", at 2026-10-31T22:40:17.547216Z}
+    {id security-enforcement-followup-2026-10-31.supply-chain, kind @complete, author "brendan@necessary.nu", at 2026-10-31T22:39:16.420436Z}
     {id security-remediation-2026-10-31.advisories, kind @complete, author "brendan@necessary.nu", at 2026-10-31T18:38:37.536743Z}
     {id security-remediation-2026-10-31.automation, kind @complete, author "brendan@necessary.nu", at 2026-10-31T20:00:23.88082Z}
     {id security-remediation-2026-10-31.campaign-evidence, kind @complete, author "brendan@necessary.nu", at 2026-10-31T19:58:29.008215Z}

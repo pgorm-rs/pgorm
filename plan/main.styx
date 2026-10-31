@@ -15456,4 +15456,95 @@ children (
             }
         )
     }
+
+    {
+        id security-enforcement-followup-2026-10-31
+        title "Make security CI reliable and merge-blocking"
+        kind @ci
+        children (
+            {
+                id security-enforcement-followup-2026-10-31.supply-chain
+                title "Pin cargo-deny and repair the supply-chain audit"
+                kind @ci
+                deps (security-remediation-2026-10-31.automation)
+                sealed true
+                log (
+                    {
+                        at 2026-10-31T22:06:02.048592Z
+                        author "brendan@bbqsrc.net"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-31T22:39:16.420436Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+
+                    {
+                        at 2026-10-31T22:39:18.907534Z
+                        author "brendan@necessary.nu"
+                        kind @errata
+                        text "The Doing transition inherited a stale clone-local email. Its operator is Brendan Molloy <brendan@necessary.nu>."
+                        after_done true
+                    }
+                )
+            }
+
+            {
+                id security-enforcement-followup-2026-10-31.stable-checks
+                title "Give every security and binding workflow a stable pull-request gate"
+                kind @ci
+                deps (security-enforcement-followup-2026-10-31.supply-chain)
+                sealed true
+                log (
+                    {
+                        at 2026-10-31T22:39:44.245591Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-31T22:40:17.547216Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+
+            {
+                id security-enforcement-followup-2026-10-31.github-enforcement
+                title "Require the stable security and binding checks on main"
+                kind @ci
+                deps (security-enforcement-followup-2026-10-31.stable-checks)
+                sealed true
+                log (
+                    {
+                        at 2026-10-31T22:58:11.723825Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-31T22:58:17.791911Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "GitHub ruleset 26285865 now requires Supply-chain security, Generative security, SQL injection security, Node-API binding and Python distributions in addition to the four CodeQL contexts."
+                    }
+
+                    {
+                        at 2026-10-31T22:58:21.723429Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
+            }
+        )
+    }
 )
