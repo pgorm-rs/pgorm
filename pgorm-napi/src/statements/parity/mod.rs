@@ -136,6 +136,7 @@ pub(crate) fn check(file: &str, built: Vec<(&str, (String, Values))>) {
 
 // [spec:pgorm:req:bindings.select+2/test]
 // [spec:pgorm:req:bindings.expressions+2/test]
+// [spec:pgorm:req:bindings.quantifiers+1/test]
 #[test]
 fn select_family_matches_its_golden_file() {
     check(

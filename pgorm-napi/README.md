@@ -321,9 +321,15 @@ for await (const row of pool.stream(query, { tagged: true })) { /* .. */ }
   `scalar`, and `array(select)`, `ARRAY(select)`: the subquery's one column as
   one array value, empty for no rows, to cast and compare as a value.
 - **ANY and ALL**: `any(source)` and `all(source)` are `ANY (..)` and
-  `ALL (..)`, the right operand of `eq` .. `gte` and of nothing else, as
-  PostgreSQL's grammar reads it — another operator refuses one, and it has no
-  `inspect` of its own. The source is a `Select`, whose rows it ranges over,
+  `ALL (..)`, the right operand of every operator PostgreSQL reads a
+  quantifier after and of nothing else: `eq` .. `gte`, `like`, `notLike`,
+  `ilike` and `notIlike` (with no `escape`), the regular-expression matches,
+  `contains`, `containedBy`, `overlaps`, the range positions, `matches` and
+  `pathExists`. `similarTo`, `isDistinctFrom`, `between`, arithmetic and
+  `concat` refuse one, and it has no `inspect` of its own. The server types a
+  bound array by the operator it follows: `pathExists` and `matches` over a
+  `jsonb` read one as `jsonpath[]`, so cast it,
+  `bind(paths).cast("jsonpath", { array: true })`. The source is a `Select`, whose rows it ranges over,
   or an array: an expression (an array column, `array(select)`) or a value
   bound as one array parameter. `col("id").eq(any([1, 3]))` is
   `"id" = ANY($1)`, the membership `isIn` tests with one placeholder for any

@@ -252,7 +252,7 @@ class ModelConstruction(unittest.TestCase):
             lambda: column.between(1, None),
             lambda: column.contains(p.Value(2, "i64")),
             lambda: column.adjacent_to("2"),
-            lambda: column.overlaps(p.any_(p.Value.array("i32", [1]))),
+            lambda: column.is_distinct_from(p.any_(p.Value.array("i32", [1]))),
         ):
             with self.assertRaises(p.ConstructionError):
                 operation()

@@ -2450,8 +2450,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name javascript, rule bindings.quantifiers}
         {impl_name python, rule bindings.quantifiers}
-    ), rule_versions_seen (
-        {id bindings.quantifiers, version 0}
     )}
     {id query-reexports-curated, covered_rules (
         sql.surface

@@ -115,7 +115,7 @@ class OperatorTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(ids, await self.written(written))
                 self.assertEqual(ids, expected)
 
-    # [spec:pgorm:req:bindings.quantifiers/test]    EXISTS, a scalar subquery, IN a Select, and
+    # [spec:pgorm:req:bindings.quantifiers+1/test]    EXISTS, a scalar subquery, IN a Select, and
     # any_ and all_ after each comparison over an array or a subquery's rows answer as the SQL
     # written by hand, an empty array false under ANY and true under ALL
     async def test_subqueries_and_quantifiers_answer_as_postgres_does(self):
@@ -146,10 +146,54 @@ class OperatorTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(ids, await self.written(written))
                 self.assertEqual(ids, expected)
         quantified = p.any_(self.c("tags"))
-        for refused in [lambda: self.c("id") + quantified, lambda: self.c("id").contains(quantified),
+        for refused in [lambda: self.c("id") + quantified, lambda: self.c("label").concat(quantified),
+                        lambda: self.c("label").similar_to(quantified),
+                        lambda: self.c("id").is_distinct_from(quantified),
+                        lambda: self.c("id").between(quantified, 3),
                         lambda: self.c("id").is_in([quantified]), lambda: bool(quantified)]:
             with self.assertRaises(p.ConstructionError):
                 refused()
+
+    # [spec:pgorm:req:bindings.quantifiers+1/test]    any_ and all_ after LIKE's and ILIKE's
+    # family, the regular-expression matches, containment, the range positions, @@ and @?, over a
+    # bound array or a subquery's rows, answer as the SQL written by hand
+    async def test_quantifiers_beyond_comparisons_answer_as_postgres_does(self):
+        texts = lambda *items: p.Value.array("text", list(items))
+        windows = p.Select(p.literal("[0,6)").cast(p.TypeName("int4range"))).union(
+            p.Select(p.literal("[8,20)").cast(p.TypeName("int4range"))))
+        windows_sql = "SELECT '[0,6)'::int4range UNION SELECT '[8,20)'::int4range"
+        paths = p.bind(["$.a", "$.c"]).cast(p.TypeName("jsonpath"), array=True)
+        label, span, doc = self.c("label"), self.c("span"), self.c("doc")
+        cases = [
+            (label.like(p.any_(texts("pg%", "s%"))), "label LIKE ANY('{pg%,s%}')", [1, 3]),
+            (label.not_like(p.all_(texts("pg%", "s%"))), "label NOT LIKE ALL('{pg%,s%}')", [2]),
+            (label.ilike(p.any_(texts("pg%"))), "label ILIKE ANY('{pg%}')", [1, 2]),
+            (label.not_ilike(p.all_(texts("pg%", "o%"))), "label NOT ILIKE ALL('{pg%,o%}')", [3]),
+            (label.like(p.any_(p.Select(p.literal("s%")))), "label LIKE ANY(SELECT 's%')", [3]),
+            (label.regex(p.any_(texts("^p", "^s"))), "label ~ ANY('{^p,^s}')", [1, 3]),
+            (label.not_regex(p.all_(texts("^p", "^s"))), "label !~ ALL('{^p,^s}')", [2]),
+            (label.iregex(p.any_(texts("^PG", "^O"))), "label ~* ANY('{^PG,^O}')", [1, 2]),
+            (label.not_iregex(p.all_(texts("^pg"))), "label !~* ALL('{^pg}')", [3]),
+            (span.contains(p.any_(p.bind(p.Value.array("i32", [3, 11])).cast(p.TypeName("int4"), array=True))), "span @> ANY('{3,11}'::int4[])", [1, 3]),
+            (span.contained_by(p.any_(windows)), f"span <@ ANY({windows_sql})", [1, 3]),
+            (span.overlaps(p.all_(windows)), f"span && ALL({windows_sql})", []),
+            (span.strictly_left_of(p.any_(windows)), f"span << ANY({windows_sql})", [1, 2]),
+            (span.strictly_right_of(p.any_(windows)), f"span >> ANY({windows_sql})", [3]),
+            (span.not_extend_right_of(p.all_(windows)), f"span &< ALL({windows_sql})", [1]),
+            (span.not_extend_left_of(p.all_(windows)), f"span &> ALL({windows_sql})", [3]),
+            (span.adjacent_to(p.any_(windows)), f"span -|- ANY({windows_sql})", [2]),
+            (label.matches(p.any_(texts("pgorm", "sql"))), "label @@ ANY('{pgorm,sql}'::text[])", [1, 2, 3]),
+            (doc.path_exists(p.any_(paths)), "doc @? ANY('{$.a,$.c}'::jsonpath[])", [1, 3]),
+            (doc.matches(p.all_(p.bind(["$.a == 1"]).cast(p.TypeName("jsonpath"), array=True))),
+             "doc @@ ALL('{\"$.a == 1\"}'::jsonpath[])", [1]),
+        ]
+        for predicate, written, expected in cases:
+            with self.subTest(written=written):
+                ids = await self.built(predicate)
+                self.assertEqual(ids, await self.written(written))
+                self.assertEqual(ids, expected)
+        with self.assertRaises(p.ConstructionError):
+            await self.built(doc.path_exists(p.any_(texts("$.a"))))
 
     async def test_bare_operators_group_as_built(self):
         predicate = (self.c("label").not_regex("^s")

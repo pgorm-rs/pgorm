@@ -6,7 +6,7 @@
 
 // [spec:pgorm:req:napi.typing+1]
 // [spec:pgorm:req:bindings.expressions+2]
-// [spec:pgorm:req:bindings.quantifiers]
+// [spec:pgorm:req:bindings.quantifiers+1]
 // [spec:pgorm:req:bindings.case]
 
 import type { Param, TypeName, Value } from "./index.d.ts";
@@ -65,37 +65,41 @@ export declare class Expr extends Builder {
   /** `a || b`. */
   concat(other: Operand): Expr;
   /** `@>`: a range, multirange or array containing the other. */
-  contains(other: Operand): Expr;
+  contains(other: Operand | Quantified): Expr;
   /** `<@`: contained by the other. */
-  containedBy(other: Operand): Expr;
+  containedBy(other: Operand | Quantified): Expr;
   /** `&&`: sharing a value with the other. */
-  overlaps(other: Operand): Expr;
+  overlaps(other: Operand | Quantified): Expr;
   /** `<<`: a range or multirange lying wholly left of the other. */
-  strictlyLeftOf(other: Operand): Expr;
+  strictlyLeftOf(other: Operand | Quantified): Expr;
   /** `>>`: a range or multirange lying wholly right of the other. */
-  strictlyRightOf(other: Operand): Expr;
+  strictlyRightOf(other: Operand | Quantified): Expr;
   /** `&<`: extending no further right than the other. */
-  notExtendRightOf(other: Operand): Expr;
+  notExtendRightOf(other: Operand | Quantified): Expr;
   /** `&>`: extending no further left than the other. */
-  notExtendLeftOf(other: Operand): Expr;
+  notExtendLeftOf(other: Operand | Quantified): Expr;
   /** `-|-`: adjacent to the other, sharing no value with nothing between. */
-  adjacentTo(other: Operand): Expr;
+  adjacentTo(other: Operand | Quantified): Expr;
   /** `~`: the text matches a POSIX regular expression, case sensitively; the pattern is bound unless it is an expression. */
-  regex(pattern: Operand): Expr;
+  regex(pattern: Operand | Quantified): Expr;
   /** `!~`: the text does not match the regular expression. */
-  notRegex(pattern: Operand): Expr;
+  notRegex(pattern: Operand | Quantified): Expr;
   /** `~*`: the text matches the regular expression, case ignored. */
-  iregex(pattern: Operand): Expr;
+  iregex(pattern: Operand | Quantified): Expr;
   /** `!~*`: the text does not match the regular expression, case ignored. */
-  notIregex(pattern: Operand): Expr;
+  notIregex(pattern: Operand | Quantified): Expr;
   /**
    * `@@`: a `tsvector` against a `tsquery`, text against text as PostgreSQL's
    * full-text conversion reads it, or a `jsonb` against a `jsonpath`
    * predicate; a `jsonpath` is written cast, as a bound string is text.
    */
-  matches(other: Operand): Expr;
-  /** `@?`: a `jsonpath` returns an item for this `jsonb`; the path is bound as text cast to `jsonpath`. */
-  pathExists(path: string): Expr;
+  matches(other: Operand | Quantified): Expr;
+  /**
+   * `@?`: a `jsonpath` returns an item for this `jsonb`; the path is bound as
+   * text cast to `jsonpath`, or `any(..)` or `all(..)` ranges over `jsonpath`
+   * values, which a bound string array is not.
+   */
+  pathExists(path: string | Quantified): Expr;
   isDistinctFrom(other: Operand): Expr;
   isNotDistinctFrom(other: Operand): Expr;
   and(other: Expr): Expr;
@@ -111,11 +115,19 @@ export declare class Expr extends Builder {
   isNotIn(source: readonly Operand[] | Select): Expr;
   between(lower: Operand, upper: Operand, options?: { readonly symmetric?: boolean }): Expr;
   notBetween(lower: Operand, upper: Operand, options?: { readonly symmetric?: boolean }): Expr;
-  /** A pattern match; the pattern is bound, and `escape` is one character, or `""` to turn escaping off. */
+  /**
+   * A pattern match; the pattern is bound, and `escape` is one character, or
+   * `""` to turn escaping off. `any(..)` or `all(..)` over patterns takes no
+   * escape.
+   */
   like(pattern: string, options?: { readonly escape?: string }): Expr;
+  like(pattern: Quantified): Expr;
   notLike(pattern: string, options?: { readonly escape?: string }): Expr;
+  notLike(pattern: Quantified): Expr;
   ilike(pattern: string, options?: { readonly escape?: string }): Expr;
+  ilike(pattern: Quantified): Expr;
   notIlike(pattern: string, options?: { readonly escape?: string }): Expr;
+  notIlike(pattern: Quantified): Expr;
   /**
    * `SIMILAR TO`: whether the whole string matches a pattern in SQL's
    * regular-expression dialect — LIKE's `%` and `_` with `|`, `*`, `+`, `?`,
@@ -150,8 +162,10 @@ export declare class Expr extends Builder {
 }
 
 /**
- * `ANY (..)` or `ALL (..)`: the right operand of `eq`, `ne`, `lt`, `lte`, `gt`
- * or `gte`, the one place PostgreSQL reads it, and no expression of its own.
+ * `ANY (..)` or `ALL (..)`: the right operand of an operator PostgreSQL reads
+ * one after — a comparison, `like`, `notLike`, `ilike` and `notIlike`, the
+ * regular-expression matches, containment, the range positions, `matches`
+ * and `pathExists` — and no expression of its own.
  */
 export declare class Quantified {
   #private;
@@ -268,13 +282,13 @@ export declare function scalar(select: Select): Expr;
  */
 export declare function array(select: Select): Expr;
 /**
- * `ANY (..)`: the comparison holds for some element of an array — an
+ * `ANY (..)`: the operator holds for some element of an array — an
  * expression, or a value bound as one array parameter — or for some row of a
  * subquery; over an empty array or no rows it is false.
  */
 export declare function any(source: Select | Operand): Quantified;
 /**
- * `ALL (..)`: the comparison holds for every element of an array, or every
+ * `ALL (..)`: the operator holds for every element of an array, or every
  * row of a subquery; over an empty array or no rows it is true.
  */
 export declare function all(source: Select | Operand): Quantified;

@@ -5,17 +5,23 @@ use pgorm::pgorm_query::{BinOper, Expr};
 use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use super::PyExpr;
+use crate::statements::PyQuantified;
 
 // [spec:pgorm:req:bindings.expressions+2]
+// [spec:pgorm:req:bindings.quantifiers+1]
 #[pymethods]
 impl PyExpr {
     /// `@?`: whether a `jsonpath` returns any item for this `jsonb`. The path
     /// is a `str`, bound as text cast to `jsonpath` by Rust's
-    /// `json_path_exists`, so it never becomes statement text.
+    /// `json_path_exists`, so it never becomes statement text, or `ANY (..)`
+    /// / `ALL (..)` over `jsonpath` values, which a bound text array is not.
     fn path_exists(&self, path: &Bound<'_, PyAny>) -> PyResult<Self> {
+        if path.is_instance_of::<PyQuantified>() {
+            return self.binary(BinOper::JsonPathExists, path);
+        }
         let path: String = path
             .extract()
-            .map_err(|_| PyTypeError::new_err("a JSON path is a str"))?;
+            .map_err(|_| PyTypeError::new_err("a JSON path is a str, or any_ or all_"))?;
         Ok(Self::from_rust(
             Expr::expr(self.inner.clone()).json_path_exists(path),
         ))

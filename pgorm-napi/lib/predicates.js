@@ -1,8 +1,10 @@
 // @ts-check
 
 // The predicates over an expression: NULL tests, membership, ranges of
-// values, patterns and text tests.
+// values, patterns and text tests. LIKE's family also takes `any(..)` or
+// `all(..)` over patterns, with no escape.
 // [spec:pgorm:req:bindings.expressions+2]
+// [spec:pgorm:req:bindings.quantifiers+1]
 
 import { arg, args, made } from "./builder.js";
 import { native } from "./operations.js";
@@ -15,7 +17,7 @@ import { Operand } from "./operands.js";
  * @param {{ escape?: string }} options
  */
 function like(expr, operator, pattern, { escape } = {}) {
-  return made.expr(native.exprLike(arg(expr), operator, pattern, escape));
+  return made.expr(native.exprLike(arg(expr), operator, arg(pattern), escape));
 }
 
 /**
@@ -78,7 +80,7 @@ export class Predicate extends Operand {
   }
 
   /**
-   * @param {string} pattern
+   * @param {string | import("./expressions.js").Quantified} pattern
    * @param {{ escape?: string }} [options]
    */
   like(pattern, options) {
@@ -86,7 +88,7 @@ export class Predicate extends Operand {
   }
 
   /**
-   * @param {string} pattern
+   * @param {string | import("./expressions.js").Quantified} pattern
    * @param {{ escape?: string }} [options]
    */
   notLike(pattern, options) {
@@ -94,7 +96,7 @@ export class Predicate extends Operand {
   }
 
   /**
-   * @param {string} pattern
+   * @param {string | import("./expressions.js").Quantified} pattern
    * @param {{ escape?: string }} [options]
    */
   ilike(pattern, options) {
@@ -102,7 +104,7 @@ export class Predicate extends Operand {
   }
 
   /**
-   * @param {string} pattern
+   * @param {string | import("./expressions.js").Quantified} pattern
    * @param {{ escape?: string }} [options]
    */
   notIlike(pattern, options) {

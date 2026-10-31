@@ -124,9 +124,13 @@ embedded one is read.
 
 `any_(source)` and `all_(source)` are `ANY (..)` and `ALL (..)`, named with a
 trailing underscore so they do not shadow Python's builtins. Each is the right
-operand of a comparison — `==`, `!=`, `<`, `<=`, `>`, `>=` or their methods —
-and of nothing else, as PostgreSQL's grammar reads it: another operator, a
-membership list or `bind` refuses it with `ConstructionError`, and it has no
+operand of every operator PostgreSQL reads a quantifier after, and of nothing
+else: the comparisons — `==`, `!=`, `<`, `<=`, `>`, `>=` or their methods —
+`like`, `not_like`, `ilike` and `not_ilike`, the regular-expression matches,
+`contains`, `contained_by` and `overlaps`, the range positions, `matches` and
+`path_exists`. `similar_to`, `is_distinct_from`, `between`, arithmetic and
+`concat`, which the grammar or the server takes no quantifier after, a
+membership list and `bind` refuse it with `ConstructionError`, and it has no
 `inspect` of its own. The source is a `Select`, whose rows it ranges over
 (Rust's `Expr::any` / `Expr::all`), or an array (Rust's `Func::any` /
 `Func::all`): an expression, such as an array column or `array(select)`, or a
@@ -147,6 +151,16 @@ col("id") == any_(array(select(col("id")).from_(Table("t"))))
 placeholder for any length, so the statement's text, and the prepared
 statement a connection caches for it, is the same at every length. Over an
 empty array, or a subquery with no row, `ANY` is false and `ALL` true.
+
+A quantified LIKE pattern carries no escape, since PostgreSQL reads no
+`ESCAPE` after `ANY (..)`: `col("name").like(any_(["a%", "b%"]))` is
+`"name" LIKE ANY($1)`. The server types a bound array by the operator it
+follows, so an element type the operator does not settle needs a cast: a
+range's `@>` reads an untyped array as ranges, so elements are
+`bind(Value.array("i32", [3, 11])).cast(TypeName("int4"), array=True)`, and
+`path_exists` and `matches` over a `jsonb` read one as `jsonpath[]`, which a
+bound list of `str` cannot be sent as (`ConstructionError` as it runs), so it
+is `bind(["$.a", "$.b"]).cast(TypeName("jsonpath"), array=True)`.
 
 `expr.at(index)` is one array element, `a[index]`, which counts from 1 and is
 NULL outside the array's bounds; `expr.slice(lower, upper)` is the slice

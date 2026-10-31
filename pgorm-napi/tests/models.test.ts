@@ -239,7 +239,7 @@ test("a column compares through its declared kind, and refuses what it cannot bi
     await Account.select("name").where(Account.col("name").ne(all(["Ann", "Cy"]))).orderBy(byId).all(pool()),
     [{ name: "Bob" }],
   );
-  assert.throws(() => Account.col("tags").contains(any(["a"]) as never), refused(/ANY and ALL follow a comparison/));
+  assert.throws(() => Account.col("id").isDistinctFrom(any([1]) as never), refused(/ANY and ALL follow a comparison/));
   assert.deepStrictEqual(await Account.select("name").where(Account.col("id").between(2, 3)).orderBy(byId).all(pool()), [
     { name: "Bob" },
     { name: "Cy" },

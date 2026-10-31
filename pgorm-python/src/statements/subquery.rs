@@ -51,10 +51,9 @@ pub(crate) fn subquery_scalar(select: PyRef<'_, PySelect>) -> PyResult<PyExpr> {
     )))
 }
 
-/// `ANY (..)` or `ALL (..)`: the right operand of a comparison and nothing
-/// else, the one place PostgreSQL's grammar reads it, so no other operator
-/// takes it and it has no SQL of its own to inspect.
-// [spec:pgorm:req:bindings.quantifiers]
+/// `ANY (..)` or `ALL (..)`: the right operand of an operator PostgreSQL
+/// reads one after and nothing else, so it has no SQL of its own to inspect.
+// [spec:pgorm:req:bindings.quantifiers+1]
 #[pyclass(name = "Quantified", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyQuantified {
@@ -76,9 +75,9 @@ impl PyQuantified {
 
 /// `any_(source)`: `ANY (..)` over a `Select`'s rows, Rust's `Expr::any`, or
 /// over an array, Rust's `Func::any`, the array bound unless it is an
-/// expression. The comparison holds for some element or row; over none it is
+/// expression. The operator holds for some element or row; over none it is
 /// false.
-// [spec:pgorm:req:bindings.quantifiers]
+// [spec:pgorm:req:bindings.quantifiers+1]
 #[pyfunction(name = "any_")]
 pub(crate) fn quantified_any(source: &Bound<'_, PyAny>) -> PyResult<PyQuantified> {
     let inner = match subquery(source)? {
@@ -89,9 +88,9 @@ pub(crate) fn quantified_any(source: &Bound<'_, PyAny>) -> PyResult<PyQuantified
 }
 
 /// `all_(source)`: `ALL (..)` over a `Select`'s rows, Rust's `Expr::all`, or
-/// over an array, Rust's `Func::all`. The comparison holds for every element
+/// over an array, Rust's `Func::all`. The operator holds for every element
 /// or row; over none it is true.
-// [spec:pgorm:req:bindings.quantifiers]
+// [spec:pgorm:req:bindings.quantifiers+1]
 #[pyfunction(name = "all_")]
 pub(crate) fn quantified_all(source: &Bound<'_, PyAny>) -> PyResult<PyQuantified> {
     let inner = match subquery(source)? {

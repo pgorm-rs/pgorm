@@ -25,6 +25,8 @@ mod tests;
 use pgorm::pgorm_query::{BinOper, SimpleExpr};
 use pyo3::prelude::*;
 
+use crate::statements::PyQuantified;
+
 pub(crate) use capabilities::operations as capabilities;
 pub use compiled::Compiled;
 pub use construct::PyCondition;
@@ -46,11 +48,50 @@ impl PyExpr {
         Self { inner }
     }
 
+    /// `operator` with `other`, bound unless it is an expression, or with
+    /// `ANY (..)` / `ALL (..)` when PostgreSQL reads one after `operator`.
     fn binary(&self, operator: BinOper, other: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self::from_rust(
-            self.inner.clone().binary(operator, coerce(other)?.inner),
-        ))
+        let right = match other.extract::<PyRef<'_, PyQuantified>>() {
+            Ok(quantified) if takes_quantifier(operator) => quantified.inner.clone(),
+            _ => coerce(other)?.inner,
+        };
+        Ok(Self::from_rust(self.inner.clone().binary(operator, right)))
     }
+}
+
+/// The operators PostgreSQL's grammar takes before `ANY` or `ALL` whose
+/// result is a boolean, as the server requires of one (`42809`). `SIMILAR
+/// TO`, `IS DISTINCT FROM`, `BETWEEN` and `IN` are read by the grammar with
+/// no quantifier at all.
+// [spec:pgorm:req:bindings.quantifiers+1]
+fn takes_quantifier(operator: BinOper) -> bool {
+    matches!(
+        operator,
+        BinOper::Equal
+            | BinOper::NotEqual
+            | BinOper::SmallerThan
+            | BinOper::SmallerThanOrEqual
+            | BinOper::GreaterThan
+            | BinOper::GreaterThanOrEqual
+            | BinOper::Like
+            | BinOper::NotLike
+            | BinOper::ILike
+            | BinOper::NotILike
+            | BinOper::Regex
+            | BinOper::NotRegex
+            | BinOper::RegexCaseInsensitive
+            | BinOper::NotRegexCaseInsensitive
+            | BinOper::Contains
+            | BinOper::Contained
+            | BinOper::Overlap
+            | BinOper::LShift
+            | BinOper::RShift
+            | BinOper::NotExtendRightOf
+            | BinOper::NotExtendLeftOf
+            | BinOper::AdjacentTo
+            | BinOper::Matches
+            | BinOper::JsonPathExists
+    )
 }
 
 pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {

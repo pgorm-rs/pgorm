@@ -835,7 +835,10 @@ the same terminals that run raw SQL.
 > - `strictly_left_of`, `strictly_right_of`, `not_extend_right_of`,
 >   `not_extend_left_of` and `adjacent_to`;
 > - `matches` and `path_exists`, the latter's quantifier ranging over
->   `jsonpath` values, which a bound text array is not (`42883`).
+>   `jsonpath` values: PostgreSQL reads a bound array there as `jsonpath[]`,
+>   which pgorm sends no text as, so an array of text is a
+>   `ConstructionError` as the statement runs, and one cast to `jsonpath[]`
+>   is sent.
 >
 > Each is the pgorm-query operator of its meaning with the quantifier as its
 > right operand. The grammar reads none after `similar_to`, `not_similar_to`,
