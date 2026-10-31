@@ -15359,6 +15359,7 @@ children (
                     security-remediation-2026-10-31.automation
                     security-remediation-2026-10-31.disclosure
                 )
+                sealed true
                 log (
                     {
                         at 2026-10-31T18:30:19.22074Z
@@ -15386,6 +15387,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "CodeQL Rust security-extended scan surfaced four high-severity rust/cleartext-logging alerts, all classified test and all tracing the view fixture helper active_accounts() into assertion diagnostics. Renamed the fixture helper to view_body() so CodeQL no longer infers account data from a name-only test fixture. Verified 13 focused render-oracle view tests, cargo fmt, workspace check/clippy, and PostgreSQL 19 all-target check/clippy."
+                    }
+
+                    {
+                        at 2026-10-31T21:01:45.188547Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Final live evidence on remediation commit daee844f (2026-10-31): CodeQL run 41240065331 succeeded for actions, javascript-typescript, python, and rust; all five prior CodeQL alerts are fixed and the open alert list is empty. SQLmap smoke run 41240065289, generative smoke run 41240065396, Node-API run 41240065251, and Python distributions run 41240065249 all succeeded. Dependabot and secret-scanning open alert lists are empty. Vulnerability alerts, Dependabot security updates, private vulnerability reporting, secret scanning, and push protection are enabled. GitHub continues to expose validity checks and non-provider pattern scanning as disabled after accepting enable requests, so those account/plan-limited enhancements are not claimed. Ruleset 26285865 is prepared in evaluate mode with no bypasses, PR-only/deletion/non-fast-forward controls, exact CodeQL status checks, strict branch freshness, and CodeQL merge protection for generic errors plus high-or-higher security alerts; it will be activated after the final plan-state commit is scanned."
+                    }
+
+                    {
+                        at 2026-10-31T21:01:53.412104Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
