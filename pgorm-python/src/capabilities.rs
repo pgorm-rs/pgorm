@@ -211,11 +211,11 @@ fn manifest() -> Value {
             "values": "Rust DDL literal rendering; inspect.params is empty",
             "runtime_ddl": true, "automatic_ddl": false,
             "registered_entity_ddl": "real Schema methods for a compiled entity; registrations.entities lists available types",
-            "index_methods": ["btree", "hash", "gin", "gist", "spgist", "brin"],
+            "index_methods": "any access method the server has, named by identifier",
             "column_types": column_types,
             "named_type": "TypeName retains schema qualification; DataType.array retains element identity",
             "type_changes": "native driver caches type metadata; close and recreate application pools after altering existing enum labels or type names",
-            "unsupported": ["runtime foreign-key construction", "schema introspection", "automatic migrations", "raw column options", "partial or expression indexes", "concurrent indexes"]
+            "unsupported": ["schema introspection", "automatic migrations", "raw column options", "concurrent indexes"]
         },
         "registrations": {"entities": [], "graphs": [], "sources": []},
         "python": {"abi": "cp314", "free_threading": false, "subinterpreters": false}

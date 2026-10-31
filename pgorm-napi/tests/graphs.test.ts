@@ -99,7 +99,9 @@ test("load reads every row's far end in one query, a list for hasMany and a reco
 test("a relation pairs as many fields at each end, each a field of its model", () => {
   assert.throws(() => Post.belongsTo(Account, { from: ["authorId", "id"], to: "id" } as never), refused(/as many fields/));
   assert.throws(() => Post.belongsTo(Account, { from: "author", to: "id" } as never), refused(/no field "author"/));
-  assert.throws(() => Post.belongsTo(Account, { from: [], to: [] } as never), refused(/non-empty list/));
+  assert.throws(() => Post.belongsTo(Account, { from: [], to: [] } as never), refused(/at least one field/));
+  assert.throws(() => Post.belongsTo(Account, { from: 7, to: "id" } as never), TypeError);
+  assert.throws(() => Post.belongsTo(Account, { from: [7], to: ["id"] } as never), TypeError);
   assert.throws(() => Post.belongsTo({} as never, { from: "authorId", to: "id" }), TypeError);
 });
 

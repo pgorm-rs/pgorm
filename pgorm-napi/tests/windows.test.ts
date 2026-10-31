@@ -26,7 +26,7 @@ import {
   Window,
   windowFunction,
 } from "../lib/index.js";
-import { scratchDatabase } from "./support.ts";
+import { mistyped, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -245,27 +245,28 @@ test("the window-only functions and the JSON aggregates run over a window", asyn
 });
 
 // [spec:pgorm:req:bindings.windows/test]
+// [spec:pgorm:req:napi.argument-errors+2/test]
 test("OVER follows only a call, a frame only ends after its start, and a window-only function needs its window", () => {
   const ordered = new Window().orderBy(byId);
   assert.throws(() => col("x").over(ordered), refused(/OVER follows only a function call/));
   assert.throws(() => col("x").add(1).over(ordered), refused(/OVER follows only/));
   assert.throws(() => call("lower", col("x")).cast("text").over(ordered), refused(/OVER follows only/));
   assert.throws(() => jsonValue(col("doc"), "$.a").over(ordered), refused(/OVER follows only/));
-  assert.throws(() => call("sum", col("x")).over(col("w") as never), refused(/Window or a window's name, not an expression/));
+  assert.throws(() => call("sum", col("x")).over(col("w") as never), mistyped(/Window or a window's name, not an expression/));
   assert.throws(() => call("sum", col("x")).over(""), refused(/identifier/));
   assert.throws(() => ordered.frame(FrameType.rows.following(1) as never), refused(/following start needs an end/));
-  assert.throws(() => ordered.frame(col("x") as never), refused(/frame is a Frame/));
+  assert.throws(() => ordered.frame(col("x") as never), mistyped(/frame is a Frame/));
   const following = FrameType.rows.following(1) as unknown as { andCurrentRow?: unknown; andPreceding?: unknown; exclude?: unknown };
   assert.equal(following.andCurrentRow, undefined);
   assert.equal(following.andPreceding, undefined);
   assert.equal(following.exclude, undefined);
   assert.equal((FrameType.rows.currentRow() as unknown as { andPreceding?: unknown }).andPreceding, undefined);
-  assert.throws(() => select(windowFunction("rank") as never), refused(/not a window function with no window/));
+  assert.throws(() => select(windowFunction("rank") as never), mistyped(/not a window function with no window/));
   assert.throws(() => windowFunction("rank", 1), refused(/no "rank" taking 1 argument/));
   assert.throws(() => windowFunction("lag"), refused(/no "lag" taking 0/));
   assert.throws(() => windowFunction("median" as never, col("x")), refused(/no "median"/));
-  assert.throws(() => select().window("w", col("x") as never), refused(/named window is a Window/));
-  assert.throws(() => FrameType.rows.currentRow().exclude("others" as never), refused(/exclusion/));
+  assert.throws(() => select().window("w", col("x") as never), mistyped(/named window is a Window/));
+  assert.throws(() => FrameType.rows.currentRow().exclude("others" as never), mistyped(/exclusion/));
 });
 
 // [spec:pgorm:req:bindings.ranges/test]

@@ -16,7 +16,7 @@ import {
   renameSchema,
   Table,
 } from "../lib/index.js";
-import { scratchDatabase } from "./support.ts";
+import { mistyped, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -68,10 +68,10 @@ test("each schema statement names its schemas as quoted identifiers and binds no
   assert.equal(renameSchema("a", "b").inspect().sql, 'ALTER SCHEMA "a" RENAME TO "b"');
 
   assert.throws(() => dropSchema([] as never), refused(/at least one schema/));
-  assert.throws(() => createSchema(new Table("t") as never), refused(/identifier is a string/));
+  assert.throws(() => createSchema(new Table("t") as never), mistyped(/identifier is a string/));
   assert.throws(() => createSchema(""), refused(/1–63 UTF-8 bytes/));
   assert.throws(() => renameSchema("a", "x".repeat(64)), refused(/1–63 UTF-8 bytes/));
-  assert.throws(() => dropSchema(["a", 3] as never), refused(/identifier is a string/));
+  assert.throws(() => dropSchema(["a", 3] as never), mistyped(/identifier is a string/));
   assert.throws(() => createSchema("a", { ifExists: true } as never), TypeError);
   assert.throws(() => dropSchema("a", { behavior: "sideways" } as never));
 });

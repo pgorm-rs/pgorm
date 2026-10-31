@@ -38,31 +38,12 @@ where
 
     // [spec:pgorm:req:bindings.schema-from-entity]
     fn schema(&self) -> Result<crate::schema::PyEntitySchema, Error> {
-        use crate::schema::{PyCreateIndex, PyCreateTable, PyDDL, PyEntitySchema, Statement};
         let schema = pgorm::Schema::new();
-        Ok(PyEntitySchema {
-            table: PyCreateTable {
-                inner: schema.create_table_from_entity(E::default())?,
-            },
-            enums: schema
-                .create_enum_from_entity(E::default())
-                .into_iter()
-                .map(|inner| PyDDL {
-                    inner: Statement::CreateEnum(inner),
-                })
-                .collect(),
-            indexes: schema
-                .create_index_from_entity(E::default())
-                .into_iter()
-                .map(|inner| PyCreateIndex { inner })
-                .collect(),
-            comments: schema
-                .create_comments_from_entity(E::default())
-                .into_iter()
-                .map(|inner| PyDDL {
-                    inner: Statement::Comment(inner),
-                })
-                .collect(),
+        Ok(crate::schema::PyEntitySchema {
+            table: schema.create_table_from_entity(E::default())?,
+            enums: schema.create_enum_from_entity(E::default()),
+            indexes: schema.create_index_from_entity(E::default()),
+            comments: schema.create_comments_from_entity(E::default()),
         })
     }
 

@@ -32,7 +32,7 @@ import {
   Table,
   truncateTable,
 } from "../lib/index.js";
-import { scratchDatabase } from "./support.ts";
+import { mistyped, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
 let shared: Pool | undefined;
@@ -342,7 +342,7 @@ test("an ALTER TABLE with no action has nothing to inspect, and every terminal r
   assert.deepStrictEqual(createTable("t").inspect().values, []);
 });
 
-// [spec:pgorm:req:napi.schema-api+3/test]
+// [spec:pgorm:req:bindings.schema-api/test]
 // [spec:pgorm:req:napi.typing+1/test]
 test("every complete DDL statement is a DDL, a Statement the terminals take, made only by the module", () => {
   const statements: DDL[] = [
@@ -365,13 +365,14 @@ test("every complete DDL statement is a DDL, a Statement the terminals take, mad
 
 // [spec:pgorm:req:bindings.schema-tables/test]
 // [spec:pgorm:req:bindings.schema-alter/test]
+// [spec:pgorm:req:napi.argument-errors+2/test]
 test("a shape PostgreSQL cannot take, or an option the builder does not know, is refused as it is built", () => {
   assert.throws(() => createTable("t").column(new ColumnDef("a")), refused(/needs a type/));
   assert.throws(() => alterTable("t").addColumn(new ColumnDef("a")), refused(/needs a type/));
   assert.throws(() => createTable(new Table("t", { alias: "x" })), refused(/without an alias/));
   assert.throws(() => createTable("t").primaryKey([] as never), refused(/at least one column/));
   assert.throws(() => createTable("t").foreignKey(["a", "b"], "u", ["x"] as never), refused(/as many referenced columns/));
-  assert.throws(() => createTable("t").foreignKey("a", "u", "x", { period: ["p"] as never }), refused(/PERIOD pair/));
+  assert.throws(() => createTable("t").foreignKey("a", "u", "x", { period: ["p"] as never }), mistyped(/PERIOD pair/));
   assert.throws(
     () => alterTable("t").modifyColumn(new ColumnDef("a", "integer").generated(col("b"), "stored")),
     refused(/setExpression/),
@@ -379,11 +380,11 @@ test("a shape PostgreSQL cannot take, or an option the builder does not know, is
   assert.throws(() => alterTable("t").modifyColumn(new ColumnDef("a", "integer").autoIncrement()), refused(/identity/));
   assert.throws(() => alterTable("t").modifyColumn(new ColumnDef("a").collate("C")), refused(/collation only with its type/));
   assert.throws(() => alterTable("t").modifyColumn(new ColumnDef("a")), refused(/changes something/));
-  assert.throws(() => new ColumnDef("a", "integer").generated(col("b"), "computed" as never), refused(/"stored", "virtual"/));
-  assert.throws(() => new ColumnDef("a", "integer").identity("sometimes" as never), refused(/generation/));
-  assert.throws(() => new ColumnDef("a", "integer").check(col("a").gt(0), { enforcement: "off" as never }), refused(/enforcement/));
-  assert.throws(() => createTable("t").unique("a", { deferrability: "later" as never }), refused(/deferrability/));
-  assert.throws(() => alterTable("t").alterConstraint("c", "valid" as never), refused(/change/));
+  assert.throws(() => new ColumnDef("a", "integer").generated(col("b"), "computed" as never), mistyped(/"stored", "virtual"/));
+  assert.throws(() => new ColumnDef("a", "integer").identity("sometimes" as never), mistyped(/generation/));
+  assert.throws(() => new ColumnDef("a", "integer").check(col("a").gt(0), { enforcement: "off" as never }), mistyped(/enforcement/));
+  assert.throws(() => createTable("t").unique("a", { deferrability: "later" as never }), mistyped(/deferrability/));
+  assert.throws(() => alterTable("t").alterConstraint("c", "valid" as never), mistyped(/change/));
   assert.throws(() => new ColumnDef("a", "integer").notNull({ nam: "x" } as never), TypeError);
   assert.throws(() => createTable("t").primaryKey("a", { nullsNotDistinct: true } as never), TypeError);
   assert.throws(() => alterTable("t").addCheck(col("a"), { notValid: "yes" } as never), TypeError);

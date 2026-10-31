@@ -278,7 +278,7 @@ fn type_behavior(cx: &mut FunctionContext) -> NeonResult<Node> {
     let behavior = arg(cx, 1);
     let behavior = pick(cx, behavior, "a behavior", BEHAVIOR)?;
     let Node::Schema(part) = receiver else {
-        return refuse(cx, "expected an ALTER TYPE that changes attributes");
+        return cx.throw_type_error("expected an ALTER TYPE that changes attributes");
     };
     let ddl = match (*part, behavior) {
         (Part::Statement(Ddl::AlterComposite(statement)), DropBehavior::Cascade) => {
@@ -293,7 +293,7 @@ fn type_behavior(cx: &mut FunctionContext) -> NeonResult<Node> {
         (Part::Statement(Ddl::RenameAttribute(statement)), DropBehavior::Restrict) => {
             Ddl::RenameAttribute(statement.restrict())
         }
-        _ => return refuse(cx, "expected an ALTER TYPE that changes attributes"),
+        _ => return cx.throw_type_error("expected an ALTER TYPE that changes attributes"),
     };
     Ok(ddl.into())
 }

@@ -140,10 +140,7 @@ pub(super) fn foreign_key<'cx>(
     if let Some(period) = get(cx, options, "period")? {
         let pair = names(cx, period, "a PERIOD pair")?;
         let [column, referenced] = <[_; 2]>::try_from(pair).or_else(|_| {
-            refuse(
-                cx,
-                "a PERIOD pair is [column, referenced column], one name each side",
-            )
+            cx.throw_type_error("a PERIOD pair is [column, referenced column], one name each side")
         })?;
         key.period(column, referenced);
     }

@@ -27,7 +27,7 @@ export class Expr extends Predicate {
    * @param {symbol} [token]
    */
   constructor(handle, token) {
-    trusted(token, "SQL expression", "col(), bind(), call() and the other expression functions");
+    trusted(token, "SQL expression", "col(), bind(), literal(), call() and the other expression functions");
     super(handle);
   }
 
@@ -131,6 +131,17 @@ export function col(name, { table, schema } = {}) {
  */
 export function bind(value) {
   return new Expr(native.exprBind(value), TRUSTED);
+}
+
+// [spec:pgorm:req:napi.pipeline-operands+2]
+/**
+ * A value written into the SQL text, as pgorm-query renders a constant, read
+ * as a parameter is read. Every other operand is bound.
+ *
+ * @param {unknown} value
+ */
+export function literal(value) {
+  return new Expr(native.exprLiteral(value), TRUSTED);
 }
 
 /**

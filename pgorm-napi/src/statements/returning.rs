@@ -6,7 +6,7 @@ use pgorm::pgorm_query::{Asterisk, BinOper, Expr, Query, ReturningClause, Return
 
 use super::{
     Node,
-    args::{arg, choice, list, name_at, node, optional_name, refuse},
+    args::{arg, choice, list, name_at, node, optional_name},
 };
 
 pub(super) const EXPORTS: &[(&str, super::Build)] = &[
@@ -52,7 +52,10 @@ pub(super) fn clause(cx: &mut FunctionContext, index: usize) -> NeonResult<Retur
                 Some(Node::Aliased(aliased)) => {
                     aliased.expr.binary(BinOper::As, Expr::col(aliased.alias))
                 }
-                _ => return refuse(cx, "a RETURNING item is an expression or an aliased one"),
+                _ => {
+                    return cx
+                        .throw_type_error("a RETURNING item is an expression or an aliased one");
+                }
             });
         }
         Query::returning().exprs(exprs)

@@ -1104,6 +1104,7 @@ assertions (
     {id migration-test-database-gate, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:17:27.556282Z}
     {id minimal-feature-build, kind @complete, author "brendan@necessary.nu", at 2026-09-06T12:31:55.569282Z}
     {id napi-addon-size, kind @complete, author "brendan@necessary.nu", at 2026-10-18T14:41:20.074691Z}
+    {id napi-binding-decisions, kind @complete, author "brendan@necessary.nu", at 2026-10-30T15:22:24.475936Z}
     {id napi-domain-entity-test, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:48:59.551771Z}
     {id napi-racing-fixture-timing, kind @complete, author "brendan@necessary.nu", at 2026-10-26T00:16:03.973045Z}
     {id napi-schema-statement-name, kind @complete, author "brendan@necessary.nu", at 2026-10-26T00:13:51.100898Z}
@@ -2237,16 +2238,18 @@ impl_evidence (
     )}
     {id python-schema-gaps, covered_rules (
         bindings.schema-alter
+        bindings.schema-api
         bindings.schema-indexes
         bindings.schema-sequences
         bindings.schema-tables
         bindings.schema-types
     ), covered_claims (
-        {impl_name main, rule bindings.schema-alter}
-        {impl_name main, rule bindings.schema-indexes}
-        {impl_name main, rule bindings.schema-sequences}
-        {impl_name main, rule bindings.schema-tables}
-        {impl_name main, rule bindings.schema-types}
+        {impl_name python, rule bindings.schema-alter}
+        {impl_name python, rule bindings.schema-api}
+        {impl_name python, rule bindings.schema-indexes}
+        {impl_name python, rule bindings.schema-sequences}
+        {impl_name python, rule bindings.schema-tables}
+        {impl_name python, rule bindings.schema-types}
     )}
     {id python-select-gaps, covered_rules (
         bindings.from-subqueries

@@ -2,8 +2,10 @@
 //! builder object boxes, an identifier, an operand that is an expression or a
 //! value to bind, a predicate, an ordering.
 //!
-//! Every refusal is a `ConstructionError` thrown as the builder method is
-//! called, so a statement that cannot be built never exists to be run.
+//! Every refusal is thrown as the builder method is called, so a statement
+//! that cannot be built never exists to be run: a `TypeError` for an
+//! argument of a type the method does not take, and a `ConstructionError`
+//! for one whose value cannot become what pgorm sends.
 
 use neon::{prelude::*, types::JsBigInt};
 use pgorm::pgorm_query::{
@@ -32,7 +34,7 @@ pub(crate) fn this<'cx>(cx: &mut FunctionContext<'cx>, index: usize) -> NeonResu
     let value = arg(cx, index);
     match node(cx, value) {
         Some(node) => Ok(node),
-        None => refuse(cx, "expected a statement or expression this module built"),
+        None => cx.throw_type_error("expected a statement or expression this module built"),
     }
 }
 
@@ -71,10 +73,7 @@ pub(crate) fn items<'cx>(
 /// minted into a `Name`, which renders quoted — never SQL.
 // [spec:pgorm:req:bindings.identifiers]
 pub(crate) fn name<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<Name> {
-    if !value.is_a::<JsString, _>(cx) {
-        return refuse(cx, "an identifier is a string");
-    }
-    let text = read::string(cx, value)?;
+    let text = read::text(cx, value, "an identifier")?;
     if text.is_empty() || text.len() > 63 || text.contains('\0') {
         return refuse(cx, "an identifier is 1–63 UTF-8 bytes without NUL");
     }
@@ -109,9 +108,9 @@ pub(crate) fn type_name<'cx>(
         return Ok(TypeName::new(name(cx, value)?));
     }
     let codec = Codec::get(cx)?;
-    match read::kind(cx, codec, value) {
-        Ok(Tag::Enum(named)) => Ok(rust_type(&named)),
-        _ => refuse(cx, "a type to cast to is a string or a TypeName"),
+    match read::named_type(cx, codec, value)? {
+        Some(named) => Ok(rust_type(&named)),
+        None => cx.throw_type_error("a type to cast to is a string or a TypeName"),
     }
 }
 
@@ -136,8 +135,28 @@ pub(crate) fn bound<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonRe
              Value.null(kind) for a typed NULL",
         );
     };
-    let expr = Expr::value(tagged.datum);
-    Ok(match tagged.tag {
+    Ok(typed(Expr::value(tagged.datum), tagged.tag))
+}
+
+/// A value written into the SQL text by pgorm-query's own rendering of a
+/// constant, read as `bound` reads it and cast as its kind needs. Only
+/// `literal()` asks for one; every other operand is bound.
+// [spec:pgorm:req:napi.pipeline-operands+2]
+pub(crate) fn literal<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonResult<SimpleExpr> {
+    let codec = Codec::get(cx)?;
+    let Some(tagged) = read::infer(cx, codec, data)? else {
+        return refuse(
+            cx,
+            "null has no kind to write: write literal(Value.null(kind)) for a typed NULL",
+        );
+    };
+    Ok(typed(SimpleExpr::Constant(tagged.datum), tagged.tag))
+}
+
+/// `expr` cast as a value of `tag` must be: an enum's label to the enum, a
+/// created range's text to its range type through `Expr::as_range`.
+fn typed(expr: SimpleExpr, tag: Tag) -> SimpleExpr {
+    match tag {
         Tag::Enum(named) => expr.cast_as_type(rust_type(&named)),
         Tag::Array(element) => match *element {
             Tag::Enum(named) => expr.cast_as_type(rust_type(&named).array()),
@@ -145,7 +164,7 @@ pub(crate) fn bound<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonRe
         },
         Tag::Created(kind) => Expr::expr(expr).as_range(rust_type(&kind.name)),
         Tag::Scalar(_) => expr,
-    })
+    }
 }
 
 /// An operand: an expression a builder made, or a value to bind.
@@ -192,9 +211,9 @@ pub(crate) fn expression<'cx>(
         Some(Node::Expr(expr)) => Ok(expr),
         Some(other) => {
             let what = other.describe();
-            refuse(cx, format!("expected an expression, got {what}"))
+            cx.throw_type_error(format!("expected an expression, got {what}"))
         }
-        None => refuse(cx, "expected an expression"),
+        None => cx.throw_type_error("expected an expression"),
     }
 }
 
@@ -220,12 +239,9 @@ pub(crate) fn predicate<'cx>(
         Some(Node::Expr(expr)) => Ok(expr.into_condition()),
         Some(other) => {
             let what = other.describe();
-            refuse(
-                cx,
-                format!("expected an expression or a Condition, got {what}"),
-            )
+            cx.throw_type_error(format!("expected an expression or a Condition, got {what}"))
         }
-        None => refuse(cx, "expected an expression or a Condition"),
+        None => cx.throw_type_error("expected an expression or a Condition"),
     }
 }
 
@@ -242,7 +258,7 @@ pub(crate) fn predicate_at<'cx>(
 pub(crate) fn ordering<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<Ordering> {
     match node(cx, value) {
         Some(Node::Ordering(ordering)) => Ok(ordering),
-        _ => refuse(cx, "an ordering is an expression's asc() or desc()"),
+        _ => cx.throw_type_error("an ordering is an expression's asc() or desc()"),
     }
 }
 
@@ -276,9 +292,9 @@ fn unchecked<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<S
         Some(Node::Select(select)) => Ok(select),
         Some(other) => {
             let what = other.describe();
-            refuse(cx, format!("expected a Select, got {what}"))
+            cx.throw_type_error(format!("expected a Select, got {what}"))
         }
-        None => refuse(cx, "expected a Select"),
+        None => cx.throw_type_error("expected a Select"),
     }
 }
 
@@ -327,16 +343,35 @@ pub(crate) fn choice<'cx>(
     choices: &[&'static str],
 ) -> NeonResult<&'static str> {
     let value = arg(cx, index);
+    let spelled: Vec<(&str, &'static str)> =
+        choices.iter().map(|choice| (*choice, *choice)).collect();
+    pick(cx, value, what, &spelled)
+}
+
+/// `value`, a string that is one of `choices`, given as `(spelling,
+/// meaning)`. A closed choice is a type, a union of string literals as
+/// Python's is a class of constants, so anything outside it is a
+/// `TypeError`.
+// [spec:pgorm:req:napi.argument-errors+2]
+pub(crate) fn pick<'cx, T: Clone>(
+    cx: &mut Cx<'cx>,
+    value: Handle<'cx, JsValue>,
+    what: &str,
+    choices: &[(&str, T)],
+) -> NeonResult<T> {
     let text = if value.is_a::<JsString, _>(cx) {
         Some(read::string(cx, value)?)
     } else {
         None
     };
-    match text.and_then(|text| choices.iter().copied().find(|choice| *choice == text)) {
-        Some(choice) => Ok(choice),
+    match text.and_then(|text| choices.iter().find(|(spelling, _)| *spelling == text)) {
+        Some((_, meaning)) => Ok(meaning.clone()),
         None => {
-            let quoted: Vec<String> = choices.iter().map(|choice| format!("{choice:?}")).collect();
-            refuse(cx, format!("{what} is one of {}", quoted.join(", ")))
+            let quoted: Vec<String> = choices
+                .iter()
+                .map(|(spelling, _)| format!("{spelling:?}"))
+                .collect();
+            cx.throw_type_error(format!("{what} is one of {}", quoted.join(", ")))
         }
     }
 }
@@ -354,6 +389,9 @@ pub(crate) fn flag<'cx>(cx: &mut FunctionContext<'cx>, index: usize) -> NeonResu
 /// `bigint`, within PostgreSQL's signed `bigint`.
 pub(crate) fn count<'cx>(cx: &mut FunctionContext<'cx>, index: usize) -> NeonResult<u64> {
     let value = arg(cx, index);
+    if !value.is_a::<JsNumber, _>(cx) && !value.is_a::<JsBigInt, _>(cx) {
+        return cx.throw_type_error("a row count is a number or a bigint");
+    }
     let counted = if let Ok(number) = value.downcast::<JsNumber, _>(cx) {
         let number = number.value(cx);
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]

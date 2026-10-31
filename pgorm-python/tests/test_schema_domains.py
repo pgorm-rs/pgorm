@@ -18,11 +18,7 @@ PREPARED_STATEMENT = (
     "FROM pg_prepared_statements WHERE starts_with(statement, $1)"
 )
 
-OPERATIONS = (
-    "create_domain", "set_domain_default", "drop_domain_default", "set_domain_not_null",
-    "drop_domain_not_null", "add_domain_check", "drop_domain_constraint",
-    "rename_domain_constraint", "validate_domain_constraint", "rename_domain", "drop_domain",
-)
+OPERATIONS = ("create_domain", "alter_domain", "drop_domain")
 
 
 class DomainConstruction(unittest.TestCase):
@@ -57,29 +53,29 @@ class DomainConstruction(unittest.TestCase):
         )
         prefix = 'ALTER DOMAIN "billing"."qty ""雪"""'
         for ddl, tail in (
-            (s.set_domain_default(name, 5), "SET DEFAULT 5"),
-            (s.drop_domain_default(name), "DROP DEFAULT"),
-            (s.set_domain_not_null(name), "SET NOT NULL"),
-            (s.drop_domain_not_null(name), "DROP NOT NULL"),
-            (s.add_domain_check(name, value > 0), "ADD CHECK (VALUE > 0)"),
+            (s.alter_domain(name).set_default(5), "SET DEFAULT 5"),
+            (s.alter_domain(name).drop_default(), "DROP DEFAULT"),
+            (s.alter_domain(name).set_not_null(), "SET NOT NULL"),
+            (s.alter_domain(name).drop_not_null(), "DROP NOT NULL"),
+            (s.alter_domain(name).add_check(value > 0), "ADD CHECK (VALUE > 0)"),
             (
-                s.add_domain_check(name, value < 9, name="small", not_valid=True),
+                s.alter_domain(name).add_check(value < 9, name="small", not_valid=True),
                 'ADD CONSTRAINT "small" CHECK (VALUE < 9) NOT VALID',
             ),
-            (s.drop_domain_constraint(name, "small"), 'DROP CONSTRAINT "small"'),
+            (s.alter_domain(name).drop_constraint("small"), 'DROP CONSTRAINT "small"'),
             (
-                s.drop_domain_constraint(name, "small", if_exists=True, cascade=True),
+                s.alter_domain(name).drop_constraint("small", if_exists=True, behavior="cascade"),
                 'DROP CONSTRAINT IF EXISTS "small" CASCADE',
             ),
-            (s.rename_domain_constraint(name, "small", "tiny"), 'RENAME CONSTRAINT "small" TO "tiny"'),
-            (s.validate_domain_constraint(name, "small"), 'VALIDATE CONSTRAINT "small"'),
-            (s.rename_domain(name, "units"), 'RENAME TO "units"'),
+            (s.alter_domain(name).rename_constraint("small", "tiny"), 'RENAME CONSTRAINT "small" TO "tiny"'),
+            (s.alter_domain(name).validate_constraint("small"), 'VALIDATE CONSTRAINT "small"'),
+            (s.alter_domain(name).rename_to("units"), 'RENAME TO "units"'),
         ):
             with self.subTest(tail=tail):
                 self.assertEqual(ddl.inspect().sql, f"{prefix} {tail}")
                 self.assertEqual(ddl.inspect().params, [])
         self.assertEqual(
-            s.drop_domain("a", name, p.Identifier("B"), if_exists=True, cascade=True).inspect().sql,
+            s.drop_domain(["a", name, p.Identifier("B")], if_exists=True, behavior="cascade").inspect().sql,
             'DROP DOMAIN IF EXISTS "a", "billing"."qty ""雪""", "B" CASCADE',
         )
         self.assertEqual(s.drop_domain("a").inspect().sql, 'DROP DOMAIN "a"')
@@ -90,26 +86,32 @@ class DomainConstruction(unittest.TestCase):
         for action in (
             lambda: s.create_domain("", "integer"),
             lambda: s.create_domain("x" * 64, "integer"),
-            lambda: s.create_domain(p.Table("t"), "integer"),
             lambda: s.create_domain("d", "integer").check("VALUE > 0"),
             lambda: s.create_domain("d", "integer").check(p.domain_value() > 0, name=""),
             lambda: s.create_domain("d", "text").collate(""),
             lambda: s.create_domain("d", "text").collate("C", schema="nul\0"),
-            lambda: s.add_domain_check("d", "VALUE > 0"),
-            lambda: s.drop_domain_constraint("d", ""),
-            lambda: s.rename_domain_constraint("d", "a", ""),
-            lambda: s.validate_domain_constraint("", "a"),
-            lambda: s.rename_domain("d", ""),
-            lambda: s.drop_domain("d", 3),
+            lambda: s.alter_domain("d").add_check("VALUE > 0"),
+            lambda: s.alter_domain("d").drop_constraint(""),
+            lambda: s.alter_domain("d").rename_constraint("a", ""),
+            lambda: s.alter_domain("").validate_constraint("a"),
+            lambda: s.alter_domain("d").rename_to(""),
+            lambda: s.drop_domain([]),
+            lambda: s.drop_domain("d", behavior="both"),
         ):
             with self.subTest(action=action), self.assertRaises(p.ConstructionError):
                 action()
         with self.assertRaises(p.UnsupportedCapabilityError):
             s.create_domain("d", "serial")
+        for action in (
+            lambda: s.drop_domain(),
+            lambda: s.drop_domain("d", "e"),
+            lambda: s.drop_domain(["d", 3]),
+            lambda: s.create_domain(p.Table("t"), "integer"),
+        ):
+            with self.subTest(action=action), self.assertRaises(TypeError):
+                action()
         with self.assertRaises(TypeError):
-            s.drop_domain()
-        with self.assertRaises(TypeError):
-            s.rename_domain("a", "b", if_exists=True)
+            s.alter_domain("a").rename_to("b", if_exists=True)
         with self.assertRaises(p.ConstructionError):
             bool(s.create_domain("d", "integer"))
         with self.assertRaises(p.ConstructionError):
@@ -129,7 +131,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         self.table = p.Table("line", schema=self.namespace)
 
     async def asyncTearDown(self):
-        await self.pool.execute(s.drop_schema(self.namespace, cascade=True))
+        await self.pool.execute(s.drop_schema(self.namespace, behavior="cascade"))
         await self.pool.close()
 
     async def refused(self, statement, sqlstate):
@@ -168,30 +170,30 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         # PostgreSQL's plan cache does not track a domain's default, so an
         # insert the connection prepared before ALTER DOMAIN keeps the default
         # it was planned with; each insert after one is a statement of its own.
-        await self.pool.execute(s.set_domain_default(self.domain, 9))
+        await self.pool.execute(s.alter_domain(self.domain).set_default(9))
         await self.pool.execute(p.insert(self.table).columns("id").values(3).returning(p.col("qty")))
-        await self.pool.execute(s.drop_domain_default(self.domain))
-        await self.pool.execute(s.drop_domain_not_null(self.domain))
+        await self.pool.execute(s.alter_domain(self.domain).drop_default())
+        await self.pool.execute(s.alter_domain(self.domain).drop_not_null())
         await self.pool.execute(p.insert(self.table).columns("id").values(4).returning(p.col("id")))
         self.assertEqual(await self.quantities(), [(1, 7), (2, 3), (3, 9), (4, None)])
-        await self.refused(s.set_domain_not_null(self.domain), "23502")
+        await self.refused(s.alter_domain(self.domain).set_not_null(), "23502")
         await self.pool.execute(p.delete(self.table).where(p.col("id") == 4))
-        await self.pool.execute(s.set_domain_not_null(self.domain))
+        await self.pool.execute(s.alter_domain(self.domain).set_not_null())
 
         value = p.domain_value()
-        await self.refused(s.add_domain_check(self.domain, value < 5, name="small"), "23514")
+        await self.refused(s.alter_domain(self.domain).add_check(value < 5, name="small"), "23514")
         await self.pool.execute(
-            s.add_domain_check(self.domain, value < 5, name="small", not_valid=True)
+            s.alter_domain(self.domain).add_check(value < 5, name="small", not_valid=True)
         )
         await self.refused(p.insert(self.table).columns("id", "qty").values(5, 6), "23514")
-        await self.refused(s.validate_domain_constraint(self.domain, "small"), "23514")
+        await self.refused(s.alter_domain(self.domain).validate_constraint("small"), "23514")
         await self.pool.execute(p.delete(self.table).where(p.col("qty") >= 5))
-        await self.pool.execute(s.validate_domain_constraint(self.domain, "small"))
+        await self.pool.execute(s.alter_domain(self.domain).validate_constraint("small"))
         self.assertEqual(await self.quantities(), [(2, 3)])
 
-        await self.pool.execute(s.rename_domain_constraint(self.domain, "small", 'tiny "雪"'))
-        await self.pool.execute(s.drop_domain_constraint(self.domain, 'tiny "雪"'))
-        await self.pool.execute(s.drop_domain_constraint(self.domain, 'tiny "雪"', if_exists=True))
+        await self.pool.execute(s.alter_domain(self.domain).rename_constraint("small", 'tiny "雪"'))
+        await self.pool.execute(s.alter_domain(self.domain).drop_constraint('tiny "雪"'))
+        await self.pool.execute(s.alter_domain(self.domain).drop_constraint('tiny "雪"', if_exists=True))
         await self.pool.execute(p.insert(self.table).columns("id", "qty").values(6, 60))
         self.assertEqual(await self.quantities(), [(2, 3), (6, 60)])
 
@@ -222,7 +224,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.pool.one(insert(1)))["qty"], 7)
         before = await self.prepared_statement(self.pool, insert(1))
         self.assertIsNotNone(before)
-        await self.pool.execute(s.set_domain_default(self.domain, 9))
+        await self.pool.execute(s.alter_domain(self.domain).set_default(9))
         await self.pool.one(insert(2))
         self.assertEqual(await self.prepared_statement(self.pool, insert(2)), before)
 
@@ -279,7 +281,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(written, 7)
             self.assertIsNotNone(kept)
 
-            await self.pool.execute(s.set_domain_default(self.domain, 9))
+            await self.pool.execute(s.alter_domain(self.domain).set_default(9))
             async with self.pool.connection() as connection:
                 await connection.notify(channel, "not read")
 
@@ -307,7 +309,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
     # column with it
     async def test_domain_renames_and_drops(self):
         await self.create()
-        await self.pool.execute(s.rename_domain(self.domain, 'units "雪"'))
+        await self.pool.execute(s.alter_domain(self.domain).rename_to('units "雪"'))
         renamed = p.TypeName('units "雪"', schema=self.namespace)
         typed = await self.pool.one(p.RawSQL(
             "SELECT format_type(atttypid, NULL) AS kind FROM pg_attribute "
@@ -316,7 +318,7 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
         ))
         self.assertTrue(typed["kind"].endswith('"units ""雪"""'), typed["kind"])
         await self.refused(s.drop_domain(renamed), "2BP01")
-        await self.pool.execute(s.drop_domain(renamed, cascade=True))
+        await self.pool.execute(s.drop_domain(renamed, behavior="cascade"))
         columns = await self.pool.query(p.RawSQL(
             "SELECT column_name AS name FROM information_schema.columns "
             "WHERE table_schema = $1 AND table_name = 'line'",
@@ -330,13 +332,13 @@ class DomainDatabase(unittest.IsolatedAsyncioTestCase):
     async def test_server_refusals_by_sqlstate(self):
         await self.create()
         await self.refused(s.create_domain(self.domain, "text"), "42710")
-        await self.refused(s.add_domain_check(self.domain, p.domain_value() > 1, name="positive"), "42710")
+        await self.refused(s.alter_domain(self.domain).add_check(p.domain_value() > 1, name="positive"), "42710")
         missing = p.TypeName("missing", schema=self.namespace)
-        await self.refused(s.set_domain_default(missing, 1), "42704")
+        await self.refused(s.alter_domain(missing).set_default(1), "42704")
         await self.refused(s.drop_domain(missing), "42704")
         await self.pool.execute(s.drop_domain(missing, if_exists=True))
-        await self.refused(s.drop_domain_constraint(self.domain, "absent"), "42704")
-        await self.refused(s.validate_domain_constraint(self.domain, "absent"), "42704")
+        await self.refused(s.alter_domain(self.domain).drop_constraint("absent"), "42704")
+        await self.refused(s.alter_domain(self.domain).validate_constraint("absent"), "42704")
         await self.refused(
             s.create_domain(p.TypeName("collated", schema=self.namespace), "integer").collate("C"),
             "42804",

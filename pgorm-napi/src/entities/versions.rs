@@ -135,7 +135,7 @@ fn upserts_job(mut cx: FunctionContext) -> JsResult<JsBox<JobHandle>> {
         Some(Box::new(match statements::node(&mut cx, conflict) {
             Some(Node::Conflict(conflict)) => conflict,
             Some(Node::ConflictUpdate(update)) => update.into(),
-            _ => return read::refuse(&mut cx, "onConflict takes a Conflict action"),
+            _ => return cx.throw_type_error("onConflict takes a Conflict action"),
         }))
     };
     let one = cx.argument::<JsBoolean>(3)?.value(&mut cx);

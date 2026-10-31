@@ -33,7 +33,7 @@ fn columns(
     for column in items(cx, value)? {
         match node(cx, column) {
             Some(Node::JsonTableColumn(column)) => columns.push(column),
-            _ => return refuse(cx, "JSON_TABLE's columns are JsonTableColumn's"),
+            _ => return cx.throw_type_error("JSON_TABLE's columns are JsonTableColumn's"),
         }
     }
     if columns.is_empty() {
@@ -162,8 +162,7 @@ fn json_table(cx: &mut FunctionContext) -> NeonResult<Node> {
     let (first, rest) = columns(cx, 2)?;
     let alias = arg(cx, 3);
     if absent(cx, alias) {
-        return refuse(
-            cx,
+        return cx.throw_type_error(
             "JSON_TABLE needs its alias, as every FROM item that is not a table does",
         );
     }

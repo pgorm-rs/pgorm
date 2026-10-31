@@ -15,7 +15,7 @@
 
 // [spec:pgorm:req:napi.typing+1]
 // [spec:pgorm:req:bindings.schema]
-// [spec:pgorm:req:napi.schema-api+3]
+// [spec:pgorm:req:bindings.schema-api]
 
 import type { CreatedMultirange, CreatedRange, TypeName } from "./index.d.ts";
 import type { Builder, Expr, Operand, Predicate } from "./expressions.d.ts";

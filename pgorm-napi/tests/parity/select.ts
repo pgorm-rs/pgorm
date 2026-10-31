@@ -22,6 +22,7 @@ import {
   exists,
   groupingSet,
   groupingSets,
+  literal,
   rollup,
   scalar,
   select,
@@ -164,6 +165,19 @@ export const cases: Record<string, () => Builder> = {
       bind(true),
       bind([1, 2, 3]),
     ),
+  "literals": () =>
+    select(
+      literal(7).add(3),
+      literal("O'Brien"),
+      literal(new Value("calm", new TypeName("mood", { schema: "app" }))),
+      literal(Value.array(new TypeName("mood"), ["calm", "glad"])),
+      literal(new Decimal("19.9900")),
+      literal(new Uuid("0190a7a6-8c8e-7000-8000-000000000001")),
+      literal(Temporal.PlainDate.from("2026-10-09")),
+      literal(true),
+      literal([1, 2, 3]),
+      literal(Value.null("i32")),
+    ).from(t).where(col("name").eq(literal("x")).and(col("id").gt(2))),
   "functions": () =>
     select(
       call("lower", col("a")),

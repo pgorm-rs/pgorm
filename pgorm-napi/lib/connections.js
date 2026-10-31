@@ -4,13 +4,13 @@
 // releases what it holds when closed — `close()`, `await using`, the end of a
 // callback — never by waiting for garbage collection.
 // [spec:pgorm:req:bindings.connections]
-// [spec:pgorm:req:napi.lifecycle]
+// [spec:pgorm:req:napi.lifecycle+2]
 // [spec:pgorm:req:bindings.results]
 // [spec:pgorm:req:napi.raw]
 // [spec:pgorm:req:bindings.transactions]
 // [spec:pgorm:req:napi.transactions+3]
 // [spec:pgorm:req:bindings.copy]
-// [spec:pgorm:req:bindings.listen]
+// [spec:pgorm:req:bindings.listen+2]
 
 import { statementArgs } from "./builder.js";
 import { COPY, CopyRunner } from "./copy.js";

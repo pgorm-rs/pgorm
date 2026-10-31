@@ -41,9 +41,9 @@ use pgorm::pgorm_query::{
 };
 
 use crate::{codec::Codec, errors::throw, rows, values::Tagged};
-pub(crate) use args::node;
 use args::refuse;
 pub(crate) use args::select as embedded_select;
+pub(crate) use args::{node, pick};
 pub(crate) use copy::{CopyFrom, CopyTo, copy_from_at, copy_to_at};
 pub(crate) use schema::Ddl;
 
@@ -237,17 +237,16 @@ pub(crate) fn compile<'cx>(cx: &mut Cx<'cx>, node: &Node) -> NeonResult<(String,
         // [spec:pgorm:req:bindings.copy]
         Node::Copy(copy) => {
             let what = copy.describe();
-            return refuse(
-                cx,
-                format!("{what} runs through copyIn(..) or copyOut(..), which carry its data"),
-            );
+            return cx.throw_type_error(format!(
+                "{what} runs through copyIn(..) or copyOut(..), which carry its data"
+            ));
         }
         other => match write::built(other) {
             Some(Ok(built)) => built,
             Some(Err(reason)) => return refuse(cx, reason),
             None => {
                 let what = other.describe();
-                return refuse(cx, format!("{what} is not a statement to run"));
+                return cx.throw_type_error(format!("{what} is not a statement to run"));
             }
         },
     };

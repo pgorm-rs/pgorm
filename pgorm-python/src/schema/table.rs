@@ -1,150 +1,160 @@
+//! `CREATE TABLE` with its columns, keys, foreign keys and `CHECK`s; the
+//! statements that drop, rename and empty a table; and comments.
+
 use super::{
+    args::{self, relation, relations, text},
     column::{self, PyColumnDef},
-    statement::{PyDDL, Statement},
-};
-use crate::{
-    errors::ConstructionError, expressions, expressions::Compiled, identifiers::PyIdentifier,
-    statements::PyTable,
+    drops::drop_list,
+    keys::{self, ForeignKeyOptions},
+    statement::{PyDDL, Statement, ddl_class},
 };
 use pgorm::pgorm_query::{
-    ConstraintChange, ConstraintDrop, NotNullConstraint, Table, TableCreateStatement, TableKey,
-    TableName, Unique, Values,
+    Comment, ConstraintRenameStatement, Primary, Table, TableCreateStatement, Unique,
 };
-use pyo3::{prelude::*, types::PyTuple};
+use pyo3::prelude::*;
 
-pub(super) fn table_name(table: &PyTable) -> PyResult<TableName> {
-    if table.inner.alias.is_some() {
-        return Err(ConstructionError::new_err(
-            "DDL table targets cannot have an alias",
-        ));
-    }
-    Ok(table.inner.name.clone())
-}
+/// `CREATE TABLE`; every method gives a new statement.
+#[derive(Debug)]
+#[pyclass(name = "CreateTable", module = "pgorm.schema", frozen, extends = PyDDL)]
+pub struct PyCreateTable;
 
-#[derive(Clone, Debug)]
-#[pyclass(name = "CreateTable", module = "pgorm.schema", frozen, from_py_object)]
-pub struct PyCreateTable {
-    pub(crate) inner: TableCreateStatement,
-}
+ddl_class!(PyCreateTable, CreateTable, TableCreateStatement, with);
 
 #[pymethods]
 impl PyCreateTable {
     // [spec:pgorm:req:bindings.schema-tables]
     #[new]
-    fn new(table: &PyTable) -> PyResult<Self> {
-        Ok(Self {
-            inner: Table::create(table_name(table)?),
+    fn new(table: &Bound<'_, PyAny>) -> PyResult<PyClassInitializer<Self>> {
+        let statement = Statement::CreateTable(Table::create(relation(table)?));
+        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
+    }
+
+    /// A column, which needs its type.
+    fn column<'py>(slf: &Bound<'py, Self>, column: &PyColumnDef) -> PyResult<Bound<'py, Self>> {
+        let column = column.typed("a column a table is created with")?;
+        Self::with(slf, |statement| {
+            statement.col(column);
         })
     }
 
-    fn column(&self, column: &PyColumnDef) -> Self {
-        let mut inner = self.inner.clone();
-        inner.col(column.inner.clone());
-        Self { inner }
+    fn if_not_exists<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, Self>> {
+        let mut statement = Self::statement(slf)?;
+        statement.if_not_exists();
+        Self::object(slf.py(), statement)
     }
 
-    fn if_not_exists(&self) -> Self {
-        let mut inner = self.inner.clone();
-        inner.if_not_exists();
-        Self { inner }
-    }
-
-    #[pyo3(signature=(first, *rest, without_overlaps=None))]
-    // A table has one primary key: a later call replaces the key an earlier
-    // one declared, as the native builder's one slot does.
+    /// The table's one primary key: a later call replaces the key an earlier
+    /// one declared, as the native builder's one slot does.
     // [spec:pgorm:req:bindings.schema-tables]
-    fn primary_key(
-        &self,
-        first: &Bound<'_, PyAny>,
-        rest: &Bound<'_, PyTuple>,
-        without_overlaps: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<Self> {
-        let key = key_columns(first, rest, without_overlaps)?;
-        let mut inner = self.inner.clone();
-        inner.primary_key(key);
-        Ok(Self { inner })
-    }
-
-    #[pyo3(signature=(first, *rest, name=None, nulls_not_distinct=false, without_overlaps=None))]
-    fn unique(
-        &self,
-        first: &Bound<'_, PyAny>,
-        rest: &Bound<'_, PyTuple>,
+    #[pyo3(signature=(columns, *, name=None, include=None, deferrability=None, without_overlaps=None))]
+    fn primary_key<'py>(
+        slf: &Bound<'py, Self>,
+        columns: &Bound<'_, PyAny>,
         name: Option<&Bound<'_, PyAny>>,
-        nulls_not_distinct: bool,
+        include: Option<&Bound<'_, PyAny>>,
+        deferrability: Option<&str>,
         without_overlaps: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<Self> {
-        let key = unique_key(first, rest, name, nulls_not_distinct, without_overlaps)?;
-        let mut inner = self.inner.clone();
-        inner.unique(key);
-        Ok(Self { inner })
+    ) -> PyResult<Bound<'py, Self>> {
+        let key = keys::key::<Primary>(columns, name, include, deferrability, without_overlaps)?;
+        Self::with(slf, |statement| {
+            statement.primary_key(key);
+        })
     }
 
-    #[pyo3(signature=(condition, *, name=None, not_enforced=false, no_inherit=false))]
-    fn check(
-        &self,
+    #[pyo3(signature=(columns, *, name=None, include=None, deferrability=None, without_overlaps=None, nulls_not_distinct=false))]
+    #[allow(clippy::too_many_arguments)]
+    fn unique<'py>(
+        slf: &Bound<'py, Self>,
+        columns: &Bound<'_, PyAny>,
+        name: Option<&Bound<'_, PyAny>>,
+        include: Option<&Bound<'_, PyAny>>,
+        deferrability: Option<&str>,
+        without_overlaps: Option<&Bound<'_, PyAny>>,
+        nulls_not_distinct: bool,
+    ) -> PyResult<Bound<'py, Self>> {
+        let key = keys::key::<Unique>(columns, name, include, deferrability, without_overlaps)?;
+        let key = keys::unique(key, nulls_not_distinct);
+        Self::with(slf, |statement| {
+            statement.unique(key);
+        })
+    }
+
+    /// Columns paired in order with as many columns of the table they
+    /// reference.
+    // [spec:pgorm:req:bindings.schema-tables]
+    #[pyo3(signature=(columns, references, ref_columns, *, name=None, on_delete=None, on_update=None, deferrability=None, enforcement=None, period=None))]
+    #[allow(clippy::too_many_arguments)]
+    fn foreign_key<'py>(
+        slf: &Bound<'py, Self>,
+        columns: &Bound<'_, PyAny>,
+        references: &Bound<'_, PyAny>,
+        ref_columns: &Bound<'_, PyAny>,
+        name: Option<&Bound<'_, PyAny>>,
+        on_delete: Option<&str>,
+        on_update: Option<&str>,
+        deferrability: Option<&str>,
+        enforcement: Option<&str>,
+        period: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Bound<'py, Self>> {
+        let table = Self::statement(slf)?.get_table_name().clone();
+        let options = ForeignKeyOptions {
+            name,
+            on_delete,
+            on_update,
+            deferrability,
+            enforcement,
+            period,
+        };
+        let key = keys::foreign_key(table, columns, references, ref_columns, options)?;
+        Self::with(slf, |statement| {
+            statement.foreign_key(key);
+        })
+    }
+
+    #[pyo3(signature=(condition, *, name=None, enforcement=None, no_inherit=false))]
+    fn check<'py>(
+        slf: &Bound<'py, Self>,
         condition: &Bound<'_, PyAny>,
         name: Option<&Bound<'_, PyAny>>,
-        not_enforced: bool,
+        enforcement: Option<&str>,
         no_inherit: bool,
-    ) -> PyResult<Self> {
-        let mut inner = self.inner.clone();
-        inner.check(column::check(condition, name, not_enforced, no_inherit)?);
-        Ok(Self { inner })
-    }
-
-    pub fn inspect(&self) -> Compiled {
-        Compiled {
-            sql: self.inner.to_string(),
-            values: Values(Vec::new()),
-        }
-    }
-
-    fn __bool__(&self) -> PyResult<bool> {
-        Err(ConstructionError::new_err(
-            "SQL statements cannot be tested as Python booleans",
-        ))
+    ) -> PyResult<Bound<'py, Self>> {
+        let check = column::check(condition, name, enforcement, no_inherit)?;
+        Self::with(slf, |statement| {
+            statement.check(check);
+        })
     }
 }
 
+/// `DROP TABLE` over one table or a non-empty list of them.
+// [spec:pgorm:req:bindings.schema-tables]
 #[pyfunction]
-#[pyo3(signature=(table, *, if_exists=false, cascade=false))]
-pub(super) fn drop_table(table: &PyTable, if_exists: bool, cascade: bool) -> PyResult<PyDDL> {
-    let mut inner = Table::drop(table_name(table)?);
-    if if_exists {
-        inner.if_exists();
-    }
-    if cascade {
-        inner.cascade();
-    }
-    Ok(PyDDL {
-        inner: Statement::DropTable(inner),
-    })
+#[pyo3(signature=(tables, *, if_exists=false, behavior=None))]
+pub(super) fn drop_table(
+    tables: &Bound<'_, PyAny>,
+    if_exists: bool,
+    behavior: Option<&str>,
+) -> PyResult<PyDDL> {
+    let drop = drop_list(relations(tables)?, if_exists, behavior)?;
+    Ok(PyDDL::new(Statement::DropTable(drop)))
 }
 
+/// `RENAME TO`: the new name is bare, a rename leaving the table in its
+/// schema.
 #[pyfunction]
-pub(super) fn rename_table(table: &PyTable, name: &Bound<'_, PyAny>) -> PyResult<PyDDL> {
-    Ok(PyDDL {
-        inner: Statement::RenameTable(Table::rename(
-            table_name(table)?,
-            PyIdentifier::new(name)?.name(),
-        )),
-    })
+pub(super) fn rename_table(table: &Bound<'_, PyAny>, name: &Bound<'_, PyAny>) -> PyResult<PyDDL> {
+    let renamed = Table::rename(relation(table)?, args::name(name)?);
+    Ok(PyDDL::new(Statement::RenameTable(renamed)))
 }
 
 #[pyfunction]
 pub(super) fn rename_column(
-    table: &PyTable,
+    table: &Bound<'_, PyAny>,
     name: &Bound<'_, PyAny>,
     new_name: &Bound<'_, PyAny>,
 ) -> PyResult<PyDDL> {
-    Ok(PyDDL {
-        inner: Statement::RenameColumn(Table::rename_column(
-            table_name(table)?,
-            PyIdentifier::new(name)?.name(),
-            PyIdentifier::new(new_name)?.name(),
-        )),
-    })
+    let renamed = Table::rename_column(relation(table)?, args::name(name)?, args::name(new_name)?);
+    Ok(PyDDL::new(Statement::RenameColumn(renamed)))
 }
 
 /// `ALTER TABLE ... RENAME CONSTRAINT ... TO ...`: a constraint of any kind,
@@ -152,289 +162,42 @@ pub(super) fn rename_column(
 // [spec:pgorm:req:bindings.schema-tables]
 #[pyfunction]
 pub(super) fn rename_constraint(
-    table: &PyTable,
+    table: &Bound<'_, PyAny>,
     name: &Bound<'_, PyAny>,
     new_name: &Bound<'_, PyAny>,
 ) -> PyResult<PyDDL> {
-    Ok(PyDDL {
-        inner: Statement::RenameConstraint(Table::rename_constraint(
-            table_name(table)?,
-            PyIdentifier::new(name)?.name(),
-            PyIdentifier::new(new_name)?.name(),
-        )),
-    })
+    let renamed =
+        ConstraintRenameStatement::new(relation(table)?, args::name(name)?, args::name(new_name)?);
+    Ok(PyDDL::new(Statement::RenameConstraint(renamed)))
 }
 
 #[pyfunction]
-pub(super) fn truncate_table(table: &PyTable) -> PyResult<PyDDL> {
-    Ok(PyDDL {
-        inner: Statement::Truncate(Table::truncate(table_name(table)?)),
-    })
+pub(super) fn truncate_table(table: &Bound<'_, PyAny>) -> PyResult<PyDDL> {
+    let truncate = Table::truncate(relation(table)?);
+    Ok(PyDDL::new(Statement::Truncate(truncate)))
 }
 
+/// `COMMENT ON TABLE`: the text a literal pgorm-query escapes.
+// [spec:pgorm:req:bindings.schema-sequences]
 #[pyfunction]
-#[pyo3(signature=(table, column, *, if_not_exists=false))]
-pub(super) fn add_column(
-    table: &PyTable,
-    column: &PyColumnDef,
-    if_not_exists: bool,
+pub(super) fn comment_on_table(
+    table: &Bound<'_, PyAny>,
+    text: &Bound<'_, PyAny>,
 ) -> PyResult<PyDDL> {
-    let pending = Table::alter(table_name(table)?);
-    let ready = if if_not_exists {
-        pending.add_column_if_not_exists(column.inner.clone())
-    } else {
-        pending.add_column(column.inner.clone())
-    };
-    Ok(PyDDL {
-        inner: Statement::AlterTable(ready),
-    })
+    let comment = Comment::on_table(relation(table)?, self::text(text, "a comment")?);
+    Ok(PyDDL::new(Statement::Comment(comment)))
 }
 
 #[pyfunction]
-pub(super) fn modify_column(table: &PyTable, column: &PyColumnDef) -> PyResult<PyDDL> {
-    Ok(PyDDL {
-        inner: Statement::AlterTable(
-            Table::alter(table_name(table)?).modify_column(column.inner.clone()),
-        ),
-    })
-}
-
-/// A key over `first` and `rest`, in order, ending `without_overlaps WITHOUT
-/// OVERLAPS` when one is given: the period column is the native key's own
-/// last slot, so it is written after every other column.
-fn key_columns<K>(
-    first: &Bound<'_, PyAny>,
-    rest: &Bound<'_, PyTuple>,
-    without_overlaps: Option<&Bound<'_, PyAny>>,
-) -> PyResult<TableKey<K>> {
-    let mut key = TableKey::new(PyIdentifier::new(first)?.name());
-    for column in rest {
-        key = key.col(PyIdentifier::new(&column)?.name());
-    }
-    if let Some(period) = without_overlaps {
-        key = key.without_overlaps(PyIdentifier::new(period)?.name());
-    }
-    Ok(key)
-}
-
-/// A unique key: [`key_columns`], with the unique kind's name and
-/// `NULLS NOT DISTINCT`.
-fn unique_key(
-    first: &Bound<'_, PyAny>,
-    rest: &Bound<'_, PyTuple>,
-    name: Option<&Bound<'_, PyAny>>,
-    nulls_not_distinct: bool,
-    without_overlaps: Option<&Bound<'_, PyAny>>,
-) -> PyResult<TableKey<Unique>> {
-    let mut key = key_columns(first, rest, without_overlaps)?;
-    if nulls_not_distinct {
-        key = key.nulls_not_distinct();
-    }
-    if let Some(name) = name {
-        key = key.name(PyIdentifier::new(name)?.name());
-    }
-    Ok(key)
-}
-
-/// `ALTER TABLE ... ADD PRIMARY KEY (...)`: the key `CreateTable.primary_key`
-/// declares, added to a table that exists.
-// [spec:pgorm:req:bindings.schema-alter]
-// [spec:pgorm:req:python.schema-api+2]
-#[pyfunction]
-#[pyo3(signature=(table, first, *rest, without_overlaps=None))]
-pub(super) fn add_primary_key(
-    table: &PyTable,
-    first: &Bound<'_, PyAny>,
-    rest: &Bound<'_, PyTuple>,
-    without_overlaps: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyDDL> {
-    let key = key_columns(first, rest, without_overlaps)?;
-    Ok(PyDDL {
-        inner: Statement::AlterTable(Table::alter(table_name(table)?).add_primary_key(key)),
-    })
-}
-
-/// `ALTER TABLE ... ADD UNIQUE (...)`: the key `CreateTable.unique` declares,
-/// added to a table that exists.
-// [spec:pgorm:req:bindings.schema-alter]
-#[pyfunction]
-#[pyo3(signature=(table, first, *rest, name=None, nulls_not_distinct=false, without_overlaps=None))]
-pub(super) fn add_unique(
-    table: &PyTable,
-    first: &Bound<'_, PyAny>,
-    rest: &Bound<'_, PyTuple>,
-    name: Option<&Bound<'_, PyAny>>,
-    nulls_not_distinct: bool,
-    without_overlaps: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyDDL> {
-    let key = unique_key(first, rest, name, nulls_not_distinct, without_overlaps)?;
-    Ok(PyDDL {
-        inner: Statement::AlterTable(Table::alter(table_name(table)?).add_unique(key)),
-    })
-}
-
-#[pyfunction]
-pub(super) fn drop_column(table: &PyTable, name: &Bound<'_, PyAny>) -> PyResult<PyDDL> {
-    Ok(PyDDL {
-        inner: Statement::AlterTable(
-            Table::alter(table_name(table)?).drop_column(PyIdentifier::new(name)?.name()),
-        ),
-    })
-}
-
-/// `ALTER TABLE ... ALTER COLUMN ... SET EXPRESSION AS (...)`: a generated
-/// column's new expression, which the rows already written take.
-// [spec:pgorm:req:bindings.schema-alter]
-#[pyfunction]
-pub(super) fn set_expression(
-    table: &PyTable,
-    name: &Bound<'_, PyAny>,
-    expression: &Bound<'_, PyAny>,
-) -> PyResult<PyDDL> {
-    Ok(PyDDL {
-        inner: Statement::AlterTable(Table::alter(table_name(table)?).set_expression(
-            PyIdentifier::new(name)?.name(),
-            expressions::require_expr(expression)?.inner,
-        )),
-    })
-}
-
-/// `ALTER TABLE ... ALTER COLUMN ... DROP EXPRESSION [IF EXISTS]`: a stored
-/// generated column made plain, keeping its values.
-// [spec:pgorm:req:bindings.schema-alter]
-#[pyfunction]
-#[pyo3(signature=(table, name, *, if_exists=false))]
-pub(super) fn drop_expression(
-    table: &PyTable,
-    name: &Bound<'_, PyAny>,
-    if_exists: bool,
-) -> PyResult<PyDDL> {
-    let pending = Table::alter(table_name(table)?);
-    let column = PyIdentifier::new(name)?.name();
-    let ready = if if_exists {
-        pending.drop_expression_if_exists(column)
-    } else {
-        pending.drop_expression(column)
-    };
-    Ok(PyDDL {
-        inner: Statement::AlterTable(ready),
-    })
-}
-
-/// `ALTER TABLE ... ADD [CONSTRAINT ...] NOT NULL ... [NO INHERIT] [NOT VALID]`:
-/// a not-null constraint over one column, the spelling that can leave the rows
-/// already there for `validate_constraint` to check.
-// [spec:pgorm:req:bindings.schema-alter]
-#[pyfunction]
-#[pyo3(signature=(table, column, *, name=None, no_inherit=false, not_valid=false))]
-pub(super) fn add_not_null(
-    table: &PyTable,
+pub(super) fn comment_on_column(
+    table: &Bound<'_, PyAny>,
     column: &Bound<'_, PyAny>,
-    name: Option<&Bound<'_, PyAny>>,
-    no_inherit: bool,
-    not_valid: bool,
+    text: &Bound<'_, PyAny>,
 ) -> PyResult<PyDDL> {
-    let mut constraint = NotNullConstraint::new(PyIdentifier::new(column)?.name());
-    if let Some(name) = name {
-        constraint = constraint.name(PyIdentifier::new(name)?.name());
-    }
-    if no_inherit {
-        constraint = constraint.no_inherit();
-    }
-    if not_valid {
-        constraint = constraint.not_valid();
-    }
-    Ok(PyDDL {
-        inner: Statement::AlterTable(Table::alter(table_name(table)?).add_not_null(constraint)),
-    })
-}
-
-/// `ALTER TABLE ... ADD [CONSTRAINT ...] CHECK (...) [NO INHERIT] [NOT
-/// ENFORCED] [NOT VALID]`: the constraint `CreateTable.check` declares, added
-/// to a table that exists, and with `not_valid` leaving the rows already
-/// there unchecked.
-// [spec:pgorm:req:bindings.schema-alter]
-#[pyfunction]
-#[pyo3(signature=(table, condition, *, name=None, not_enforced=false, no_inherit=false, not_valid=false))]
-pub(super) fn add_check(
-    table: &PyTable,
-    condition: &Bound<'_, PyAny>,
-    name: Option<&Bound<'_, PyAny>>,
-    not_enforced: bool,
-    no_inherit: bool,
-    not_valid: bool,
-) -> PyResult<PyDDL> {
-    let check = column::check(condition, name, not_enforced, no_inherit)?;
-    let pending = Table::alter(table_name(table)?);
-    let added = if not_valid {
-        pending.add_check(check.not_valid())
-    } else {
-        pending.add_check(check)
-    };
-    Ok(PyDDL {
-        inner: Statement::AlterTable(added),
-    })
-}
-
-/// `ALTER TABLE ... VALIDATE CONSTRAINT ...`: the rows a `NOT VALID`
-/// constraint skipped, checked now.
-// [spec:pgorm:req:bindings.schema-alter]
-#[pyfunction]
-pub(super) fn validate_constraint(table: &PyTable, name: &Bound<'_, PyAny>) -> PyResult<PyDDL> {
-    Ok(PyDDL {
-        inner: Statement::AlterTable(
-            Table::alter(table_name(table)?).validate_constraint(PyIdentifier::new(name)?.name()),
-        ),
-    })
-}
-
-/// `ALTER TABLE ... DROP CONSTRAINT [IF EXISTS] ... [CASCADE]`: a constraint
-/// of any kind, dropped by name.
-// [spec:pgorm:req:bindings.schema-alter]
-#[pyfunction]
-#[pyo3(signature=(table, name, *, if_exists=false, cascade=false))]
-pub(super) fn drop_constraint(
-    table: &PyTable,
-    name: &Bound<'_, PyAny>,
-    if_exists: bool,
-    cascade: bool,
-) -> PyResult<PyDDL> {
-    let mut drop = ConstraintDrop::new(PyIdentifier::new(name)?.name());
-    if if_exists {
-        drop = drop.if_exists();
-    }
-    if cascade {
-        drop = drop.cascade();
-    }
-    Ok(PyDDL {
-        inner: Statement::AlterTable(Table::alter(table_name(table)?).drop_constraint(drop)),
-    })
-}
-
-/// `ALTER TABLE ... ALTER CONSTRAINT ... <change>`, the change named as the
-/// native `ConstraintChange` variant is.
-// [spec:pgorm:req:bindings.schema-alter]
-#[pyfunction]
-pub(super) fn alter_constraint(
-    table: &PyTable,
-    name: &Bound<'_, PyAny>,
-    change: &str,
-) -> PyResult<PyDDL> {
-    let change = match change {
-        "inherit" => ConstraintChange::Inherit,
-        "no_inherit" => ConstraintChange::NoInherit,
-        "enforced" => ConstraintChange::Enforced,
-        "not_enforced" => ConstraintChange::NotEnforced,
-        _ => {
-            return Err(ConstructionError::new_err(
-                "a constraint change is 'inherit', 'no_inherit', 'enforced' or 'not_enforced'",
-            ));
-        }
-    };
-    Ok(PyDDL {
-        inner: Statement::AlterTable(
-            Table::alter(table_name(table)?)
-                .alter_constraint(PyIdentifier::new(name)?.name(), change),
-        ),
-    })
+    let comment = Comment::on_column(
+        relation(table)?,
+        args::name(column)?,
+        self::text(text, "a comment")?,
+    );
+    Ok(PyDDL::new(Statement::Comment(comment)))
 }

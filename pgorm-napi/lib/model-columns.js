@@ -32,7 +32,7 @@ let keyOf;
  */
 function flag(flag, what) {
   if (flag === undefined) return false;
-  if (typeof flag !== "boolean") throw new ConstructionError(`a column's ${what} is a boolean`);
+  if (typeof flag !== "boolean") throw new TypeError(`a column's ${what} is a boolean`);
   return flag;
 }
 
@@ -54,9 +54,10 @@ function named(kind) {
 function labels(values, kind) {
   if (values === undefined) return null;
   if (!(kind instanceof TypeName)) throw new ConstructionError("only an enum column lists its values");
-  if (!Array.isArray(values) || values.length === 0 || !values.every((label) => typeof label === "string")) {
-    throw new ConstructionError("an enum column's values are a non-empty list of strings");
+  if (!Array.isArray(values) || !values.every((label) => typeof label === "string")) {
+    throw new TypeError("an enum column's values are a list of strings");
   }
+  if (values.length === 0) throw new ConstructionError("an enum column lists at least one value");
   if (new Set(values).size !== values.length) throw new ConstructionError("an enum column lists each value once");
   return Object.freeze([...values]);
 }
@@ -79,7 +80,7 @@ export class Column {
     if (token !== DECLARED) throw new TypeError("a Column is made by column(kind, options)");
     if (typeof options !== "object" || options === null) throw new TypeError("a column's options are an object");
     for (const option of Object.keys(options)) {
-      if (!OPTIONS.has(option)) throw new ConstructionError(`${JSON.stringify(option)} is no column option`);
+      if (!OPTIONS.has(option)) throw new TypeError(`${JSON.stringify(option)} is no column option`);
     }
     const declared = /** @type {Record<string, unknown>} */ (options);
     if (typeof kind === "string") {
@@ -93,12 +94,12 @@ export class Column {
         );
       }
     } else {
-      throw new ConstructionError("a column's kind is a kind name, a TypeName, a CreatedRange or a CreatedMultirange");
+      throw new TypeError("a column's kind is a kind name, a TypeName, a CreatedRange or a CreatedMultirange");
     }
     /** @readonly */
     this.kind = kind;
     if (declared.name !== undefined && typeof declared.name !== "string") {
-      throw new ConstructionError("a column's name is a string");
+      throw new TypeError("a column's name is a string");
     }
     /** @readonly @type {string | null} */
     this.name = declared.name ?? null;
@@ -112,7 +113,7 @@ export class Column {
     this.default = flag(declared.default, "default");
     const generated = declared.generated ?? null;
     if (generated !== null && generated !== "always" && generated !== "byDefault") {
-      throw new ConstructionError('a column is generated "always" or "byDefault"');
+      throw new TypeError('a column is generated "always" or "byDefault"');
     }
     /** @readonly @type {"always" | "byDefault" | null} */
     this.generated = generated;

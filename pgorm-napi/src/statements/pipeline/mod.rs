@@ -141,7 +141,7 @@ pub(super) fn compile<'cx>(cx: &mut Cx<'cx>, part: &Part) -> NeonResult<(String,
         ),
         other => {
             let what = other.describe();
-            refuse(cx, format!("{what} is not a statement to run"))
+            cx.throw_type_error(format!("{what} is not a statement to run"))
         }
     }
 }

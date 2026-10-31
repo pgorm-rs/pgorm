@@ -68,7 +68,7 @@ macro_rules! on_view {
                 view.$method($($arg),*);
                 Ok(Ddl::CreateRecursiveView(view).into())
             }
-            _ => refuse($cx, $why),
+            _ => $cx.throw_type_error($why),
         }
     };
 }
@@ -159,11 +159,10 @@ fn view_check_option(cx: &mut FunctionContext) -> NeonResult<Node> {
             view.check_option(option);
             Ok(Ddl::CreateView(view).into())
         }
-        Ddl::CreateRecursiveView(_) => refuse(
-            cx,
+        Ddl::CreateRecursiveView(_) => cx.throw_type_error(
             "a recursive view takes no check option: PostgreSQL refuses WITH CHECK OPTION there",
         ),
-        _ => refuse(cx, "a check option belongs to a view"),
+        _ => cx.throw_type_error("a check option belongs to a view"),
     }
 }
 
@@ -236,9 +235,7 @@ fn relation_if_not_exists(cx: &mut FunctionContext) -> NeonResult<Node> {
             create.if_not_exists();
             Ok(Ddl::CreateTableAs(create).into())
         }
-        _ => refuse(
-            cx,
-            "IF NOT EXISTS belongs to a materialized view or CREATE TABLE AS: PostgreSQL has none for a view",
+        _ => cx.throw_type_error("IF NOT EXISTS belongs to a materialized view or CREATE TABLE AS: PostgreSQL has none for a view",
         ),
     }
 }
@@ -253,10 +250,7 @@ fn relation_with_no_data(cx: &mut FunctionContext) -> NeonResult<Node> {
             create.with_no_data();
             Ok(Ddl::CreateTableAs(create).into())
         }
-        _ => refuse(
-            cx,
-            "WITH NO DATA belongs to a materialized view or CREATE TABLE AS",
-        ),
+        _ => cx.throw_type_error("WITH NO DATA belongs to a materialized view or CREATE TABLE AS"),
     }
 }
 

@@ -2,56 +2,60 @@
 
 Construction performs no database work. Execute statements explicitly through
 ``await pool.execute(statement)`` or ``await connection.execute(statement)``.
+Every complete statement is a ``DDL``; an ``ALTER`` that names its object and
+no action yet (``PendingAlterTable`` and its kin) is not, and its first action
+gives the statement.
 """
 
+# [spec:pgorm:req:bindings.schema-api]
 from .._native import (
-    DataType as DataType, ColumnDef as ColumnDef, DDL as DDL,
-    CreateTable as CreateTable, CreateIndex as CreateIndex,
-    EntitySchema as EntitySchema, schema_from_entity as from_entity,
-    drop_table as drop_table, rename_table as rename_table,
-    rename_column as rename_column, truncate_table as truncate_table,
-    add_column as add_column, modify_column as modify_column,
-    drop_column as drop_column, set_expression as set_expression,
-    drop_expression as drop_expression, add_primary_key as add_primary_key,
-    add_unique as add_unique, add_not_null as add_not_null,
-    add_check as add_check, validate_constraint as validate_constraint,
-    alter_constraint as alter_constraint, drop_constraint as drop_constraint,
-    rename_constraint as rename_constraint, drop_index as drop_index,
-    create_enum as create_enum, add_enum_value as add_enum_value,
-    rename_enum as rename_enum, rename_enum_value as rename_enum_value,
-    drop_enum as drop_enum,
-    create_view as create_view, create_recursive_view as create_recursive_view,
-    drop_view as drop_view, create_materialized_view as create_materialized_view,
-    refresh_materialized_view as refresh_materialized_view,
-    drop_materialized_view as drop_materialized_view, create_table_as as create_table_as,
+    DataType as DataType, ColumnDef as ColumnDef, DDL as DDL, EntitySchema as EntitySchema,
+    schema_from_entity as from_entity,
+    CreateTable as CreateTable, CreateIndex as CreateIndex, drop_table as drop_table,
+    rename_table as rename_table, rename_column as rename_column,
+    rename_constraint as rename_constraint, truncate_table as truncate_table,
+    comment_on_table as comment_on_table, comment_on_column as comment_on_column,
+    drop_index as drop_index,
+    PendingAlterTable as PendingAlterTable, AlterTable as AlterTable, alter_table as alter_table,
+    CreateType as CreateType, PendingAlterType as PendingAlterType,
+    AlterComposite as AlterComposite, RenameAttribute as RenameAttribute,
+    alter_type as alter_type, drop_type as drop_type,
+    CreateSequence as CreateSequence, PendingAlterSequence as PendingAlterSequence,
+    AlterSequence as AlterSequence, alter_sequence as alter_sequence,
+    drop_sequence as drop_sequence, rename_sequence as rename_sequence,
+    create_extension as create_extension, drop_extension as drop_extension,
+    CreateView as CreateView, CreateRecursiveView as CreateRecursiveView,
+    CreateMaterializedView as CreateMaterializedView, CreateTableAs as CreateTableAs,
+    drop_view as drop_view, refresh_materialized_view as refresh_materialized_view,
+    drop_materialized_view as drop_materialized_view,
     create_schema as create_schema, drop_schema as drop_schema, rename_schema as rename_schema,
-    CreateDomain as CreateDomain, set_domain_default as set_domain_default,
-    drop_domain_default as drop_domain_default, set_domain_not_null as set_domain_not_null,
-    drop_domain_not_null as drop_domain_not_null, add_domain_check as add_domain_check,
-    drop_domain_constraint as drop_domain_constraint,
-    rename_domain_constraint as rename_domain_constraint,
-    validate_domain_constraint as validate_domain_constraint, rename_domain as rename_domain,
-    drop_domain as drop_domain,
+    CreateDomain as CreateDomain, PendingAlterDomain as PendingAlterDomain,
+    alter_domain as alter_domain, drop_domain as drop_domain,
 )
 
 create_table = CreateTable
 create_index = CreateIndex
+create_type = CreateType
 create_domain = CreateDomain
+create_sequence = CreateSequence
+create_view = CreateView
+create_recursive_view = CreateRecursiveView
+create_materialized_view = CreateMaterializedView
+create_table_as = CreateTableAs
 
 __all__ = [
-    "DataType", "ColumnDef", "DDL", "CreateTable", "CreateIndex", "EntitySchema",
-    "create_table", "create_index", "from_entity", "drop_table", "rename_table",
-    "rename_column", "truncate_table", "add_column", "modify_column", "drop_column",
-    "set_expression", "drop_expression",
-    "add_primary_key", "add_unique", "add_not_null", "add_check", "validate_constraint",
-    "alter_constraint", "drop_constraint", "rename_constraint", "drop_index", "create_enum",
-    "add_enum_value",
-    "rename_enum",
-    "rename_enum_value", "drop_enum",
-    "create_view", "create_recursive_view", "drop_view", "create_materialized_view",
-    "refresh_materialized_view", "drop_materialized_view", "create_table_as",
+    "DataType", "ColumnDef", "DDL", "EntitySchema", "from_entity",
+    "CreateTable", "create_table", "PendingAlterTable", "AlterTable", "alter_table",
+    "drop_table", "rename_table", "rename_column", "rename_constraint", "truncate_table",
+    "comment_on_table", "comment_on_column",
+    "CreateIndex", "create_index", "drop_index",
+    "CreateType", "create_type", "PendingAlterType", "AlterComposite", "RenameAttribute",
+    "alter_type", "drop_type",
+    "CreateDomain", "create_domain", "PendingAlterDomain", "alter_domain", "drop_domain",
+    "CreateSequence", "create_sequence", "PendingAlterSequence", "AlterSequence",
+    "alter_sequence", "drop_sequence", "rename_sequence", "create_extension", "drop_extension",
+    "CreateView", "create_view", "CreateRecursiveView", "create_recursive_view",
+    "CreateMaterializedView", "create_materialized_view", "CreateTableAs", "create_table_as",
+    "drop_view", "refresh_materialized_view", "drop_materialized_view",
     "create_schema", "drop_schema", "rename_schema",
-    "CreateDomain", "create_domain", "set_domain_default", "drop_domain_default",
-    "set_domain_not_null", "drop_domain_not_null", "add_domain_check", "drop_domain_constraint",
-    "rename_domain_constraint", "validate_domain_constraint", "rename_domain", "drop_domain",
 ]

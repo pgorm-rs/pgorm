@@ -21,6 +21,7 @@ import {
   Value,
 } from "../lib/index.js";
 import { Account, modelDatabase, truncate, Version } from "./model-fixtures.ts";
+import { mistyped } from "./support.ts";
 
 let database: { pool: Pool; drop(): Promise<void> } | undefined;
 
@@ -96,9 +97,16 @@ test("a declaration is data: it sends nothing, and describes its table and field
 });
 
 // [spec:pgorm:req:bindings.models/test]
+// [spec:pgorm:req:napi.argument-errors+2/test]
 test("a declaration that cannot be used is refused as it is made", () => {
   const unknown = { nullabel: true } as unknown as Record<string, never>;
-  assert.throws(() => column("text", unknown), refused(/"nullabel" is no column option/));
+  assert.throws(() => column("text", unknown), mistyped(/"nullabel" is no column option/));
+  assert.throws(() => column("text", { nullable: "yes" as never }), mistyped(/nullable is a boolean/));
+  assert.throws(() => column("text", { name: 7 as never }), mistyped(/name is a string/));
+  assert.throws(() => column("i32", { generated: "sometimes" as never }), mistyped(/"always" or "byDefault"/));
+  assert.throws(() => column(7 as never), mistyped(/a column's kind is/));
+  assert.throws(() => column(new TypeName("mood", { schema: "app" }), { values: "a" as never }), mistyped(/a list of strings/));
+  assert.throws(() => column(new TypeName("mood", { schema: "app" }), { values: [] }), refused(/at least one value/));
   assert.throws(() => column("u64" as "i64"), refused(/never decodes as u64/));
   assert.throws(() => column(new TypeName("mood")), refused(/names its type's schema/));
   assert.throws(() => column("i32", { primaryKey: true, nullable: true }), refused(/primary-key column is not nullable/));
@@ -110,8 +118,8 @@ test("a declaration that cannot be used is refused as it is made", () => {
     refused(/two fields of a model name one column/),
   );
   assert.throws(() => model("t", { columns: {} }), refused(/at least one column/));
-  assert.throws(() => model("t", { columns: { a: "text" as never } }), refused(/no column\(\) declaration/));
-  assert.throws(() => model("t", { columns: { a: column("text") }, table: "x" } as never), refused(/"table" is no model option/));
+  assert.throws(() => model("t", { columns: { a: "text" as never } }), mistyped(/no column\(\) declaration/));
+  assert.throws(() => model("t", { columns: { a: column("text") }, table: "x" } as never), mistyped(/"table" is no model option/));
   assert.throws(() => model("", { columns: { a: column("text") } }), ConstructionError);
   assert.throws(() => model("t", { columns: { a: column("text", { name: "x".repeat(64) }) } }), ConstructionError);
 });
@@ -251,8 +259,8 @@ test("a column compares through its declared kind, and refuses what it cannot bi
 test("a key names every key field and no other, a composite one included", async () => {
   await Version.insertMany([{ doc: 1, rev: 1, body: "one" }, { doc: 1, rev: 2, body: "two" }]).execute(pool());
   assert.equal((await Version.findByKey({ doc: 1, rev: 2 }).one(pool())).body, "two");
-  assert.throws(() => Version.key({ doc: 1 } as never), refused(/gives doc, rev, and nothing else/));
-  assert.throws(() => Version.key({ doc: 1, rev: 1, body: "x" } as never), refused(/gives doc, rev, and nothing else/));
+  assert.throws(() => Version.key({ doc: 1 } as never), mistyped(/gives doc, rev, and nothing else/));
+  assert.throws(() => Version.key({ doc: 1, rev: 1, body: "x" } as never), mistyped(/gives doc, rev, and nothing else/));
   assert.throws(() => Version.key({ doc: 1, rev: null } as never), refused(/compared with null/));
   const keyless = model("keyless", { columns: { a: column("text") } });
   assert.throws(() => keyless.key({} as never), refused(/declares no primary key/));

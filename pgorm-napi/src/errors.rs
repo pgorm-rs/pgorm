@@ -93,7 +93,7 @@ impl Failure {
     /// The class name `lib/index.js` maps the failure to.
     pub(crate) fn kind(&self) -> &'static str {
         match self {
-            // [spec:pgorm:req:bindings.errors]    the constraint classes pgorm's SqlError names
+            // [spec:pgorm:req:bindings.errors+2]    the constraint classes pgorm's SqlError names
             Self::Database(diagnostics) => match diagnostics.sqlstate.as_str() {
                 "23505" => "UniqueViolationError",
                 "23503" => "ForeignKeyViolationError",
@@ -194,7 +194,7 @@ impl std::error::Error for Failure {}
 /// Classify a pgorm error. A PostgreSQL error anywhere in its cause chain
 /// decides the class, so a server's refusal during connection (a bad password,
 /// a missing database) carries its SQLSTATE like any other.
-// [spec:pgorm:req:bindings.errors]
+// [spec:pgorm:req:bindings.errors+2]
 pub(crate) fn failure(error: &pgorm::Error, secrets: &Redactions) -> Failure {
     let mut source: &(dyn std::error::Error + 'static) = error;
     loop {
@@ -210,7 +210,7 @@ pub(crate) fn failure(error: &pgorm::Error, secrets: &Redactions) -> Failure {
         pgorm::Error::Pool(_) => Failure::Connection("PostgreSQL pool acquisition failed".into()),
         // A channel name the listener refuses before sending anything is the
         // caller's input, as a parameter that cannot be bound is.
-        // [spec:pgorm:req:bindings.listen]
+        // [spec:pgorm:req:bindings.listen+2]
         pgorm::Error::Listen(pgorm::ListenError::ChannelTooLong { .. }) => {
             Failure::Construction(secrets.apply(&error.to_string()))
         }
@@ -328,7 +328,7 @@ mod tests {
         assert_eq!(Failure::Internal("x".into()).kind(), "InternalError");
     }
 
-    // [spec:pgorm:req:bindings.errors/test]
+    // [spec:pgorm:req:bindings.errors+2/test]
     #[test]
     fn a_constraint_violation_names_its_own_class() {
         let violation = |sqlstate: &str| {

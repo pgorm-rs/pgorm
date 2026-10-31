@@ -12,14 +12,12 @@ use pgorm::pgorm_query::{
     SequenceOption, SequenceOptions, TableName, extension::TypeRef,
 };
 
+pub(in crate::statements) use super::super::args::pick;
 use super::super::{
     Node,
     args::{absent, arg, name, node, refuse},
 };
-use crate::{
-    codec::Codec,
-    values::{Tag, read},
-};
+use crate::{codec::Codec, values::read};
 
 /// The options object at `index`, its keys checked against `known`; `None`
 /// when it is left out.
@@ -98,30 +96,6 @@ pub(super) fn choice<'cx, T: Clone>(
         return Ok(None);
     };
     pick(cx, value, key, choices).map(Some)
-}
-
-/// `value`, a string that is one of `choices`.
-pub(in crate::statements) fn pick<'cx, T: Clone>(
-    cx: &mut Cx<'cx>,
-    value: Handle<'cx, JsValue>,
-    what: &str,
-    choices: &[(&str, T)],
-) -> NeonResult<T> {
-    let text = if value.is_a::<JsString, _>(cx) {
-        Some(read::string(cx, value)?)
-    } else {
-        None
-    };
-    match text.and_then(|text| choices.iter().find(|(spelling, _)| *spelling == text)) {
-        Some((_, meaning)) => Ok(meaning.clone()),
-        None => {
-            let quoted: Vec<String> = choices
-                .iter()
-                .map(|(spelling, _)| format!("{spelling:?}"))
-                .collect();
-            refuse(cx, format!("{what} is one of {}", quoted.join(", ")))
-        }
-    }
 }
 
 pub(super) const DEFERRABILITY: &[(&str, Deferrability)] = &[
@@ -203,7 +177,7 @@ pub(in crate::statements) fn relation<'cx>(
             cx,
             "a DDL statement names a Table without an alias: an alias belongs to a query",
         ),
-        _ => refuse(cx, "a table or sequence is named by a string or a Table"),
+        _ => cx.throw_type_error("a table or sequence is named by a string or a Table"),
     }
 }
 
@@ -242,15 +216,15 @@ pub(super) fn type_ref<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> Ne
         return Ok(TypeRef::Type(name(cx, value)?));
     }
     let codec = Codec::get(cx)?;
-    match cx.try_catch(|cx| read::kind(cx, codec, value)) {
-        Ok(Tag::Enum(named)) => {
+    match read::named_type(cx, codec, value)? {
+        Some(named) => {
             let type_name = Name::runtime(named.name);
             Ok(match named.schema {
                 Some(schema) => TypeRef::SchemaType(Name::runtime(schema), type_name),
                 None => TypeRef::Type(type_name),
             })
         }
-        _ => refuse(cx, "a type is named by a string or a TypeName"),
+        None => cx.throw_type_error("a type is named by a string or a TypeName"),
     }
 }
 
@@ -291,6 +265,9 @@ pub(in crate::statements) fn integer<'cx>(
     value: Handle<'cx, JsValue>,
     what: &str,
 ) -> NeonResult<i64> {
+    if !value.is_a::<JsNumber, _>(cx) && !value.is_a::<JsBigInt, _>(cx) {
+        return cx.throw_type_error(format!("{what} is a number or a bigint"));
+    }
     let read = if let Ok(number) = value.downcast::<JsNumber, _>(cx) {
         let number = number.value(cx);
         #[allow(clippy::cast_possible_truncation)]
