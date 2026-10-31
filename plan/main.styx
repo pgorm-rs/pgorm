@@ -15521,6 +15521,29 @@ children (
                 title "Require the stable security and binding checks on main"
                 kind @ci
                 deps (security-enforcement-followup-2026-10-31.stable-checks)
+                sealed true
+                log (
+                    {
+                        at 2026-10-31T22:58:11.723825Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-31T22:58:17.791911Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "GitHub ruleset 26285865 now requires Supply-chain security, Generative security, SQL injection security, Node-API binding and Python distributions in addition to the four CodeQL contexts."
+                    }
+
+                    {
+                        at 2026-10-31T22:58:21.723429Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
+                    }
+                )
             }
         )
     }
