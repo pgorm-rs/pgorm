@@ -139,7 +139,7 @@ class PipelineConstruction(unittest.TestCase):
             base.select(pl.literal(1).as_("sum")).inspect()
 
     # [spec:pgorm:req:bindings.pipeline-binder/test]
-    # [spec:pgorm:req:python.pipeline-operands+2/test]
+    # [spec:pgorm:req:bindings.operands/test]
     def test_plain_operands_bind_through_their_stage(self):
         base = pl.from_(p.Table("items"))
         key, amount = pl.col("items", "id"), pl.col("items", "amount")
@@ -227,7 +227,8 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.close()
 
     # [spec:pgorm:req:bindings.pipeline/test]
-    # [spec:pgorm:req:python.pipeline-operands+2/test]
+    # [spec:pgorm:req:python.pipeline/test]
+    # [spec:pgorm:req:bindings.row-count/test]
     async def test_terminals_models_and_dynamic_streams(self):
         model = p.Model(
             "items",
@@ -292,8 +293,8 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
             with self.subTest(name=name):
                 await cases[name].all(self.connection)
 
-    # [spec:pgorm:req:bindings.pipeline-expressions/test]
-    # [spec:pgorm:req:python.pipeline-operands+2/test]
+    # [spec:pgorm:req:bindings.pipeline-expressions+2/test]
+    # [spec:pgorm:req:bindings.operands/test]
     async def test_literal_and_bound_text_remain_values(self):
         payload = "O'Brien'); DROP TABLE items; -- 雪"
         await self.connection.execute(
@@ -315,7 +316,7 @@ class PipelineDatabase(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((row["id"], row["category"]), (5, payload))
         self.assertEqual(len(await base.all(self.connection)), 5)
 
-    # [spec:pgorm:req:bindings.pipeline-expressions/test]
+    # [spec:pgorm:req:bindings.pipeline-expressions+2/test]
     async def test_aggregates_windows_and_typed_nulls(self):
         base = pl.from_(p.Table("items"))
         amount = pl.col("items", "amount")
@@ -387,7 +388,7 @@ class PipelineDomainEnums(unittest.IsolatedAsyncioTestCase):
         await self.connection.close()
         await self.pool.close()
 
-    # [spec:pgorm:req:bindings.pipeline-expressions/test]    a column with no registration compares as the
+    # [spec:pgorm:req:bindings.pipeline-expressions+2/test]    a column with no registration compares as the
     # schema-qualified enum compares_as names, bound, literal, listed and through an alias,
     # where each left bare is refused with 42883
     async def test_untyped_columns_compare_as_the_named_enum(self):

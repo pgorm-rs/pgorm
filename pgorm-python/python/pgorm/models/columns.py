@@ -47,7 +47,7 @@ MODEL_KINDS = frozenset(
 )
 
 
-# [spec:pgorm:req:bindings.models]
+# [spec:pgorm:req:bindings.models+2]
 @dataclass(frozen=True, slots=True)
 class Column:
     kind: str | p.TypeName | p.CreatedRange

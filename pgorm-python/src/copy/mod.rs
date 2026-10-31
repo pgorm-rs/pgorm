@@ -147,7 +147,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-// [spec:pgorm:req:python.capabilities+1]
+// [spec:pgorm:req:python.capabilities+2]
 // [spec:pgorm:req:bindings.copy]
 // [spec:pgorm:req:bindings.copy-rows]
 pub(crate) fn capabilities() -> Map<String, Value> {

@@ -31,7 +31,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
     def active(self, identity, name="Nora"):
         return self.account.active().set("id", identity).set("display name", name)
 
-    # [spec:pgorm:req:bindings.entities/test]
+    # [spec:pgorm:req:bindings.entities+2/test]
     async def test_registration_declares_real_types_and_mapping(self):
         registrations = p.capabilities()["registrations"]["entities"]
         self.assertEqual([r["name"] for r in registrations],
@@ -51,7 +51,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(p.ConstructionError):
             self.account.col("missing")
 
-    # [spec:pgorm:req:bindings.entities/test]
+    # [spec:pgorm:req:bindings.entities+2/test]
     async def test_registration_declares_its_reachable_terminals(self):
         terminals = self.account.describe()["terminals"]
         self.assertEqual(terminals, [
@@ -300,7 +300,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(await self.account.find().where(self.account.col("id") == 98).optional(connection))
 
     # [spec:pgorm:req:bindings.entity-reads+2/test]
-    # [spec:pgorm:req:bindings.errors+2/test]
+    # [spec:pgorm:req:bindings.errors+3/test]
     async def test_decode_failure_does_not_become_absence(self):
         async with self.pool.connection() as connection:
             await self.active(1).insert(connection)
@@ -308,14 +308,14 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(p.DecodeError):
                 await self.account.find().optional(connection)
 
-    # [spec:pgorm:req:bindings.errors+2/test]
+    # [spec:pgorm:req:bindings.errors+3/test]
     async def test_parameter_failure_preserves_connection(self):
         async with self.pool.connection() as connection:
             with self.assertRaises(p.ConstructionError):
                 await connection.one(p.RawSQL("SELECT $1::integer AS n", [p.Value("text", "text")]))
             self.assertTrue(await connection.ping())
 
-    # [spec:pgorm:req:bindings.entities/test]
+    # [spec:pgorm:req:bindings.entities+2/test]
     # [spec:pgorm:req:bindings.cancellation/test]
     async def test_cancellation_interrupts_an_active_rust_hook(self):
         async with self.pool.connection() as connection:

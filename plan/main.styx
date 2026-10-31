@@ -14728,21 +14728,21 @@ children (
                 [spec:pgorm:req:bindings.values]
                 [spec:pgorm:req:bindings.windows]
                 [spec:pgorm:req:napi.application]
-                [spec:pgorm:req:napi.argument-errors]
+                [spec:pgorm:req:bindings.argument-errors]
                 [spec:pgorm:req:napi.cancellation]
                 [spec:pgorm:req:napi.codegen]
                 [spec:pgorm:req:napi.errors]
                 [spec:pgorm:req:napi.lifecycle]
                 [spec:pgorm:req:napi.naming]
-                [spec:pgorm:req:napi.pipeline-operands]
+                [spec:pgorm:req:bindings.operands]
                 [spec:pgorm:req:napi.raw]
                 [spec:pgorm:req:napi.records]
-                [spec:pgorm:req:napi.row-count]
+                [spec:pgorm:req:bindings.row-count]
                 [spec:pgorm:req:napi.runtime]
                 [spec:pgorm:req:napi.temporal]
                 [spec:pgorm:req:napi.transactions]
                 [spec:pgorm:req:napi.typing]
-                [spec:pgorm:req:napi.update-many-guard]
+                [spec:pgorm:req:napi.pipeline-table-names]
                 [spec:pgorm:req:napi.values]
                 [spec:pgorm:req:bindings.case]
                 [spec:pgorm:req:bindings.connections]
@@ -14810,17 +14810,14 @@ children (
                 [spec:pgorm:req:bindings.values]
                 [spec:pgorm:req:bindings.windows]
                 [spec:pgorm:def:python.api]
-                [spec:pgorm:req:python.argument-errors]
                 [spec:pgorm:req:python.cancellation]
                 [spec:pgorm:req:python.capabilities]
                 [spec:pgorm:req:python.codegen]
                 [spec:pgorm:req:python.expressions]
-                [spec:pgorm:req:python.input-boundaries]
                 [spec:pgorm:req:python.lifecycle]
                 [spec:pgorm:req:python.naming]
-                [spec:pgorm:req:python.pipeline-operands]
+                [spec:pgorm:req:python.pipeline]
                 [spec:pgorm:req:python.records]
-                [spec:pgorm:req:python.row-count]
                 [spec:pgorm:req:python.runtime]
                 [spec:pgorm:req:python.transactions]
                 [spec:pgorm:req:python.truth-testing]
@@ -15101,6 +15098,9 @@ children (
         id python-binding-decisions
         title "Python binds every plain operand, infers lists and dicts, reports a wrong row count as DecodeError, guards update_many, lists its registrations and takes PEM data as ca"
         kind @feat
+        implements {
+            python ([spec:pgorm:req:bindings.argument-errors] [spec:pgorm:req:bindings.operands] [spec:pgorm:req:bindings.row-count])
+        }
         deps (binding-renames)
         log (
             {

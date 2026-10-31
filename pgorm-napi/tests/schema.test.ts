@@ -365,7 +365,7 @@ test("every complete DDL statement is a DDL, a Statement the terminals take, mad
 
 // [spec:pgorm:req:bindings.schema-tables/test]
 // [spec:pgorm:req:bindings.schema-alter/test]
-// [spec:pgorm:req:napi.argument-errors+2/test]
+// [spec:pgorm:req:bindings.argument-errors/test]
 test("a shape PostgreSQL cannot take, or an option the builder does not know, is refused as it is built", () => {
   assert.throws(() => createTable("t").column(new ColumnDef("a")), refused(/needs a type/));
   assert.throws(() => alterTable("t").addColumn(new ColumnDef("a")), refused(/needs a type/));

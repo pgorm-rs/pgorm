@@ -44,7 +44,7 @@ macro_rules! view_options {
 
             /// Names appended to the column list, renaming the query's leading
             /// columns.
-            // [spec:pgorm:req:bindings.schema-views]
+            // [spec:pgorm:req:bindings.schema-views+2]
             fn columns<'py>(
                 slf: &Bound<'py, Self>,
                 names: &Bound<'_, PyAny>,
@@ -114,7 +114,7 @@ ddl_class!(PyCreateView, CreateView, Box<ViewCreateStatement>);
 
 #[pymethods]
 impl PyCreateView {
-    // [spec:pgorm:req:bindings.schema-views]
+    // [spec:pgorm:req:bindings.schema-views+2]
     #[new]
     fn new(
         name: &Bound<'_, PyAny>,
@@ -128,7 +128,7 @@ impl PyCreateView {
     /// `WITH LOCAL CHECK OPTION` or `WITH CASCADED CHECK OPTION`: a row
     /// written through the view must be one it shows. The bare form means
     /// `CASCADED`, so it has no spelling of its own.
-    // [spec:pgorm:req:bindings.schema-views]
+    // [spec:pgorm:req:bindings.schema-views+2]
     fn check_option<'py>(slf: &Bound<'py, Self>, option: &str) -> PyResult<Bound<'py, Self>> {
         let option = pick(
             option,
@@ -163,7 +163,7 @@ impl PyCreateRecursiveView {
     /// The column list is what the recursive query's rows are called, so it
     /// is one name or a non-empty list: the grammar refuses a recursive view
     /// without one.
-    // [spec:pgorm:req:bindings.schema-views]
+    // [spec:pgorm:req:bindings.schema-views+2]
     #[new]
     fn new(
         name: &Bound<'_, PyAny>,
@@ -195,7 +195,7 @@ ddl_class!(
 
 #[pymethods]
 impl PyCreateMaterializedView {
-    // [spec:pgorm:req:bindings.schema-views]
+    // [spec:pgorm:req:bindings.schema-views+2]
     #[new]
     fn new(
         name: &Bound<'_, PyAny>,
@@ -222,7 +222,7 @@ ddl_class!(PyCreateTableAs, CreateTableAs, Box<TableCreateAsStatement>);
 
 #[pymethods]
 impl PyCreateTableAs {
-    // [spec:pgorm:req:bindings.schema-views]
+    // [spec:pgorm:req:bindings.schema-views+2]
     #[new]
     fn new(
         name: &Bound<'_, PyAny>,
@@ -237,7 +237,7 @@ impl PyCreateTableAs {
 relation_options!(PyCreateTableAs);
 
 /// `DROP VIEW` over one view or a non-empty list of them.
-// [spec:pgorm:req:bindings.schema-views]
+// [spec:pgorm:req:bindings.schema-views+2]
 #[pyfunction]
 #[pyo3(signature=(names, *, if_exists=false, behavior=None))]
 pub(super) fn drop_view(
@@ -252,7 +252,7 @@ pub(super) fn drop_view(
 /// `REFRESH MATERIALIZED VIEW`. PostgreSQL refuses `CONCURRENTLY` beside
 /// `WITH NO DATA`, and the Rust statement holds the two in one slot, so both
 /// together are refused here rather than one silently kept.
-// [spec:pgorm:req:bindings.schema-views]
+// [spec:pgorm:req:bindings.schema-views+2]
 #[pyfunction]
 #[pyo3(signature=(name, *, concurrently=false, with_no_data=false))]
 pub(super) fn refresh_materialized_view(
@@ -279,7 +279,7 @@ pub(super) fn refresh_materialized_view(
 }
 
 /// `DROP MATERIALIZED VIEW` over one view or a non-empty list of them.
-// [spec:pgorm:req:bindings.schema-views]
+// [spec:pgorm:req:bindings.schema-views+2]
 #[pyfunction]
 #[pyo3(signature=(names, *, if_exists=false, behavior=None))]
 pub(super) fn drop_materialized_view(

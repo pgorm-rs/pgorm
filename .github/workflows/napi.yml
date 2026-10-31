@@ -136,7 +136,7 @@ jobs:
       # An application's own module: the fixture crate registers its entities
       # and graphs, builds one native library with the binding's API, and runs
       # its suite against it in both runtimes.
-      # [spec:pgorm:req:napi.application+1]
+      # [spec:pgorm:req:napi.application+2]
       - name: Application module with registered entities
         run: |
           cargo fmt --manifest-path pgorm-napi/tests/application-binding/Cargo.toml --all -- --check

@@ -358,7 +358,7 @@ export declare function dropType(
   options?: { readonly ifExists?: boolean; readonly behavior?: DropBehavior },
 ): DDL;
 
-// [spec:pgorm:req:bindings.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains+2]
 
 /**
  * `CREATE DOMAIN`; every method returns a new statement. The clauses render
@@ -503,7 +503,7 @@ export declare function dropSchema(
 /** `ALTER SCHEMA ... RENAME TO`, which PostgreSQL gives no `IF EXISTS`. */
 export declare function renameSchema(name: string, newName: string): DDL;
 
-// [spec:pgorm:req:bindings.schema-views]
+// [spec:pgorm:req:bindings.schema-views+2]
 
 /**
  * The options a view takes, plain or recursive: each written only when set,

@@ -17,7 +17,7 @@ def bits(value):
 
 
 # [spec:pgorm:req:bindings.values/test]
-# [spec:pgorm:req:python.values+6/test]
+# [spec:pgorm:req:python.values+7/test]
 # [spec:pgorm:req:bindings.value-tags/test]
 class ValueTests(unittest.TestCase):
     def test_scalar_variants_and_typed_nulls(self):
@@ -222,6 +222,7 @@ class ValueTests(unittest.TestCase):
             with self.subTest(kind=kind), self.assertRaises(TypeError):
                 Value.null(kind)
 
+    # [spec:pgorm:req:python.values+7/test]
     def test_lists_infer_as_arrays_dicts_as_json(self):
         cases = [
             ([1, None, 3], "i64", [1, None, 3]),
@@ -252,7 +253,7 @@ class ValueTests(unittest.TestCase):
                 Value(invalid)
 
     # [spec:pgorm:req:bindings.values/test]
-    # [spec:pgorm:req:python.values+6/test]
+    # [spec:pgorm:req:python.values+7/test]
     def test_interval_keeps_three_signed_fields(self):
         interval = Interval(1, -2, 3_000_004)
         self.assertEqual((interval.months, interval.days, interval.microseconds), (1, -2, 3_000_004))

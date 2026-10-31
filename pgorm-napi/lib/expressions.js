@@ -3,7 +3,7 @@
 // Expressions over pgorm-query's builders. An operand that is not an
 // expression is a value, bound as a parameter: nothing a caller passes becomes
 // SQL text, and an identifier is quoted wherever it appears.
-// [spec:pgorm:req:bindings.expressions]
+// [spec:pgorm:req:bindings.expressions+2]
 // [spec:pgorm:req:bindings.quantifiers]
 
 import { arg, args, Builder, Handle, made, trusted, TRUSTED } from "./builder.js";
@@ -133,7 +133,7 @@ export function bind(value) {
   return new Expr(native.exprBind(value), TRUSTED);
 }
 
-// [spec:pgorm:req:napi.pipeline-operands+2]
+// [spec:pgorm:req:bindings.operands]
 /**
  * A value written into the SQL text, as pgorm-query renders a constant, read
  * as a parameter is read. Every other operand is bound.

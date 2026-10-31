@@ -15,9 +15,9 @@ def inspection(expression):
     return compiled.sql, [value.snapshot() for value in compiled.params]
 
 
-# [spec:pgorm:req:bindings.expressions/test]
-# [spec:pgorm:req:bindings.identifiers/test]
-# [spec:pgorm:req:python.input-boundaries+1/test]
+# [spec:pgorm:req:bindings.expressions+2/test]
+# [spec:pgorm:req:bindings.identifiers+2/test]
+# [spec:pgorm:req:bindings.operands/test]
 # [spec:pgorm:req:bindings.statements/test]
 # [spec:pgorm:req:bindings.delegation/test]
 class ExpressionTests(unittest.TestCase):

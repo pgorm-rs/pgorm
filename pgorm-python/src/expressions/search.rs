@@ -6,7 +6,7 @@ use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use super::PyExpr;
 
-// [spec:pgorm:req:bindings.expressions]
+// [spec:pgorm:req:bindings.expressions+2]
 #[pymethods]
 impl PyExpr {
     /// `@?`: whether a `jsonpath` returns any item for this `jsonb`. The path

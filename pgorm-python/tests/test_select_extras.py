@@ -25,8 +25,8 @@ def text_array(values):
     return p.bind(p.Value.array("text", values)).cast(p.TypeName("text"), array=True)
 
 
-# [spec:pgorm:req:bindings.select/test]
-# [spec:pgorm:req:bindings.expressions/test]
+# [spec:pgorm:req:bindings.select+2/test]
+# [spec:pgorm:req:bindings.expressions+2/test]
 class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -205,7 +205,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
                   .order_by(self.s("id").asc()))
         self.assertEqual(await self.rows(joined), [(1, "a"), (2, "b"), (3, "c")])
 
-    # [spec:pgorm:req:bindings.select/test]    a call returning record reads through the
+    # [spec:pgorm:req:bindings.select+2/test]    a call returning record reads through the
     # columns its definition list gives, a lone call's list in the alias, each call of a ROWS FROM
     # with its own, and the server refuses a missing list or one on another function
     # [spec:pgorm:req:sql.ast.select.column-definitions/test]
@@ -274,7 +274,7 @@ class SelectExtrasTests(unittest.IsolatedAsyncioTestCase):
         count = p.Select(p.call("count", unaliased.col("id"))).from_(unaliased)
         self.assertEqual(await self.rows(count), [(200,)])
 
-    # [spec:pgorm:req:bindings.expressions/test]    array(select) collects a subquery's one
+    # [spec:pgorm:req:bindings.expressions+2/test]    array(select) collects a subquery's one
     # column into an array value, empty for no rows, cast as one value, and the server refuses a
     # subquery of two columns with 42601
     async def test_array_collects_a_subquery_column(self):

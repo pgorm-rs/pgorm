@@ -32,8 +32,8 @@ class PoolStatus(NamedTuple):
 
 # [spec:pgorm:req:python.runtime+1]
 # [spec:pgorm:req:bindings.runtime]
-# [spec:pgorm:req:bindings.connections]
-# [spec:pgorm:req:python.lifecycle+2]
+# [spec:pgorm:req:bindings.connections+2]
+# [spec:pgorm:req:python.lifecycle+3]
 class Pool:
     """A pool owned by the asyncio loop running at construction.
 
@@ -208,7 +208,7 @@ class Pool:
             raise
         return CopyRowStream(native, connection)
 
-    # [spec:pgorm:req:python.argument-errors]
+    # [spec:pgorm:req:bindings.argument-errors]
     async def listener(self, *, capacity: int = 1024) -> Listener:
         """Open a dedicated listening connection with this pool's configuration.
 

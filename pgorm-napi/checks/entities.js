@@ -15,7 +15,7 @@
 //
 // The suite reads PGORM_TEST_DSN, or the server DATABASE_URL names, as the
 // binding's own suite does, and makes and drops a database of its own.
-// [spec:pgorm:req:napi.application+1]
+// [spec:pgorm:req:napi.application+2]
 
 import { spawnSync } from "node:child_process";
 import { copyFileSync, cpSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";

@@ -29,7 +29,7 @@ pub(crate) fn seconds(value: f64, name: &str) -> PyResult<Duration> {
         .map_err(|_| ConstructionError::new_err(format!("{name} is outside the supported range")))
 }
 
-// [spec:pgorm:req:bindings.connections]
+// [spec:pgorm:req:bindings.connections+2]
 impl PoolConfig {
     pub(crate) fn build(self) -> PyResult<(pgorm::DatabasePool, Redactions, Duration)> {
         if self.max_size == 0 || self.max_size > tokio::sync::Semaphore::MAX_PERMITS {

@@ -31,7 +31,7 @@ export * from "./listen.d.ts";
 /** The addon's version, which is the pgorm release it is built from. */
 export declare const version: string;
 
-// [spec:pgorm:req:bindings.connections]
+// [spec:pgorm:req:bindings.connections+2]
 /**
  * The channel pgorm-migration's runner notifies once a batch that applied a
  * migration commits: give it as {@link PoolOptions.statementCacheChannel} for

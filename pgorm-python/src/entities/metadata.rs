@@ -58,7 +58,7 @@ impl InputKind {
             ColumnType::Array(member) => return Self::Array(Box::new(Self::from_column(member))),
             // A domain's values travel as its base type's do, so its column
             // takes and reads back what a column of the base would.
-            // [spec:pgorm:req:bindings.schema-domains]
+            // [spec:pgorm:req:bindings.schema-domains+2]
             ColumnType::Domain { base, .. } => return Self::from_column(base),
             _ => return Self::Explicit,
         };
@@ -298,7 +298,7 @@ mod tests {
     use pgorm::pgorm_query::{ArrayType, Range, RangeType};
     use std::sync::Arc;
 
-    // [spec:pgorm:req:bindings.entities/test]    a range column hints its range kind, so a
+    // [spec:pgorm:req:bindings.entities+2/test]    a range column hints its range kind, so a
     // registered entity's range field takes a `pgorm.Range` as its value
     #[test]
     fn range_columns_hint_their_range_kind() -> PyResult<()> {
@@ -345,7 +345,7 @@ mod tests {
         })
     }
 
-    // [spec:pgorm:req:bindings.entities/test]    a created range column hints its created kind,
+    // [spec:pgorm:req:bindings.entities+2/test]    a created range column hints its created kind,
     // so a registered entity's field takes a `pgorm.Range` and reads back tagged with the type
     #[test]
     fn created_range_columns_hint_their_created_kind() -> PyResult<()> {
@@ -396,7 +396,7 @@ mod tests {
         })
     }
 
-    // [spec:pgorm:req:bindings.schema-domains/test]    a domain column hints its base type, through
+    // [spec:pgorm:req:bindings.schema-domains+2/test]    a domain column hints its base type, through
     // a domain over a domain, an array of the domain and a domain over an enum, so a registered
     // entity's field binds and reads back as a column of the base would
     #[test]

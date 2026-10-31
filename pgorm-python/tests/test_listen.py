@@ -198,7 +198,7 @@ class ListenerExecution(unittest.IsolatedAsyncioTestCase):
             await anext(listener)
 
     # [spec:pgorm:req:bindings.listen+2/test]    a capacity is a positive whole number
-    # [spec:pgorm:req:python.argument-errors/test]
+    # [spec:pgorm:req:bindings.argument-errors/test]
     async def test_capacity_is_a_positive_int(self):
         for capacity in (0, -1, 2**64):
             with self.subTest(capacity=capacity), self.assertRaises(ValueError):
@@ -229,7 +229,7 @@ class ListenerExecution(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await received(listener), ("py_cancel", "kept"))
 
     # [spec:pgorm:req:bindings.listen+2/test]    closing ends iteration; closing the pool closes its listeners
-    # [spec:pgorm:req:python.lifecycle+2/test]
+    # [spec:pgorm:req:python.lifecycle+3/test]
     async def test_close_and_pool_close_end_listeners(self):
         listener = await self.pool.listener()
         await listener.listen("py_close")

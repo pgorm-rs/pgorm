@@ -215,7 +215,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await connection.ping())
 
     # [spec:pgorm:req:bindings.copy/test]    a raising source aborts and the connection stays usable
-    # [spec:pgorm:req:python.argument-errors/test]
+    # [spec:pgorm:req:bindings.argument-errors/test]
     async def test_raising_source_aborts_and_keeps_connection(self):
         marker = ValueError("source failed")
 
@@ -619,7 +619,7 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
             bool(stream)
 
     # [spec:pgorm:req:bindings.copy-rows/test]    a row of the wrong width or type raises a construction error that aborts the COPY
-    # [spec:pgorm:req:python.argument-errors/test]
+    # [spec:pgorm:req:bindings.argument-errors/test]
     async def test_wrong_width_or_type_aborts_copy(self):
         copy = p.CopyFrom(self.rows, "binary").columns("id", "name")
         refusals = [

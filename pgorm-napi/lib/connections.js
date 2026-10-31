@@ -3,9 +3,9 @@
 // Pools, connections and transactions. Each holds a native handle and
 // releases what it holds when closed — `close()`, `await using`, the end of a
 // callback — never by waiting for garbage collection.
-// [spec:pgorm:req:bindings.connections]
+// [spec:pgorm:req:bindings.connections+2]
 // [spec:pgorm:req:napi.lifecycle+2]
-// [spec:pgorm:req:bindings.results]
+// [spec:pgorm:req:bindings.results+2]
 // [spec:pgorm:req:napi.raw]
 // [spec:pgorm:req:bindings.transactions]
 // [spec:pgorm:req:napi.transactions+3]
@@ -160,7 +160,7 @@ export async function runStatement(db, terminal, statement, options) {
  * addon — on a pool's connection, a connection or a transaction, with the
  * operation a statement gets around it: the busy refusal, the abort, the
  * discard of a connection an abort left in an unknown state.
- * [spec:pgorm:req:bindings.entities]
+ * [spec:pgorm:req:bindings.entities+2]
  * [spec:pgorm:req:bindings.registered-pools]
  *
  * @param {unknown} db

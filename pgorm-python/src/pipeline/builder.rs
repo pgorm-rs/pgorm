@@ -243,6 +243,7 @@ impl PyPipeline {
         selection.select(self, qualifiers)
     }
 
+    // [spec:pgorm:req:python.pipeline]
     fn all<'py>(
         &self,
         py: Python<'py>,

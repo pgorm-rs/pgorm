@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 
 use super::PyExpr;
 
-// [spec:pgorm:req:bindings.expressions]
+// [spec:pgorm:req:bindings.expressions+2]
 // [spec:pgorm:req:python.naming+2]
 #[pymethods]
 impl PyExpr {

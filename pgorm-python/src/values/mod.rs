@@ -290,7 +290,7 @@ impl PyValue {
 /// else what `convert::infer` reads it as. An empty or all-`None` list has no
 /// kind, a list of several kinds or of lists no one kind, and a `tuple` reads
 /// as a row rather than a value.
-// [spec:pgorm:req:python.values+6]
+// [spec:pgorm:req:python.values+7]
 fn inferred(data: &Bound<'_, PyAny>) -> PyResult<Tag> {
     if !data.is_exact_instance_of::<PyList>() {
         return convert::infer(data).map(Tag::Scalar);

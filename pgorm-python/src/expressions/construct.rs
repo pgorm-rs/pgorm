@@ -5,7 +5,7 @@ use super::{PyExpr, compiled::Compiled};
 use crate::{errors::ConstructionError, identifiers::PyIdentifier, values::PyValue};
 
 // [spec:pgorm:req:bindings.delegation]
-// [spec:pgorm:req:bindings.identifiers]
+// [spec:pgorm:req:bindings.identifiers+2]
 #[pyfunction]
 #[pyo3(signature = (name, *, table=None, schema=None))]
 pub(crate) fn col(
@@ -33,7 +33,7 @@ pub(crate) fn col(
 
 /// The keyword `VALUE`, the value a domain's `CHECK` tests; anywhere else
 /// PostgreSQL reads it as a column named `value`.
-// [spec:pgorm:req:bindings.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains+2]
 #[pyfunction]
 pub(crate) fn domain_value() -> PyExpr {
     PyExpr::from_rust(Expr::domain_value().into())
@@ -44,7 +44,7 @@ pub(crate) fn bind(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
     value_expr(value, false)
 }
 
-// [spec:pgorm:req:python.input-boundaries+1]
+// [spec:pgorm:req:bindings.operands]
 #[pyfunction]
 pub(crate) fn literal(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
     value_expr(value, true)
@@ -175,7 +175,7 @@ pub(crate) fn require_expr(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
         .map_err(|_| PyTypeError::new_err("expected a query expression"))
 }
 
-// [spec:pgorm:req:bindings.expressions]
+// [spec:pgorm:req:bindings.expressions+2]
 #[pyfunction]
 #[pyo3(signature = (name, *arguments))]
 pub(crate) fn call(name: &str, arguments: &Bound<'_, PyTuple>) -> PyResult<PyExpr> {

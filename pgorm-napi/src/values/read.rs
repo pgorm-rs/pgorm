@@ -40,7 +40,7 @@ pub(crate) fn refuse<'cx, T>(cx: &mut Cx<'cx>, message: impl Into<String>) -> Ne
 /// The string an argument that is text must be, `what` naming it in the
 /// `TypeError` anything else is. A value to bind has no wrong type, since any
 /// value may be a parameter; one that cannot be bound is `refuse`d.
-// [spec:pgorm:req:napi.argument-errors+2]
+// [spec:pgorm:req:bindings.argument-errors]
 pub(crate) fn text<'cx>(
     cx: &mut Cx<'cx>,
     data: Handle<'cx, JsValue>,

@@ -1185,7 +1185,6 @@ assertions (
     {id public-enums-non-exhaustive, kind @complete, author "brendan@necessary.nu", at 2026-10-26T17:36:55.644296Z}
     {id python-acceptance-emcc-probe, kind @complete, author "brendan@necessary.nu", at 2026-10-08T22:42:02.931055Z}
     {id python-application-check-names, kind @complete, author "brendan@necessary.nu", at 2026-10-06T12:22:29.683239Z}
-    {id python-binding-decisions, kind @doing, author "brendan@necessary.nu", at 2026-10-30T15:31:47.46622Z}
     {id python-campaign-entity-key-attributes, kind @complete, author "brendan@necessary.nu", at 2026-10-09T00:36:38.298184Z}
     {id python-campaign-write-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-09T01:01:46.308791Z}
     {id python-copy-typing-cases, kind @complete, author "brendan@necessary.nu", at 2026-10-19T10:48:39.938347Z}
@@ -2687,6 +2686,15 @@ impl_evidence (
         {impl_name main, rule testing.isolation}
     ), rule_versions_seen (
         {id testing.isolation, version 0}
+    )}
+    {id python-binding-decisions, covered_rules (
+        bindings.argument-errors
+        bindings.operands
+        bindings.row-count
+    ), covered_claims (
+        {impl_name python, rule bindings.argument-errors}
+        {impl_name python, rule bindings.operands}
+        {impl_name python, rule bindings.row-count}
     )}
 )
 

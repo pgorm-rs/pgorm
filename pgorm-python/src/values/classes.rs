@@ -17,7 +17,7 @@ use crate::errors::ConstructionError;
 /// `None` on a side is no bound there, and a side with no bound includes
 /// nothing, so its bracket is always `(` or `)`.
 // [spec:pgorm:req:bindings.values]
-// [spec:pgorm:req:python.values+6]
+// [spec:pgorm:req:python.values+7]
 #[pyclass(name = "Range", module = "pgorm", frozen)]
 #[derive(Debug)]
 pub struct PyRange {
@@ -188,7 +188,7 @@ impl PyRange {
 /// A multirange: an immutable sequence of ranges, in the order written. The
 /// server stores one sorted and merged.
 // [spec:pgorm:req:bindings.values]
-// [spec:pgorm:req:python.values+6]
+// [spec:pgorm:req:python.values+7]
 #[pyclass(name = "Multirange", module = "pgorm", frozen, sequence)]
 #[derive(Debug)]
 pub struct PyMultirange {

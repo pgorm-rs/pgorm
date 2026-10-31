@@ -93,7 +93,7 @@ option.
 > the runtime: an operation that does I/O is awaited in the language's own
 > asynchronous form (`python.runtime`, `napi.promises`).
 
-> [spec:pgorm:req:bindings.errors+2]
+> [spec:pgorm:req:bindings.errors+3]
 > Each binding MUST report a failure as an instance of its own error classes,
 > all derived from one base class of the binding and from the language's own
 > base error:
@@ -111,8 +111,10 @@ option.
 >   `DatabaseError`;
 > - `ConnectionError` when the server cannot be reached or the connection
 >   breaks;
-> - `ConstructionError` for an argument that cannot become what pgorm sends;
-> - `DecodeError` for a result that cannot become the native value asked for;
+> - `ConstructionError` for an argument whose value cannot become what pgorm
+>   sends;
+> - `DecodeError` for a result that cannot become the native value asked for,
+>   a wrong row count among them (`bindings.row-count`);
 > - `LifecycleError` for a pool, connection, transaction, stream or listener
 >   used after it closed, or while another operation holds it;
 > - `TimeoutError` when no connection becomes free within a pool's acquire
@@ -120,15 +122,9 @@ option.
 > - `InternalError` when pgorm or the binding fails in a way no input should
 >   cause, a panic above all.
 >
-> An argument a call cannot use is refused before anything is sent: with a
-> `ConstructionError` when it cannot become what pgorm sends, and otherwise
-> with the error class each binding's rule names (`python.argument-errors`,
-> `napi.argument-errors`). Where a rule in this chapter names a
-> `ConstructionError` for an argument, it names it for the argument's value:
-> one of a type the call does not take, an options object holding a key the
-> call does not know among them, is refused with the class the binding's own
-> rule names for that. A cancelled operation is reported in the
-> language's own way (`python.cancellation`, `napi.cancellation`). An error
+> An argument a call cannot use is refused before anything is sent, with the
+> class `bindings.argument-errors` names. A cancelled operation is reported in
+> the language's own way (`python.cancellation`, `napi.cancellation`). An error
 > from PostgreSQL anywhere in a failure's cause chain makes the failure a
 > `DatabaseError`, so a refusal during connection carries its SQLSTATE too.
 > Credentials MUST NOT appear in an error, a nested cause, a representation
@@ -137,6 +133,72 @@ option.
 > A caught panic MUST stay an identifiable `InternalError`: it MUST NOT leave
 > an operation pending, and MUST NOT be classified as an expected rejection of
 > input.
+
+> [spec:pgorm:req:bindings.argument-errors]
+> An argument of a type the call does not take MUST be refused with the
+> language's `TypeError`, before anything is sent; a `ConstructionError`
+> (`bindings.errors`) is left to an argument whose value cannot become what
+> pgorm sends. Where a rule refuses an argument's other values with a
+> `ConstructionError`, an argument of another type is a `TypeError` all the
+> same. A `TypeError` is:
+>
+> - text that is not the language's string — an identifier, a type's,
+>   function's, field's or qualifier's name, a JSON path, a LIKE pattern or
+>   escape, a channel, a payload, a connection string, a COPY option — a flag
+>   that is not a boolean, a count, size, offset or sampling argument that is
+>   not a number (Python's `int` where a whole one is taken), a list that is
+>   not the language's list, a pair of the wrong length, and a value kind that
+>   is no kind name, `TypeName`, `CreatedRange` or `CreatedMultirange`;
+> - a value outside a closed choice, whose type is the choice: a class whose
+>   members are the choice, or a string that is one of its spellings, the
+>   union of their literals (`Literal[..]` in Python's typing) — a join kind,
+>   a lock strength, a frame's mode, start, end or exclusion, a NULLS
+>   placement, an SQL/JSON behaviour, a generated or identity mode, a
+>   deferrability, an enforcement, a foreign key's action, a behavior, a
+>   constraint's change, a transaction's mode or isolation level, a COPY
+>   format or log verbosity, the TLS mode, the recycling method, a sequence's
+>   type, an index entry's order, a view's check option and the rest;
+> - an option the call does not know — a keyword argument in Python, a key of
+>   the options object in JavaScript — so a misspelt option is never left out;
+> - a builder, or a plain value, where the call takes a builder of another
+>   class: a `Select`; an expression where only an expression goes (a
+>   projection, a grouping item, a RETURNING item, a table function's call, a
+>   CHECK, a side of AND and OR); an expression or a `Condition` where a
+>   predicate goes; an ordering; a `Window` or `ExtendedWindow`, a WINDOW
+>   entry and OVER's window among them; a frame; a `Table` or FROM item; a
+>   WITH clause; a MERGE action; a conflict action; a `ColumnDef`; a
+>   `DataType`; a `TypeName` where a type is named; a model's column
+>   declaration; and a receiver of another class, a handle only the binding
+>   makes among them;
+> - a builder no terminal runs given to one, a COPY given to any terminal but
+>   `copy_in` and `copy_out`, and a COPY of another direction or format given
+>   to `copy_in`, `copy_out`, `copy_in_rows` or `copy_out_rows`;
+> - a statement in a form the binding's raw rule does not take (`python.raw`,
+>   `napi.raw`): Python's SQL text outside a `RawSQL`, and JavaScript's
+>   parameter list beside a built statement; a COPY source that is text or no
+>   iterable, a chunk it yields that is not bytes, rows that are text or
+>   bytes, and a row that is no sequence; and a binder function that returns
+>   an awaitable or anything but an operand or a list of them.
+>
+> A value has no wrong type. A parameter, an operand, a `Value`'s data, the
+> data the binding's value classes are made from, a model field's value, a
+> COPY row's field and a JSON document may each be any value of the
+> language, and one that cannot become what pgorm sends is a
+> `ConstructionError`: a builder that is no expression given as an operand,
+> and `any(..)` and `all(..)` outside a comparison, among them. So is a name
+> pgorm has nothing for — a function, a value kind, a built-in type, a
+> pipeline cast, a registration, a field or a column — an identifier outside
+> 1–63 bytes, a count or size out of range, an integer outside `bigint`, an
+> empty list where one is needed, an expression where a table function takes
+> a call, a pending statement or a `ColumnDef` given to a terminal
+> (`bindings.schema`, `bindings.merge`), and a statement PostgreSQL would
+> refuse.
+>
+> A listener's capacity is the one argument a value of the right type can
+> take out of range with nothing pgorm sends to refuse it: a capacity of the
+> type the language counts in that is not a positive whole number is the
+> language's own class for a value out of range, Python's `ValueError` and
+> JavaScript's `RangeError`.
 
 ## Values
 
@@ -235,16 +297,16 @@ A pool holds the connections; a `Connection` is one of them checked out; a
 statement's rows over one. Each is a native handle that is released by being
 closed, and a transaction by the block or callback it was opened for ending.
 
-> [spec:pgorm:req:bindings.connections]
+> [spec:pgorm:req:bindings.connections+2]
 > A `Pool` MUST be built from a connection string and options: a TLS mode, CA
-> certificates, a maximum size, connect and acquire timeouts, a
+> certificates as PEM data, a maximum size, connect and acquire timeouts, a
 > statement-cache size, a recycling method and a statement-cache channel.
-> Building one sends nothing, and an unusable string or option is a
-> `ConstructionError`; `connect` returns a pool whose server answered. TLS
-> MUST default to verifying the server's certificate and host name against the
-> CA given or the platform's trust store, with no silent fallback to
-> plaintext. Only `sslmode=disable` in the string or the `disable` TLS mode
-> connects in plaintext.
+> Building one sends nothing, and a string or an option value the pool
+> cannot use is a `ConstructionError`; `connect` returns a pool whose server
+> answered. TLS MUST default to verifying the server's certificate and host
+> name against the CA given or the platform's trust store, with no silent
+> fallback to plaintext. Only `sslmode=disable` in the string or the
+> `disable` TLS mode connects in plaintext.
 >
 > A pool lends a `Connection` with `acquire`, and runs a statement of its own
 > on a connection lent to it alone. Acquiring past the acquire timeout MUST
@@ -272,18 +334,26 @@ closed, and a transaction by the block or callback it was opened for ending.
 > is released. Connections live on the runtime and hold nothing the
 > language's event loop waits on.
 
-> [spec:pgorm:req:bindings.results]
+> [spec:pgorm:req:bindings.results+2]
 > A pool, a connection and a transaction MUST run a statement through pgorm's
 > cached `ConnectionTrait` path with the same four terminals. `execute` gives
 > the affected-row count as an exact integer; `query` gives every row; `one`
 > gives exactly one row; and `optional` gives at most one, or null. A
 > statement is a built statement (`bindings.statements`), a pipeline
 > (`bindings.pipeline`), or raw SQL with its values (`python.raw`,
-> `napi.raw`). Any other row count is an error of the class each binding's
-> rule names (`python.row-count`, `napi.row-count`), decided after the query,
-> and never in place of a database or decode failure. A database or decode error
-> MUST NOT become an empty result, a null or a missing row. Decoding uses the
-> documented Rust decode path.
+> `napi.raw`). Any other row count is a `DecodeError` (`bindings.row-count`).
+> A database or decode error MUST NOT become an empty result, a null or a
+> missing row. Decoding uses the documented Rust decode path.
+
+> [spec:pgorm:req:bindings.row-count]
+> `one` finding no row or several, `optional` finding several, and the `one`
+> and `optional` of model, entity, graph and pipeline queries and of a
+> pipeline's selected sources finding a count they do not take MUST be a
+> `DecodeError`, the result being no record of the kind asked for: decided
+> after the query, never in place of a database or decode failure, and never
+> a `DatabaseError`, which PostgreSQL's errors alone are. A registered
+> entity's write that reads back no row, pgorm's `RecordNotFound`, is a
+> `DecodeError` too.
 
 > [spec:pgorm:req:bindings.streams]
 > `stream` on a pool or a connection MUST give an async iterator over a
@@ -486,20 +556,20 @@ the same terminals that run raw SQL.
 > condition is no statement to run. A statement binding more than 65,535
 > values MUST be refused with a `ConstructionError` before anything is sent.
 
-> [spec:pgorm:req:bindings.identifiers]
+> [spec:pgorm:req:bindings.identifiers+2]
 > Identifiers, qualified type names, values, typed structural choices and raw
 > SQL MUST each have their own constructors, so no one is taken for another.
 > Every identifier — of a column, a table, a schema, an alias, a collation, a
 > common table expression or a type — MUST be text of 1 to 63 UTF-8 bytes
 > without NUL, minted with `Name::runtime`, so it is quoted wherever
-> pgorm-query writes it and a dot in it is part of the name; anything else is
+> pgorm-query writes it and a dot in it is part of the name; any other text is
 > a `ConstructionError`. Schema, table and column names are runtime inputs;
 > no fixture's names are required. Accepted text MUST reach the Rust API
 > unchanged, quotes, percent signs, backslashes and Unicode included. A
 > language or PostgreSQL limit on a representation MUST be an explicit error,
 > never a silent normalization.
 
-> [spec:pgorm:req:bindings.select]
+> [spec:pgorm:req:bindings.select+2]
 > `select` MUST build pgorm-query's `SelectStatement` through the Rust
 > builder's own methods:
 >
@@ -523,7 +593,7 @@ the same terminals that run raw SQL.
 >   `sql.ast.select.group-distinct`);
 > - ORDER BY with a direction and NULLS FIRST or LAST;
 > - LIMIT and OFFSET, each a non-negative integer within PostgreSQL's `bigint`,
->   or null to remove one, anything else a `ConstructionError`; and
+>   or null to remove one, any other integer a `ConstructionError`; and
 >   `limit_with_ties`, the same count in LIMIT's slot;
 > - DISTINCT;
 > - UNION, INTERSECT and EXCEPT, each with its ALL form;
@@ -677,7 +747,25 @@ the same terminals that run raw SQL.
 
 ## Expressions
 
-> [spec:pgorm:req:bindings.expressions]
+> [spec:pgorm:req:bindings.operands]
+> A value an operand is given that is not an expression MUST be bound, in
+> statements and pipelines alike, never written into the SQL: in a statement
+> as `bindings.expressions` binds it, and in a pipeline inferred or declared
+> with `Value` as a parameter is, an interval included, and minted as a
+> placeholder by the binder of the stage that takes it, a stage given no
+> binder function taking its binder form (`bindings.pipeline-binder`) when one
+> of its operands binds. A window's partition and ordering take no value.
+>
+> Both bindings MUST offer `literal(value)` in statements and in pipelines,
+> the one way a value reaches the SQL text, never by concatenation: a
+> statement's through pgorm-query's own rendering of a constant
+> (`SimpleExpr::Constant`), the value read as a parameter is read and cast as
+> its kind needs, an enum's label to its type and a created range's text to
+> its range; a pipeline's as pgorm's pipeline writes a literal
+> (`bindings.pipeline-expressions`). The literal path and the bound path stay
+> apart: neither replaces the other.
+
+> [spec:pgorm:req:bindings.expressions+2]
 > An expression MUST lower into pgorm-query's own builders. `col` is a column,
 > qualified by a table and its schema. An operand that is not an expression is
 > a value bound as a parameter, never interpolated: inferred as a parameter
@@ -701,7 +789,7 @@ the same terminals that run raw SQL.
 > expression. `matches` (`@@`) is `BinOper::Matches`, full-text search or a
 > `jsonpath` predicate. `path_exists` (`@?`) takes a `jsonpath` as text,
 > bound as pgorm-query's `json_path_exists` binds it, as text cast to
-> `jsonpath`; anything else is a `ConstructionError`. `starts_with`,
+> `jsonpath`; any other value is a `ConstructionError`. `starts_with`,
 > `ends_with` and `contains_text` read their argument as text through
 > PostgreSQL's `starts_with`, `right` and `strpos`, so `%` and `_` match
 > themselves. The other operand of each binary operator is bound unless it is
@@ -791,7 +879,7 @@ decode into records of its fields, and its relations, graphs, cursors and
 pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 `Paginator`.
 
-> [spec:pgorm:req:bindings.models]
+> [spec:pgorm:req:bindings.models+2]
 > `model(name, columns, schema)` MUST declare a model of a table,
 > schema-qualified when a schema is given, from a mapping of fields, each a
 > `Column(kind, options)`. The kind is one every result decodes as — any
@@ -801,8 +889,8 @@ pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 > field's own name by default), `nullable`, `array`, `primary_key`, `default`,
 > `generated` (always or by default) and an enum's `values`.
 >
-> Anything else MUST be a `ConstructionError` raised as the model is
-> declared: an unknown option, a key column that is nullable, a generated
+> Any other value MUST be a `ConstructionError` raised as the model is
+> declared: a key column that is nullable, a generated
 > column with a default, labels on a column that is no enum, two fields of
 > one column, a field named twice, an enum or created range without its
 > schema, and an identifier pgorm would not take. Declaring a model MUST send
@@ -953,7 +1041,7 @@ registrations. The program reaches each registration by name, and every
 operation on one is the entity's own Rust API. A binding cannot instantiate a
 Rust generic at run time, only use the ones compiled in.
 
-> [spec:pgorm:req:bindings.entities]
+> [spec:pgorm:req:bindings.entities+2]
 > Each binding MUST let a downstream application crate register its own
 > entities, `SelectGraph` shapes and pipeline source tuples, for any entity
 > whose model converts into its ActiveModel, and build one native module from
@@ -964,7 +1052,9 @@ Rust generic at run time, only use the ones compiled in.
 > fabricate a generic instantiation at run time.
 >
 > `entity(name)` and `graph(name)` give one registration, and a name the
-> module does not register is a `ConstructionError`. `describe()` reports a
+> module does not register is a `ConstructionError`; `entities()`, `graphs()`
+> and `pipeline.source_tuples()` list the names the module registers of each
+> kind, in order. `describe()` reports a
 > registration: its table; each column's SQL name, type, nullability, key
 > membership and the kind its values bind and read as; its primary key, and
 > whether that key ends `WITHOUT OVERLAPS`; its relations, with their columns,
@@ -1022,7 +1112,7 @@ Rust generic at run time, only use the ones compiled in.
 > is the column's value with the kind the entity declares. A record or an
 > ActiveModel of another registration MUST be refused.
 
-> [spec:pgorm:req:bindings.entity-versions]
+> [spec:pgorm:req:bindings.entity-versions+2]
 > The write terminals that read a row's two versions MUST be the statement
 > terminals they are in Rust, so no `ActiveModelBehavior` hook runs around
 > them: an update's `returning_change` is `UpdateOne::exec_returning_change`;
@@ -1033,8 +1123,9 @@ Rust generic at run time, only use the ones compiled in.
 > new record, or updated, holding both. A row a conflict clause held back is
 > null from `returning_upsert` and left out of `returning_upserts`.
 > `update_many().set` writes a value through the column's `save_as` and takes
-> an expression as written; how an `update_many()` with no condition is held
-> is each binding's own (`napi.update-many-guard`).
+> an expression as written. An `update_many()` MUST have `where` or
+> `all_rows()` before it runs, a `ConstructionError` otherwise, as a
+> statement's UPDATE does (`bindings.writes`).
 
 > [spec:pgorm:req:bindings.entity-graphs+2]
 > `graph(name).find(aliases)` MUST build the registered `SelectGraph` with the
@@ -1123,7 +1214,7 @@ placeholders belong to the stage that minted them.
 > `ConstructionError` from `inspect()` or the terminal, before anything is
 > sent.
 
-> [spec:pgorm:req:bindings.pipeline-expressions]
+> [spec:pgorm:req:bindings.pipeline-expressions+2]
 > Pipeline expressions MUST be objects of their own, lowered into
 > `pgorm::pipeline::Expr` only as a stage takes them, never mixed with the
 > statement builders' expressions: `col(table, column)`, qualified as prqlc
@@ -1145,9 +1236,8 @@ placeholders belong to the stage that minted them.
 > is a placeholder, inferred or declared with `Value` as a parameter is, an
 > interval included. A value with no kind and a value whose kind needs a cast
 > pgorm's pipeline cannot write (an enum's or a created range's) MUST be a
-> `ConstructionError` naming the explicit form. How a plain operand that is
-> neither is read is each binding's own (`python.pipeline-operands`,
-> `napi.pipeline-operands`).
+> `ConstructionError` naming the explicit form. A plain operand is bound by
+> the stage that takes it (`bindings.operands`).
 
 > [spec:pgorm:req:bindings.pipeline-binder]
 > Each expression-taking stage MUST have a binder form — `filter_with`,
@@ -1375,7 +1465,7 @@ placeholders belong to the stage that minted them.
 > Commenting on a table and on a column build its COMMENT ON, the text a
 > literal pgorm-query escapes.
 
-> [spec:pgorm:req:bindings.schema-views]
+> [spec:pgorm:req:bindings.schema-views+2]
 > Views, materialized views and tables created from a query MUST be built
 > through pgorm-query's builders for them (`sql.ddl.view`,
 > `sql.ddl.materialized-view`, `sql.ddl.create-table-as`), each named as a
@@ -1412,15 +1502,14 @@ placeholders belong to the stage that minted them.
 >   `if_exists` and a behavior.
 >
 > What the Rust types cannot hold MUST be refused with a `ConstructionError`
-> as the statement is built, never dropped: a check option other than the
-> two, a recursive view without columns, and a refresh both concurrent and
-> with no data. What only the server knows it refuses, by SQLSTATE, as a
-> `DatabaseError`: a check option on a view that cannot be updated
-> (`0A000`), a row a check option refuses (`44000`), an OR REPLACE that moves
-> or drops a column (`42P16`), a materialized view read before it is
-> populated (`55000`), a concurrent refresh without a unique index (`55000`)
-> or of an unpopulated view (`0A000`), and a drop of the other kind
-> (`42809`).
+> as the statement is built, never dropped: a recursive view without columns,
+> and a refresh both concurrent and with no data. What only the server knows
+> it refuses, by SQLSTATE, as a `DatabaseError`: a check option on a view that
+> cannot be updated (`0A000`), a row a check option refuses (`44000`), an OR
+> REPLACE that moves or drops a column (`42P16`), a materialized view read
+> before it is populated (`55000`), a concurrent refresh without a unique
+> index (`55000`) or of an unpopulated view (`0A000`), and a drop of the other
+> kind (`42809`).
 
 > [spec:pgorm:req:bindings.schema-schemas]
 > The statements over a schema MUST be built through pgorm-query's `Schema`
@@ -1437,7 +1526,7 @@ placeholders belong to the stage that minted them.
 > drop under RESTRICT, said or unsaid, of a schema that holds anything
 > (`2BP01`).
 
-> [spec:pgorm:req:bindings.schema-domains]
+> [spec:pgorm:req:bindings.schema-domains+2]
 > The statements over a domain MUST be built through pgorm-query's `Domain`
 > (`sql.ddl.domain`), under `bindings.schema`, each domain named as a type is,
 > by text or a `TypeName` carrying its schema, and every other name an
@@ -1459,16 +1548,16 @@ placeholders belong to the stage that minted them.
 > never empty, with `if_exists` and a behavior. `inspect()` gives an empty
 > parameter list, a default's and a check's values inlined.
 >
-> A name that is not an identifier, a check that is not an expression and an
-> unknown base type MUST be refused as the statement is built, the first two
-> with a `ConstructionError`. A registered entity's column whose type is a
-> domain (`ColumnType::Domain`) reports, binds and reads as the kind of the
-> type it is over, an enum's labels included, so its records and the types
-> generated for it are typed by its base. What only the server knows it
-> refuses by SQLSTATE, as a `DatabaseError`: a domain or constraint name
-> already taken (`42710`); a missing domain or constraint (`42704`); a value
-> a check refuses (`23514`) and a null under NOT NULL (`23502`), whether
-> written to a column of the domain or met among the values already there by
-> adding a check, setting NOT NULL or validating a constraint; a collation on
-> a base type without one (`42804`); and a drop under RESTRICT, said or
-> unsaid, of a domain a column is typed with (`2BP01`).
+> Text that is not an identifier and an unknown base type MUST be refused as
+> the statement is built, the first with a `ConstructionError`. A registered
+> entity's column whose type is a domain (`ColumnType::Domain`) reports, binds
+> and reads as the kind of the type it is over, an enum's labels included, so
+> its records and the types generated for it are typed by its base. What only
+> the server knows it refuses by SQLSTATE, as a `DatabaseError`: a domain or
+> constraint name already taken (`42710`); a missing domain or constraint
+> (`42704`); a value a check refuses (`23514`) and a null under NOT NULL
+> (`23502`), whether written to a column of the domain or met among the values
+> already there by adding a check, setting NOT NULL or validating a
+> constraint; a collation on a base type without one (`42804`); and a drop
+> under RESTRICT, said or unsaid, of a domain a column is typed with
+> (`2BP01`).

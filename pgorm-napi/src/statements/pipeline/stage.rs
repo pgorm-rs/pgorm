@@ -259,6 +259,7 @@ fn relation<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<So
             alias: None,
         });
     }
+    // [spec:pgorm:req:napi.pipeline-table-names]
     if value.is_a::<JsString, _>(cx) {
         let name = super::super::args::name(cx, value)?;
         return Ok(Source {

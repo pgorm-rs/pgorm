@@ -39,7 +39,7 @@ impl Redactions {
     }
 }
 
-// [spec:pgorm:req:bindings.errors+2]
+// [spec:pgorm:req:bindings.errors+3]
 pub(crate) fn database_error(error: pgorm::Error, secrets: &Redactions) -> PyErr {
     let mut source: &(dyn std::error::Error + 'static) = &error;
     loop {
@@ -60,7 +60,7 @@ pub(crate) fn database_error(error: pgorm::Error, secrets: &Redactions) -> PyErr
         pgorm::Error::Listen(_) => ConnectionError::new_err(secrets.apply(&error.to_string())),
         // A result that is not the row or rows asked for, a `one` finding none
         // among them, cannot become the record asked for.
-        // [spec:pgorm:req:python.row-count+2]
+        // [spec:pgorm:req:bindings.row-count]
         pgorm::Error::Conversion { .. }
         | pgorm::Error::Type(_)
         | pgorm::Error::Json(_)
@@ -84,7 +84,7 @@ fn postgres_error(error: &tokio_postgres::Error, secrets: &Redactions) -> PyErr 
         return client_error(error, secrets);
     };
     let message = secrets.apply(db.message());
-    // [spec:pgorm:req:bindings.errors+2]    the constraint classes pgorm's SqlError names
+    // [spec:pgorm:req:bindings.errors+3]    the constraint classes pgorm's SqlError names
     let exception = match db.code().code() {
         "23505" => UniqueViolationError::new_err(message.clone()),
         "23503" => ForeignKeyViolationError::new_err(message.clone()),

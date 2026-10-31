@@ -9,7 +9,7 @@ use crate::{
     transactions::work::{Output, Work},
 };
 
-// [spec:pgorm:req:bindings.results]
+// [spec:pgorm:req:bindings.results+2]
 pub(crate) fn execute<'py>(
     py: Python<'py>,
     target: Target,
@@ -47,7 +47,7 @@ pub(crate) fn fetch<'py>(
         let Output::Rows(rows) = target.run(Work::Fetch(compiled)).await? else {
             return Err(InternalError::new_err("unexpected query result"));
         };
-        // [spec:pgorm:req:python.row-count+2]
+        // [spec:pgorm:req:bindings.row-count]
         if (mode == 1 && rows.len() != 1) || (mode == 2 && rows.len() > 1) {
             return Err(DecodeError::new_err(format!(
                 "expected {} row, received {}",

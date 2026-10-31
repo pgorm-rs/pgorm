@@ -11,7 +11,7 @@ def rows(changes):
     return [(change.old["id"], change.old["note"], change.new["note"]) for change in changes]
 
 
-# [spec:pgorm:req:bindings.entity-versions/test]
+# [spec:pgorm:req:bindings.entity-versions+2/test]
 class RegisteredVersions(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -63,7 +63,7 @@ class RegisteredVersions(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(p.ConstructionError):
                 await self.account.update_many().where(self.account.col("id") == 1).returning_changes(connection)
 
-    # [spec:pgorm:req:bindings.entity-versions/test]
+    # [spec:pgorm:req:bindings.entity-versions+2/test]
     async def test_update_many_needs_where_or_all_rows(self):
         async with self.pool.connection() as connection:
             unguarded = self.account.update_many().set("note", "every")

@@ -5,7 +5,7 @@
  */
 
 // [spec:pgorm:req:napi.typing+1]
-// [spec:pgorm:req:bindings.expressions]
+// [spec:pgorm:req:bindings.expressions+2]
 // [spec:pgorm:req:bindings.quantifiers]
 // [spec:pgorm:req:bindings.case]
 

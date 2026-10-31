@@ -27,7 +27,7 @@ _GATHER = 64 * 1024
 _SLICE = 256 * 1024
 
 
-# [spec:pgorm:req:python.argument-errors]
+# [spec:pgorm:req:bindings.argument-errors]
 def _view(item: object) -> memoryview:
     if isinstance(item, str):
         raise TypeError("COPY data is bytes; encode text before copying it")

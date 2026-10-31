@@ -5,7 +5,7 @@
 // the statement builders. Declaring a model sends nothing and runs no DDL,
 // and claims no Rust entity: no derive, `EntityTrait` or ActiveModel hook is
 // behind it.
-// [spec:pgorm:req:bindings.models]
+// [spec:pgorm:req:bindings.models+2]
 
 import { Condition } from "./conditions.js";
 import { ConstructionError } from "./errors.js";

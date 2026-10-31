@@ -3,7 +3,7 @@ use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use crate::errors::ConstructionError;
 
-// [spec:pgorm:req:bindings.identifiers]
+// [spec:pgorm:req:bindings.identifiers+2]
 /// One owned PostgreSQL identifier; punctuation is never parsed as SQL.
 #[pyclass(name = "Identifier", module = "pgorm", frozen, eq, from_py_object)]
 #[derive(Clone, Debug, PartialEq, Eq)]

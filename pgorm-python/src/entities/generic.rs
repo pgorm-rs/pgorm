@@ -25,7 +25,7 @@ pub(crate) struct EntityAdapter<E> {
     pub(crate) entity: PhantomData<E>,
 }
 
-// [spec:pgorm:req:bindings.entities]
+// [spec:pgorm:req:bindings.entities+2]
 impl<E> EntityBackend for EntityAdapter<E>
 where
     E: EntityTrait + Send + Sync + 'static,

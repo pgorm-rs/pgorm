@@ -115,6 +115,7 @@ enum Request {
     UnlistenAll,
 }
 
+// [spec:pgorm:req:bindings.argument-errors]
 fn channel(value: &Bound<'_, PyAny>) -> PyResult<String> {
     value
         .extract::<String>()
@@ -346,7 +347,7 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     Ok(())
 }
 
-// [spec:pgorm:req:python.capabilities+1]
+// [spec:pgorm:req:python.capabilities+2]
 // [spec:pgorm:req:bindings.listen+2]
 pub(crate) fn policy() -> Value {
     json!({

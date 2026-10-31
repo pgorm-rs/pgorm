@@ -3,7 +3,7 @@ use serde_json::{Value, json};
 
 use crate::UnsupportedCapabilityError;
 
-// [spec:pgorm:req:python.capabilities+1]
+// [spec:pgorm:req:python.capabilities+2]
 fn manifest() -> Value {
     let scalar_kinds = [
         "bool",
@@ -241,7 +241,7 @@ fn manifest() -> Value {
         operations.extend(crate::schema::capabilities());
         operations.extend(crate::transactions::capabilities());
         operations.extend(crate::copy::capabilities());
-        // [spec:pgorm:req:bindings.connections]
+        // [spec:pgorm:req:bindings.connections+2]
         operations.insert(
             "pool.statement_cache_channel".to_owned(),
             json!({"rust_api": "pgorm::ManagerConfig::statement_cache_channel", "features": ["runtime-tokio"]}),

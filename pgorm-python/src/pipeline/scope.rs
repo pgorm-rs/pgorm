@@ -63,8 +63,8 @@ impl Scope {
 /// A value to bind: any parameter, inferred or declared with `Value`, but none
 /// whose kind needs a cast pgorm's pipeline cannot write, nor `None`, which has
 /// no kind.
-// [spec:pgorm:req:bindings.pipeline-expressions]
-// [spec:pgorm:req:python.pipeline-operands+2]
+// [spec:pgorm:req:bindings.pipeline-expressions+2]
+// [spec:pgorm:req:bindings.operands]
 pub(super) fn bindable(value: &Bound<'_, PyAny>) -> PyResult<Value> {
     if value.is_none() {
         return Err(ConstructionError::new_err(
@@ -166,7 +166,7 @@ impl Plan {
     /// own value as the expression reaches it. `failed` notes a lowering that
     /// could not finish, which one scope minting both rules out.
     // [spec:pgorm:req:bindings.pipeline-binder]
-    // [spec:pgorm:req:python.pipeline-operands+2]
+    // [spec:pgorm:req:bindings.operands]
     pub(super) fn lower<'brand, const N: usize>(
         &self,
         binder: &mut pl::Binder<'brand>,

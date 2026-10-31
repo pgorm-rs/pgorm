@@ -27,7 +27,7 @@ def accounts():
 
 
 class ModelConstruction(unittest.TestCase):
-    # [spec:pgorm:req:bindings.models/test]
+    # [spec:pgorm:req:bindings.models+2/test]
     def test_descriptor_names_and_values_are_owned(self):
         from pgorm.models.columns import MODEL_KINDS
 
@@ -61,7 +61,7 @@ class ModelConstruction(unittest.TestCase):
         self.assertEqual(write.inspect().params[-1].value, ["a"])
         self.assertEqual(write.inspect().params[0].kind, "i32")
 
-    # [spec:pgorm:req:bindings.models/test]
+    # [spec:pgorm:req:bindings.models+2/test]
     def test_unknown_fields_and_collisions_fail_early(self):
         model = accounts()
         for operation in (
