@@ -15380,6 +15380,13 @@ children (
                         kind @note
                         text "The first CodeQL Python upload found high-severity py/redos alert #1 in test_emit_rust.py: the Rust-literal test regex allowed a backslash-u sequence through both a wildcard escape and a Unicode escape branch. Rewrote the parser regexes with disjoint emitted escape forms; 326 generative tests and Ruff format/lint pass. Enforcement remains in evaluate mode until the fix is rescanned."
                     }
+
+                    {
+                        at 2026-10-31T20:40:35.823237Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "CodeQL Rust security-extended scan surfaced four high-severity rust/cleartext-logging alerts, all classified test and all tracing the view fixture helper active_accounts() into assertion diagnostics. Renamed the fixture helper to view_body() so CodeQL no longer infers account data from a name-only test fixture. Verified 13 focused render-oracle view tests, cargo fmt, workspace check/clippy, and PostgreSQL 19 all-target check/clippy."
+                    }
                 )
             }
         )

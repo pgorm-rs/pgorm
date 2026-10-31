@@ -37,7 +37,7 @@ fn option_names(node: &serde_json::Value) -> Vec<&str> {
 /// `SELECT "id", "name" FROM "account" WHERE "active" = TRUE AND "name" <>
 /// E'it\'s'`: a body carrying two values, one of them a string whose quote
 /// the literal escapes.
-fn active_accounts() -> SelectStatement {
+fn view_body() -> SelectStatement {
     Query::select()
         .columns([n("id"), n("name")])
         .from(n("account"))
@@ -53,7 +53,7 @@ const ACTIVE_ACCOUNTS: &str =
 // body's values are written into it as literals, there being nothing to bind them to
 #[test]
 fn a_view_writes_its_body_with_values_inlined() -> error::Result<()> {
-    let sql = View::create(n("active_account"), active_accounts())?.to_string();
+    let sql = View::create(n("active_account"), view_body())?.to_string();
     assert_eq!(
         sql,
         format!(r#"CREATE VIEW "active_account" AS {ACTIVE_ACCOUNTS}"#)
@@ -82,7 +82,7 @@ fn a_view_writes_its_body_with_values_inlined() -> error::Result<()> {
 // as the clause it was written as
 #[test]
 fn every_view_clause_renders_in_one_order() -> error::Result<()> {
-    let sql = View::create((n("app"), n("active_account")), active_accounts())?
+    let sql = View::create((n("app"), n("active_account")), view_body())?
         .check_option(ViewCheckOption::Local)
         .security_invoker()
         .columns([n("account_id"), n("account_name")])
@@ -255,7 +255,7 @@ fn a_view_drop_names_one_or_more_views() {
 // read back as the CREATE TABLE AS the grammar holds it as
 #[test]
 fn a_materialized_view_is_created_empty_or_full() -> error::Result<()> {
-    let sql = MaterializedView::create(n("active_account"), active_accounts())?.to_string();
+    let sql = MaterializedView::create(n("active_account"), view_body())?.to_string();
     assert_eq!(
         sql,
         format!(r#"CREATE MATERIALIZED VIEW "active_account" AS {ACTIVE_ACCOUNTS}"#)
@@ -265,8 +265,7 @@ fn a_materialized_view_is_created_empty_or_full() -> error::Result<()> {
     assert_eq!(create["into"]["rel"]["relname"], "active_account");
     assert_eq!(create["into"]["skip_data"], false);
 
-    let mut statement_ =
-        MaterializedView::create((n("app"), n("active_account")), active_accounts())?;
+    let mut statement_ = MaterializedView::create((n("app"), n("active_account")), view_body())?;
     statement_
         .with_no_data()
         .columns([n("account_id")])
@@ -355,7 +354,7 @@ fn a_materialized_view_drop_names_its_kind() {
 // renamed or not, and its rows or none
 #[test]
 fn a_table_is_created_from_a_query() -> error::Result<()> {
-    let sql = Table::create_as(n("account_copy"), active_accounts())?.to_string();
+    let sql = Table::create_as(n("account_copy"), view_body())?.to_string();
     assert_eq!(
         sql,
         format!(r#"CREATE TABLE "account_copy" AS {ACTIVE_ACCOUNTS}"#)
@@ -364,7 +363,7 @@ fn a_table_is_created_from_a_query() -> error::Result<()> {
     assert_eq!(create["objtype"], ObjectType::ObjectTable as i32);
     assert_eq!(create["into"]["rel"]["relname"], "account_copy");
 
-    let mut statement_ = Table::create_as((n("app"), n("account_copy")), active_accounts())?;
+    let mut statement_ = Table::create_as((n("app"), n("account_copy")), view_body())?;
     statement_
         .column(n("account_id"))
         .with_no_data()
