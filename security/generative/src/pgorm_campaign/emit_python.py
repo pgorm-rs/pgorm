@@ -870,7 +870,7 @@ class Emitter:
                     query = call(query, "column", [definition])
                 key = [column["name"] for column in d["columns"] if column["primary"]]
                 if key:
-                    query = call(query, "primary_key", [literal(name) for name in key])
+                    query = call(query, "primary_key", [literal(key)])
                 return query
             case "schema.drop":
                 return f"sch.drop_table({var(i['table'])})"
@@ -896,23 +896,25 @@ class Emitter:
                 return call(query, "unique", []) if d["unique"] else query
             case "schema.enum":
                 kind = type_name(d["name"], d["schema"])
-                return f"sch.create_enum({kind}, {literal(d['labels'])})"
+                return f"sch.create_type({kind}).values({literal(d['labels'])})"
             case "schema.enum_change":
                 kind = type_name(d["name"], d["schema"])
                 if d["method"] == "drop":
-                    return f"sch.drop_enum({kind})"
+                    return f"sch.drop_type({kind})"
                 if "value" not in d:
                     raise UnsupportedInstruction(
                         "schema.enum_change " + d["method"] + " needs a value"
                     )
                 if d["method"] == "add":
-                    return f"sch.add_enum_value({kind}, {literal(d['value'])})"
+                    return f"sch.alter_type({kind}).add_value({literal(d['value'])})"
                 if "new_value" not in d:
                     raise UnsupportedInstruction(
                         "schema.enum_change rename needs its replacement value"
                     )
-                arguments = [kind, literal(d["value"]), literal(d["new_value"])]
-                return "sch.rename_enum_value(" + ", ".join(arguments) + ")"
+                arguments = [literal(d["value"]), literal(d["new_value"])]
+                return (
+                    f"sch.alter_type({kind}).rename_value(" + ", ".join(arguments) + ")"
+                )
         raise UnsupportedInstruction("no public Python source for " + name)
 
     def stage(self, node, indent, lines):

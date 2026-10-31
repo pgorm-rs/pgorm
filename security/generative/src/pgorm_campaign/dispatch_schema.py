@@ -37,7 +37,7 @@ def dispatch(name, i, d, p):
                 query = query.column(value)
             key = [column["name"] for column in d["columns"] if column["primary"]]
             if key:
-                query = query.primary_key(*key)
+                query = query.primary_key(key)
             return query, ["pgorm_query::Table::create", "pgorm_query::ColumnDef"]
         case "schema.drop":
             return schema.drop_table(i["table"]), ["pgorm_query::Table::drop"]
@@ -58,22 +58,24 @@ def dispatch(name, i, d, p):
                 "pgorm_query::Index::create"
             ]
         case "schema.enum":
-            return schema.create_enum(
-                p.TypeName(d["name"], schema=d["schema"]), d["labels"]
-            ), ["pgorm_query::extension::postgres::Type::create"]
+            kind = p.TypeName(d["name"], schema=d["schema"])
+            return schema.create_type(kind).values(d["labels"]), [
+                "pgorm_query::extension::postgres::Type::create"
+            ]
         case "schema.enum_change":
             kind = p.TypeName(d["name"], schema=d["schema"])
             match d["method"]:
                 case "add":
-                    return schema.add_enum_value(kind, d["value"]), [
+                    return schema.alter_type(kind).add_value(d["value"]), [
                         "pgorm_query::extension::postgres::Type::alter"
                     ]
                 case "rename":
-                    return schema.rename_enum_value(kind, d["value"], d["new_value"]), [
-                        "pgorm_query::extension::postgres::Type::alter"
-                    ]
+                    renamed = schema.alter_type(kind).rename_value(
+                        d["value"], d["new_value"]
+                    )
+                    return renamed, ["pgorm_query::extension::postgres::Type::alter"]
                 case "drop":
-                    return schema.drop_enum(kind), [
+                    return schema.drop_type(kind), [
                         "pgorm_query::extension::postgres::Type::drop"
                     ]
     raise RuntimeError("inactive schema dispatch: " + name)

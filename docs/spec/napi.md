@@ -306,58 +306,6 @@ first rule: a value reaches JavaScript exactly or not at all.
 > range's text to its range; the pipeline's as pgorm's pipeline writes a
 > literal. A pipeline's source may also be a table's name as a string.
 
-## Schema
-
-> [spec:pgorm:req:napi.schema-api+3]
-> The module MUST spell the DDL `bindings.schema` describes as these
-> factories and builders, every complete statement a `DDL` and a member of
-> the `Statement` union the terminals take; no export is named
-> `SchemaStatement`:
->
-> - `createTable(table)` gives a `CreateTable` with `column`, `primaryKey`,
->   `unique`, `foreignKey`, `check` and `ifNotExists`, and
->   `new ColumnDef(name, type)` a column;
-> - `alterTable(table)` gives a `PendingAlterTable`, whose first action gives
->   an `AlterTable` that takes more; `dropTable`, `renameTable`,
->   `renameColumn`, `renameConstraint` and `truncateTable` give statements;
-> - `createIndex(table, entry, { name })` gives a `CreateIndex` with
->   `column`, `unique`, `nullsNotDistinct`, `ifNotExists`, `using`, `include`
->   and `where`, an entry being a name, an expression or `{ on, order,
->   operatorClass }`; `dropIndex(table, name)` gives a statement;
-> - `createType(name)` gives a `CreateType` with `asEnum`, `values`,
->   `asComposite`, `attribute` and `asRange`; `alterType(name)` a
->   `PendingAlterType` with `addValue`, `renameTo`, `renameValue`,
->   `renameAttribute` (a `RenameAttribute`) and the composite's
->   `addAttribute`, `dropAttribute` and `alterAttribute` (an
->   `AlterComposite`); and `dropType(names, { ifExists, behavior })`;
-> - `createSequence(name)` gives a `CreateSequence` and `alterSequence(name)`
->   a `PendingAlterSequence`, whose first clause gives an `AlterSequence`;
->   `dropSequence`, `renameSequence`, `createExtension(name, { ifNotExists,
->   schema, version, cascade })`, `dropExtension(name, { ifExists,
->   behavior })`, `commentOnTable` and `commentOnColumn` give statements;
-> - `createView(name, query)` gives a `CreateView` with `orReplace`,
->   `columns`, `checkOption`, `securityBarrier` and `securityInvoker`;
->   `createRecursiveView(name, columns, query)` a `CreateRecursiveView` with
->   the same methods but `checkOption`; `createMaterializedView(name, query)`
->   and `createTableAs(name, query)` builders with `ifNotExists`, `columns`
->   and `withNoData`; and `refreshMaterializedView(name, { concurrently,
->   withNoData })`, `dropView` and `dropMaterializedView(names, { ifExists,
->   behavior })` statements;
-> - `createSchema(name, { ifNotExists })`, `dropSchema(names, { ifExists,
->   behavior })` and `renameSchema(name, newName)` give statements;
-> - `createDomain(name, base)` gives a `CreateDomain`; `alterDomain(name)` a
->   `PendingAlterDomain` whose actions `setDefault`, `dropDefault`,
->   `setNotNull`, `dropNotNull`, `addCheck(condition, { name, notValid })`,
->   `dropConstraint(name, { ifExists, behavior })`, `renameConstraint`,
->   `validateConstraint` and `renameTo` each give a statement; and
->   `dropDomain(names, { ifExists, behavior })`;
-> - `fromEntity(entity)` gives an `EntitySchema` of the table, enum, index
->   and comment statements (`bindings.schema-from-entity`).
->
-> A list of names is one name or a non-empty array, an empty array a
-> `ConstructionError`; a behavior is `"cascade"` or `"restrict"`; and a
-> collation a name or `{ name, schema }`.
-
 ## Registered entities
 
 > [spec:pgorm:req:napi.application+1]

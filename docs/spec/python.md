@@ -191,50 +191,6 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > A pipeline's `all`, `one` and `optional` run it on a connection or a
 > transaction, as the terminals do.
 
-> [spec:pgorm:req:python.schema-api+2]
-> `pgorm.schema` MUST spell the DDL `bindings.schema` describes as these
-> functions and builders, each returning a `DDL` statement unless it is a
-> builder:
->
-> - `CreateTable(table)` (also `create_table`), `ColumnDef(name, type)`,
->   `CreateIndex(table, first, *, name)` (also `create_index`) and
->   `CreateDomain(name, base)` (also `create_domain`) are builders;
-> - each ALTER TABLE action is a function over the table it names first:
->   `add_column`, `modify_column`, `drop_column`, `set_expression`,
->   `drop_expression`, `add_primary_key`, `add_unique`, `add_check`,
->   `add_not_null`, `drop_constraint`, `validate_constraint`,
->   `alter_constraint`, `rename_column` and `rename_constraint`, beside
->   `drop_table`, `rename_table`, `truncate_table` and `drop_index`;
-> - an enum type is `create_enum(name, values)`, `add_enum_value(name, value,
->   *, before, after)`, `rename_enum_value`, `rename_enum` and `drop_enum`;
-> - views are `create_view(name, query, *, columns, or_replace, check_option,
->   security_barrier, security_invoker)`, `check_option` being `"local"` or
->   `"cascaded"`; `create_recursive_view(name, columns, query, *, or_replace,
->   security_barrier, security_invoker)`; `drop_view(name, *, if_exists,
->   cascade)`; `create_materialized_view(name, query, *, columns,
->   if_not_exists, with_no_data)`; `refresh_materialized_view(name, *,
->   concurrently, with_no_data)`; `drop_materialized_view(name, *, if_exists,
->   cascade)`; and `create_table_as(name, query, *, columns, if_not_exists,
->   with_no_data)`;
-> - schemas are `create_schema(name, *, if_not_exists)`, `drop_schema(name,
->   *names, if_exists, cascade)` and `rename_schema(name, new_name)`;
-> - each ALTER DOMAIN action is a function over the domain it names first:
->   `set_domain_default(domain, value)`, `drop_domain_default(domain)`,
->   `set_domain_not_null(domain)`, `drop_domain_not_null(domain)`,
->   `add_domain_check(domain, condition, *, name, not_valid)`,
->   `drop_domain_constraint(domain, name, *, if_exists, cascade)`,
->   `rename_domain_constraint(domain, name, new_name)`,
->   `validate_domain_constraint(domain, name)` and `rename_domain(domain,
->   new_name)`, beside `drop_domain(domain, *domains, if_exists, cascade)`;
-> - `from_entity(entity)` gives an `EntitySchema` of the table, enum, index
->   and comment statements (`bindings.schema-from-entity`).
->
-> Every name is a `str` or an `Identifier`, and a type a `str`, a `TypeName`,
-> a `DataType`, a `CreatedRange` or a `CreatedMultirange`. The capability
-> manifest lists each function as a `schema.` operation needing no
-> registration, `CreateDomain` as `schema.create_domain`, and `domain_value`
-> among the expression constructors.
-
 ## Execution and lifecycle
 
 > [spec:pgorm:req:python.runtime+1]

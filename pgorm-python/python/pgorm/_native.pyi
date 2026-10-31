@@ -1,38 +1,42 @@
 from typing import Any
 from asyncio import CancelledError as CancelledError
 from ._schema import (
-    DataType as DataType, ColumnDef as ColumnDef, DDL as DDL,
-    CreateTable as CreateTable, CreateIndex as CreateIndex, EntitySchema as EntitySchema,
-    schema_from_entity as schema_from_entity, drop_table as drop_table,
-    rename_table as rename_table, rename_column as rename_column, truncate_table as truncate_table,
-    add_column as add_column, modify_column as modify_column, drop_column as drop_column,
-    set_expression as set_expression, drop_expression as drop_expression,
-    add_primary_key as add_primary_key, add_unique as add_unique,
-    drop_index as drop_index, create_enum as create_enum, add_enum_value as add_enum_value,
-    rename_enum as rename_enum, rename_enum_value as rename_enum_value, drop_enum as drop_enum,
+    DataType as DataType, ColumnDef as ColumnDef, DDL as DDL, EntitySchema as EntitySchema,
+    schema_from_entity as schema_from_entity,
 )
-from ._schema_constraints import (
-    add_not_null as add_not_null, add_check as add_check,
-    validate_constraint as validate_constraint, alter_constraint as alter_constraint,
-    drop_constraint as drop_constraint, rename_constraint as rename_constraint,
+from ._schema_tables import (
+    CreateTable as CreateTable, CreateIndex as CreateIndex, drop_table as drop_table,
+    rename_table as rename_table, rename_column as rename_column,
+    rename_constraint as rename_constraint, truncate_table as truncate_table,
+    comment_on_table as comment_on_table, comment_on_column as comment_on_column,
+    drop_index as drop_index,
+)
+from ._schema_alter import (
+    PendingAlterTable as PendingAlterTable, AlterTable as AlterTable, alter_table as alter_table,
+)
+from ._schema_types import (
+    CreateType as CreateType, PendingAlterType as PendingAlterType,
+    AlterComposite as AlterComposite, RenameAttribute as RenameAttribute,
+    alter_type as alter_type, drop_type as drop_type,
+)
+from ._schema_sequences import (
+    CreateSequence as CreateSequence, PendingAlterSequence as PendingAlterSequence,
+    AlterSequence as AlterSequence, alter_sequence as alter_sequence,
+    drop_sequence as drop_sequence, rename_sequence as rename_sequence,
+    create_extension as create_extension, drop_extension as drop_extension,
 )
 from ._schema_views import (
-    create_view as create_view, create_recursive_view as create_recursive_view,
-    drop_view as drop_view, create_materialized_view as create_materialized_view,
-    refresh_materialized_view as refresh_materialized_view,
-    drop_materialized_view as drop_materialized_view, create_table_as as create_table_as,
+    CreateView as CreateView, CreateRecursiveView as CreateRecursiveView,
+    CreateMaterializedView as CreateMaterializedView, CreateTableAs as CreateTableAs,
+    drop_view as drop_view, refresh_materialized_view as refresh_materialized_view,
+    drop_materialized_view as drop_materialized_view,
 )
 from ._schema_schemas import (
     create_schema as create_schema, drop_schema as drop_schema, rename_schema as rename_schema,
 )
 from ._schema_domains import (
-    CreateDomain as CreateDomain, set_domain_default as set_domain_default,
-    drop_domain_default as drop_domain_default, set_domain_not_null as set_domain_not_null,
-    drop_domain_not_null as drop_domain_not_null, add_domain_check as add_domain_check,
-    drop_domain_constraint as drop_domain_constraint,
-    rename_domain_constraint as rename_domain_constraint,
-    validate_domain_constraint as validate_domain_constraint, rename_domain as rename_domain,
-    drop_domain as drop_domain,
+    CreateDomain as CreateDomain, PendingAlterDomain as PendingAlterDomain,
+    alter_domain as alter_domain, drop_domain as drop_domain,
 )
 from ._pipeline_builder import Pipeline as Pipeline, PipelineSource as PipelineSource, PipelineGrouped as PipelineGrouped
 from ._pipeline_expr import PipelineExpr as PipelineExpr, PipelineBinder as PipelineBinder, PipelineOver as PipelineOver

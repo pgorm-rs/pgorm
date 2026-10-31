@@ -387,12 +387,12 @@ quality {
         // a Rust function through such an entry point; removing it removes
         // JSON_SCALAR from Python
         //
-        // drop_domain_default, set_domain_not_null and drop_domain_not_null
-        // are pgorm-python's bindings of the three ALTER DOMAIN actions that
+        // drop_default, set_not_null and drop_not_null are pgorm-python's
+        // PendingAlterDomain methods for the three ALTER DOMAIN actions that
         // take nothing but the domain, so each body is the one call that
         // chooses the action. Python reaches an action only through its own
-        // entry point; folding them into one function taking the action as a
-        // string would trade three typed names for one untyped argument
+        // method; folding them into one method taking the action as a string
+        // would trade three typed names for one untyped argument
         //
         // subquery_array and subquery_exists are pgorm-python's bindings of
         // Expr::array and Expr::exists, Python's array(select) and
@@ -400,6 +400,6 @@ quality {
         // clause to apply, so each body is the Rust constructor over the
         // embedded subquery, and the entry point is the only way Python
         // reaches it
-        allow-names (new account_only over raw json_scalar drop_domain_default set_domain_not_null drop_domain_not_null subquery_array subquery_exists)
+        allow-names (new account_only over raw json_scalar drop_default set_not_null drop_not_null subquery_array subquery_exists)
     }
 }

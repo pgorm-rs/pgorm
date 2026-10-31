@@ -24,7 +24,7 @@ class ViewConstruction(unittest.TestCase):
             p.require_capability("schema." + operation)
         table = p.Table("account")
         query = p.Select(p.col("id")).from_(table).where(p.col("name") != "it's")
-        view = s.create_view(p.Table("v", schema="app"), query, columns=["key"], check_option="local")
+        view = s.create_view(p.Table("v", schema="app"), query).columns(["key"]).check_option("local")
         compiled = view.inspect()
         self.assertEqual(
             compiled.sql,
@@ -57,19 +57,24 @@ class ViewConstruction(unittest.TestCase):
             lambda: s.refresh_materialized_view(p.Table("m"), concurrently=True, with_no_data=True),
             lambda: s.create_view(p.Table("v", alias="w"), query),
             lambda: s.create_materialized_view(p.Table("m", alias="w"), query),
-            lambda: s.create_table_as(p.Table("t"), query, columns=[""]),
+            lambda: s.create_table_as(p.Table("t"), query).columns([""]),
             lambda: s.drop_view(p.Table("v", alias="w")),
         ):
             with self.subTest(action=action), self.assertRaises(p.ConstructionError):
                 action()
-        with self.assertRaises(TypeError):
-            s.create_view(p.Table("v"), query, check_option="both")
         for action in (
             lambda: s.create_view(p.Table("v"), p.RawSQL("SELECT 1")),
-            lambda: s.create_table_as(p.Table("t"), query, columns="key"),
+            lambda: s.create_view(p.Table("v"), query).check_option("both"),
+            lambda: s.create_table_as(p.Table("t"), query).columns("key"),
         ):
             with self.subTest(action=action), self.assertRaises(TypeError):
                 action()
+        # The grammar takes no check option on a recursive view, no IF NOT EXISTS on a view
+        # and no OR REPLACE on a materialized view or a table, so their builders have none.
+        self.assertFalse(hasattr(s.CreateRecursiveView, "check_option"))
+        self.assertFalse(hasattr(s.CreateView, "if_not_exists"))
+        self.assertFalse(hasattr(s.CreateMaterializedView, "or_replace"))
+        self.assertFalse(hasattr(s.CreateTableAs, "or_replace"))
 
     # [spec:pgorm:req:bindings.schema-views/test]    each builder refuses a query whose tie limit
     # has no ORDER BY, or whose window is undeclared, as it is called, with the Rust constructor's error
@@ -125,7 +130,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
     # shows, an insert through it reaches the table, and its check option refuses a hidden row
     async def test_view_reads_writes_and_checks_rows(self):
         view = self.relation('active "x"')
-        await self.pool.execute(s.create_view(view, accounts_query(self.table), check_option="cascaded"))
+        await self.pool.execute(s.create_view(view, accounts_query(self.table)).check_option("cascaded"))
         self.assertEqual(await self.names(view), ["ada", "it's"])
         await self.pool.execute(p.insert(view).columns("name").values("dee"))
         self.assertEqual(await self.names(self.table), ["ada", "it's", "cy", "dee"])
@@ -135,8 +140,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
 
         await self.pool.execute(s.create_view(
             view, accounts_query(self.table).select(p.col("id"), p.col("name"), p.col("active"), p.col("id").as_("again")),
-            or_replace=True, security_barrier=True,
-        ))
+        ).or_replace().security_barrier())
         options = await self.pool.one(p.RawSQL(
             "SELECT reloptions::text[] AS options FROM pg_class WHERE oid = $1::text::regclass",
             [f'{self.quoted}."active ""x"""'],
@@ -145,7 +149,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(p.DatabaseError) as refused:
             await self.pool.execute(s.drop_view(self.table))
         self.assertEqual(refused.exception.sqlstate, "42809")
-        await self.pool.execute(s.drop_view(view, cascade=True))
+        await self.pool.execute(s.drop_view(view, behavior="cascade"))
         await self.pool.execute(s.drop_view(view, if_exists=True))
 
     # [spec:pgorm:req:bindings.schema-views/test]    an ordered tie limit the check admits is
@@ -179,7 +183,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
     # refresh, and a concurrent refresh needs a unique index
     async def test_materialized_view_refreshes_concurrently(self):
         view = self.relation('snapshot "x"')
-        await self.pool.execute(s.create_materialized_view(view, accounts_query(self.table), with_no_data=True))
+        await self.pool.execute(s.create_materialized_view(view, accounts_query(self.table)).with_no_data())
         with self.assertRaises(p.DatabaseError) as refused:
             await self.names(view)
         self.assertEqual(refused.exception.sqlstate, "55000")
@@ -197,7 +201,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(p.DatabaseError) as refused:
             await self.names(view)
         self.assertEqual(refused.exception.sqlstate, "55000")
-        await self.pool.execute(s.create_materialized_view(view, p.Select(p.literal(1)), if_not_exists=True))
+        await self.pool.execute(s.create_materialized_view(view, p.Select(p.literal(1))).if_not_exists())
         await self.pool.execute(s.drop_materialized_view(view))
         await self.pool.execute(s.drop_materialized_view(view, if_exists=True))
 
@@ -205,7 +209,7 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
     # has its columns, renamed where names are given, and keeps the rows inserted later
     async def test_table_created_from_query_without_data(self):
         copy = self.relation('copy "x"')
-        await self.pool.execute(s.create_table_as(copy, accounts_query(self.table), columns=["account_id"], with_no_data=True))
+        await self.pool.execute(s.create_table_as(copy, accounts_query(self.table)).columns(["account_id"]).with_no_data())
         empty = await self.pool.query(p.Select(p.col("account_id")).from_(copy))
         self.assertEqual(empty, [])
         await self.pool.execute(p.RawSQL(
@@ -213,9 +217,9 @@ class ViewDatabase(unittest.IsolatedAsyncioTestCase):
         ))
         rows = await self.pool.query(p.Select(p.col("account_id"), p.col("name")).from_(copy).order_by(p.col("account_id").asc()))
         self.assertEqual([dict(row) for row in rows], [{"account_id": 1, "name": "ada"}, {"account_id": 2, "name": "it's"}])
-        await self.pool.execute(s.create_table_as(copy, p.Select(p.literal(1)), if_not_exists=True))
+        await self.pool.execute(s.create_table_as(copy, p.Select(p.literal(1))).if_not_exists())
         with self.assertRaises(p.DatabaseError) as refused:
-            await self.pool.execute(s.create_table_as(self.relation("too_many"), p.Select(p.literal(1)), columns=["a", "b"]))
+            await self.pool.execute(s.create_table_as(self.relation("too_many"), p.Select(p.literal(1))).columns(["a", "b"]))
         self.assertEqual(refused.exception.sqlstate, "42601")
 
 

@@ -1,23 +1,59 @@
-use super::{PyCreateIndex, PyCreateTable, PyDDL};
+use super::{
+    PyCreateIndex, PyCreateTable, PyCreateType,
+    statement::{PyDDL, Statement},
+};
 use crate::{entities::PyEntity, errors::ConstructionError};
+use pgorm::pgorm_query::{
+    CommentStatement, IndexCreateStatement, TableCreateStatement, extension::TypeCreateStatement,
+};
 use pyo3::{exceptions::PyTypeError, prelude::*};
 
-/// A detached result of Rust's Schema methods for a compiled entity.
-#[derive(Clone, Debug)]
-#[pyclass(name = "EntitySchema", module = "pgorm.schema", frozen, from_py_object)]
+/// A detached result of Rust's Schema methods for a compiled entity: each
+/// read gives new statement objects over the statements pgorm wrote.
+#[derive(Debug)]
+#[pyclass(name = "EntitySchema", module = "pgorm.schema", frozen)]
 pub struct PyEntitySchema {
-    #[pyo3(get)]
-    pub(crate) table: PyCreateTable,
-    #[pyo3(get)]
-    pub(crate) enums: Vec<PyDDL>,
-    #[pyo3(get)]
-    pub(crate) indexes: Vec<PyCreateIndex>,
-    #[pyo3(get)]
-    pub(crate) comments: Vec<PyDDL>,
+    pub(crate) table: TableCreateStatement,
+    pub(crate) enums: Vec<TypeCreateStatement>,
+    pub(crate) indexes: Vec<IndexCreateStatement>,
+    pub(crate) comments: Vec<CommentStatement>,
 }
 
 #[pymethods]
 impl PyEntitySchema {
+    /// `CREATE TABLE`, with its primary key, unique keys and foreign keys.
+    #[getter]
+    fn table<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyCreateTable>> {
+        PyCreateTable::object(py, self.table.clone())
+    }
+
+    /// `CREATE TYPE .. AS ENUM` for each enum type its columns name.
+    #[getter]
+    fn enums<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyCreateType>>> {
+        self.enums
+            .iter()
+            .map(|statement| PyCreateType::object(py, statement.clone()))
+            .collect()
+    }
+
+    /// `CREATE INDEX` for each column it indexes.
+    #[getter]
+    fn indexes<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyCreateIndex>>> {
+        self.indexes
+            .iter()
+            .map(|statement| PyCreateIndex::object(py, statement.clone()))
+            .collect()
+    }
+
+    /// `COMMENT ON` its table and its columns.
+    #[getter]
+    fn comments(&self) -> Vec<PyDDL> {
+        self.comments
+            .iter()
+            .map(|statement| PyDDL::new(Statement::Comment(statement.clone())))
+            .collect()
+    }
+
     fn __bool__(&self) -> PyResult<bool> {
         Err(ConstructionError::new_err(
             "entity schemas cannot be tested as Python booleans",

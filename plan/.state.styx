@@ -2237,16 +2237,18 @@ impl_evidence (
     )}
     {id python-schema-gaps, covered_rules (
         bindings.schema-alter
+        bindings.schema-api
         bindings.schema-indexes
         bindings.schema-sequences
         bindings.schema-tables
         bindings.schema-types
     ), covered_claims (
-        {impl_name main, rule bindings.schema-alter}
-        {impl_name main, rule bindings.schema-indexes}
-        {impl_name main, rule bindings.schema-sequences}
-        {impl_name main, rule bindings.schema-tables}
-        {impl_name main, rule bindings.schema-types}
+        {impl_name python, rule bindings.schema-alter}
+        {impl_name python, rule bindings.schema-api}
+        {impl_name python, rule bindings.schema-indexes}
+        {impl_name python, rule bindings.schema-sequences}
+        {impl_name python, rule bindings.schema-tables}
+        {impl_name python, rule bindings.schema-types}
     )}
     {id python-select-gaps, covered_rules (
         bindings.from-subqueries
