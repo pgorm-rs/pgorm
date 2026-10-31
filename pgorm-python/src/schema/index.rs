@@ -50,28 +50,28 @@ pub struct PyCreateIndex;
 
 ddl_class!(PyCreateIndex, CreateIndex, IndexCreateStatement, with);
 
+/// An index over its first entry, named as asked and by PostgreSQL
+/// otherwise.
+// [spec:pgorm:req:bindings.schema-indexes]
+#[pyfunction]
+#[pyo3(signature=(table, on, *, name=None, order=None, operator_class=None))]
+pub(super) fn create_index<'py>(
+    py: Python<'py>,
+    table: &Bound<'_, PyAny>,
+    on: &Bound<'_, PyAny>,
+    name: Option<&Bound<'_, PyAny>>,
+    order: Option<&str>,
+    operator_class: Option<&Bound<'_, PyAny>>,
+) -> PyResult<Bound<'py, PyCreateIndex>> {
+    let mut created = Index::create(relation(table)?, entry(on, order, operator_class)?);
+    if let Some(name) = name {
+        created.name(args::name(name)?);
+    }
+    PyCreateIndex::object(py, created)
+}
+
 #[pymethods]
 impl PyCreateIndex {
-    /// An index over its first entry, named as asked and by PostgreSQL
-    /// otherwise.
-    // [spec:pgorm:req:bindings.schema-indexes]
-    #[new]
-    #[pyo3(signature=(table, on, *, name=None, order=None, operator_class=None))]
-    fn new(
-        table: &Bound<'_, PyAny>,
-        on: &Bound<'_, PyAny>,
-        name: Option<&Bound<'_, PyAny>>,
-        order: Option<&str>,
-        operator_class: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyClassInitializer<Self>> {
-        let mut created = Index::create(relation(table)?, entry(on, order, operator_class)?);
-        if let Some(name) = name {
-            created.name(args::name(name)?);
-        }
-        let statement = Statement::CreateIndex(created);
-        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
-    }
-
     #[pyo3(signature=(on, *, order=None, operator_class=None))]
     fn column<'py>(
         slf: &Bound<'py, Self>,

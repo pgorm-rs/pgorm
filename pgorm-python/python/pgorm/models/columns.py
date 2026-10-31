@@ -70,7 +70,7 @@ def _labels(values: object) -> tuple[str, ...]:
     return labels
 
 
-# [spec:pgorm:req:bindings.models+2]
+# [spec:pgorm:req:bindings.models+3]
 @dataclass(frozen=True, slots=True)
 class Column:
     kind: str | p.TypeName | p.CreatedRange
@@ -135,7 +135,9 @@ class Column:
         """Whether an insert may leave the column out."""
         return self.nullable or self.default or self.generated is not None
 
-    def validate(self, value: p.Value, *, decoding: bool = False) -> p.Value:
+    def _validate(self, value: p.Value, *, decoding: bool = False) -> p.Value:
+        """``value``, refused unless it is of the declared kind, null only
+        where the column is nullable and an enum's label one it lists."""
         error = p.DecodeError if decoding else p.ConstructionError
         if (value.kind, value.type_name, value.created_type, value.element_type) != (
             self._null.kind,
@@ -153,7 +155,8 @@ class Column:
                     raise error(f"{label!r} is not one of the column's values")
         return value
 
-    def value(self, data: Any) -> p.Value:
+    def _value(self, data: Any) -> p.Value:
+        """``data`` converted to the declared kind, and validated."""
         kind = self.kind
         if isinstance(data, p.Value):
             result = data
@@ -161,22 +164,11 @@ class Column:
             result = p.Value.array(kind, data)
         else:
             result = p.Value(data, kind)
-        return self.validate(result)
-
-    def describe(self) -> dict[str, Any]:
-        return {
-            "column": self.name,
-            "type": self._null.snapshot()["type"],
-            "nullable": self.nullable,
-            "primary_key": self.primary_key,
-            "default": self.default,
-            "generated": self.generated,
-            "values": None if self.values is None else list(self.values),
-        }
+        return self._validate(result)
 
 
 # [spec:pgorm:req:bindings.model-columns+1]
-# [spec:pgorm:req:bindings.column-operators]
+# [spec:pgorm:req:bindings.column-operators+1]
 class ModelColumn(p._DeclaredColumn):
     """A model field's column, itself the column's expression.
 
@@ -230,7 +222,7 @@ class ModelColumn(p._DeclaredColumn):
             raise p.ConstructionError(
                 f"{self.field_name} compared with None is never true: test it with is_null()"
             )
-        return self.declaration.value(value)
+        return self.declaration._value(value)
 
     def eq(self, other: Any) -> p.Expr:
         return super().eq(self._operand(other))

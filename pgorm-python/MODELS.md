@@ -40,6 +40,14 @@ non-boolean flag, a `generated` or `values` of the wrong type and an unknown
 a generated column with a default and labels on a column that is no enum a
 `ConstructionError`. An unknown option is Python's own `TypeError`.
 
+A `Column` is a declaration and has no methods: a model converts each value
+through its field's column where it takes one, and `Value(data, kind)` is the
+conversion a program calls. `model.describe()` reports the declaration as data:
+the table's `schema`, `table` and `alias`, the `primary_key` fields, and under
+`columns` each field's SQL `column`, its `type`, `nullable`, `primary_key`,
+`default`, `generated` and an enum's `values`. Neither a `Column` nor
+`col(field)` describes itself.
+
 ## Query and write
 
 ```python
@@ -103,11 +111,17 @@ fields, in declaration order. It requires every key field and rejects extras.
 Keys may be composite. Nullable primary-key declarations are rejected. A key
 declaration alone neither creates a constraint nor checks the database schema.
 
-`insert(mapping)`, `insert_many(rows)`, `update(mapping)` and `delete()` return
-write builders. `execute(connection)` returns affected rows. `returning(*fields)`
-selects declared output fields and returns a row-producing builder; no
-arguments means all fields. Updates and deletes require `where(predicate)` or
-explicit `all_rows()`, using the native write guard. An empty update is an
+`insert(mapping)` and `insert_many(rows)` return a `ModelInsert`,
+`update(mapping)` a `ModelUpdate` and `delete()` a `ModelDelete`, each with
+only its own statement's methods, so a type checker refuses an insert's `where`
+or a delete's `returning_change` as it refuses any attribute a class lacks.
+All three take `returning`, `execute` and `inspect`; an insert also takes
+`on_conflict` and the upsert terminals, an update `where`, `all_rows()` and the
+change terminals, and a delete `where` and `all_rows()`. `execute(connection)`
+returns affected rows. `returning(*fields)` selects declared output fields and
+returns a row-producing `ModelRows`; no arguments means all fields. Updates and
+deletes require `where(predicate)` or explicit `all_rows()`, using the native
+write guard. An empty update is an
 error. An insert that sets no field requests the Rust builder's default row; an
 insert must set every field neither nullable, defaulted nor generated, and no
 write sets a field generated always. Every row of `insert_many` sets the same
@@ -121,7 +135,9 @@ row's two versions as pgorm's `exec_returning_change(s)` and
 `exec_returning_upsert(s)` do: a `Change` of `old` and `new` records, and an
 upsert `Inserted(model)` or `Updated(change)`; a row an insert's conflict
 clause held back is None from `returning_upsert` and left out of
-`returning_upserts`. `inspect(terminal=...)` shows the statement each runs.
+`returning_upserts`. `inspect(terminal=...)` shows the statement each runs: an
+insert's `"returning_upsert"` or `"returning_upserts"`, an update's
+`"returning_change"` or `"returning_changes"`, any other a `TypeError`.
 
 Missing mapping entries stay omitted, allowing database defaults on INSERT and
 leaving fields unchanged on UPDATE. `None` is an explicit SQL NULL and requires

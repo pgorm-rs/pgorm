@@ -8,7 +8,7 @@ import pgorm as p
 from pgorm import _native, pipeline as pl, schema as s
 from pgorm._registered import entities as views, graphs as graph_views, versions as version_views
 from pgorm.codegen.types import FieldType
-from pgorm.models import Column, Model, ModelRecord, Relation, cursors, graphs, queries, record
+from pgorm.models import Column, Model, ModelRecord, Relation, cursors, graphs, queries, record, writes
 from pgorm.runtime import PoolStatus
 
 # Classes whose instances keep Python's own truth, grouped by why that is safe.
@@ -53,6 +53,10 @@ BUILT_ELSEWHERE = {
     version_views.InsertManyView, p.Notification, p.Listener, p.RowStream,
     p.CopyOutStream, p.CopyRowStream,
 }
+
+# Bases the model writes share and no program builds: every write refuses
+# through the __bool__ they give it, and each is sampled through a write.
+BASES = {writes._Write, writes._Guarded}
 
 
 def defined_classes():
@@ -119,7 +123,8 @@ def other_samples():
         s.create_table_as(table, p.select(p.col("id")).from_(table)),
         pl.from_(table), pl.col("items", "id"), pl.from_(table).group(pl.col("items", "id")),
         pl.Over(), pl.source(table),
-        model.col("id"), model.find(), model.delete(), model.insert({"id": 1}).returning("id"),
+        model.col("id"), model.find(), model.delete(), model.insert({"id": 1}),
+        model.update({"id": 2}), model.insert({"id": 1}).returning("id"),
         model.graph(), model.find().cursor("id"), model.find().paginate(2),
     ]
 
@@ -135,7 +140,11 @@ class TruthTesting(unittest.TestCase):
         # listed as exempt with its reason, so none evaluates as true unnoticed.
         defined = defined_classes()
         sampled = {type(sample) for sample in samples}
-        self.assertEqual(defined - sampled - EXEMPT - BUILT_ELSEWHERE, set())
+        self.assertEqual(defined - sampled - EXEMPT - BUILT_ELSEWHERE - BASES, set())
+        for base in BASES:
+            with self.subTest(base=base):
+                self.assertIn(base, defined)
+                self.assertTrue(any(issubclass(kind, base) for kind in sampled))
         self.assertEqual((EXEMPT | BUILT_ELSEWHERE) - defined, set())
         self.assertEqual(sampled & EXEMPT, set())
         for kind in BUILT_ELSEWHERE:

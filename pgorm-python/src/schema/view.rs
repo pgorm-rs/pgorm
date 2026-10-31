@@ -112,19 +112,19 @@ pub struct PyCreateView;
 
 ddl_class!(PyCreateView, CreateView, Box<ViewCreateStatement>);
 
+// [spec:pgorm:req:bindings.schema-views+2]
+#[pyfunction]
+pub(super) fn create_view<'py>(
+    py: Python<'py>,
+    name: &Bound<'_, PyAny>,
+    query: PyRef<'_, PySelect>,
+) -> PyResult<Bound<'py, PyCreateView>> {
+    let view = construct(View::create(relation(name)?, query.inner.clone()))?;
+    PyCreateView::object(py, Box::new(view))
+}
+
 #[pymethods]
 impl PyCreateView {
-    // [spec:pgorm:req:bindings.schema-views+2]
-    #[new]
-    fn new(
-        name: &Bound<'_, PyAny>,
-        query: PyRef<'_, PySelect>,
-    ) -> PyResult<PyClassInitializer<Self>> {
-        let view = construct(View::create(relation(name)?, query.inner.clone()))?;
-        let statement = Statement::CreateView(Box::new(view));
-        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
-    }
-
     /// `WITH LOCAL CHECK OPTION` or `WITH CASCADED CHECK OPTION`: a row
     /// written through the view must be one it shows. The bare form means
     /// `CASCADED`, so it has no spelling of its own.
@@ -158,25 +158,22 @@ ddl_class!(
     Box<RecursiveViewCreateStatement>
 );
 
-#[pymethods]
-impl PyCreateRecursiveView {
-    /// The column list is what the recursive query's rows are called, so it
-    /// is one name or a non-empty list: the grammar refuses a recursive view
-    /// without one.
-    // [spec:pgorm:req:bindings.schema-views+2]
-    #[new]
-    fn new(
-        name: &Bound<'_, PyAny>,
-        columns: &Bound<'_, PyAny>,
-        query: PyRef<'_, PySelect>,
-    ) -> PyResult<PyClassInitializer<Self>> {
-        let name = relation(name)?;
-        let (first, rest) = self::columns(columns, "a recursive view's column list")?;
-        let mut view = construct(View::create_recursive(name, first, query.inner.clone()))?;
-        view.columns(rest);
-        let statement = Statement::CreateRecursiveView(Box::new(view));
-        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
-    }
+/// The column list is what the recursive query's rows are called, so it is
+/// one name or a non-empty list: the grammar refuses a recursive view without
+/// one.
+// [spec:pgorm:req:bindings.schema-views+2]
+#[pyfunction]
+pub(super) fn create_recursive_view<'py>(
+    py: Python<'py>,
+    name: &Bound<'_, PyAny>,
+    columns: &Bound<'_, PyAny>,
+    query: PyRef<'_, PySelect>,
+) -> PyResult<Bound<'py, PyCreateRecursiveView>> {
+    let name = relation(name)?;
+    let (first, rest) = self::columns(columns, "a recursive view's column list")?;
+    let mut view = construct(View::create_recursive(name, first, query.inner.clone()))?;
+    view.columns(rest);
+    PyCreateRecursiveView::object(py, Box::new(view))
 }
 
 view_options!(PyCreateRecursiveView);
@@ -193,21 +190,18 @@ ddl_class!(
     Box<MaterializedViewCreateStatement>
 );
 
-#[pymethods]
-impl PyCreateMaterializedView {
-    // [spec:pgorm:req:bindings.schema-views+2]
-    #[new]
-    fn new(
-        name: &Bound<'_, PyAny>,
-        query: PyRef<'_, PySelect>,
-    ) -> PyResult<PyClassInitializer<Self>> {
-        let create = construct(MaterializedView::create(
-            relation(name)?,
-            query.inner.clone(),
-        ))?;
-        let statement = Statement::CreateMaterializedView(Box::new(create));
-        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
-    }
+// [spec:pgorm:req:bindings.schema-views+2]
+#[pyfunction]
+pub(super) fn create_materialized_view<'py>(
+    py: Python<'py>,
+    name: &Bound<'_, PyAny>,
+    query: PyRef<'_, PySelect>,
+) -> PyResult<Bound<'py, PyCreateMaterializedView>> {
+    let create = construct(MaterializedView::create(
+        relation(name)?,
+        query.inner.clone(),
+    ))?;
+    PyCreateMaterializedView::object(py, Box::new(create))
 }
 
 relation_options!(PyCreateMaterializedView);
@@ -220,18 +214,15 @@ pub struct PyCreateTableAs;
 
 ddl_class!(PyCreateTableAs, CreateTableAs, Box<TableCreateAsStatement>);
 
-#[pymethods]
-impl PyCreateTableAs {
-    // [spec:pgorm:req:bindings.schema-views+2]
-    #[new]
-    fn new(
-        name: &Bound<'_, PyAny>,
-        query: PyRef<'_, PySelect>,
-    ) -> PyResult<PyClassInitializer<Self>> {
-        let create = construct(Table::create_as(relation(name)?, query.inner.clone()))?;
-        let statement = Statement::CreateTableAs(Box::new(create));
-        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
-    }
+// [spec:pgorm:req:bindings.schema-views+2]
+#[pyfunction]
+pub(super) fn create_table_as<'py>(
+    py: Python<'py>,
+    name: &Bound<'_, PyAny>,
+    query: PyRef<'_, PySelect>,
+) -> PyResult<Bound<'py, PyCreateTableAs>> {
+    let create = construct(Table::create_as(relation(name)?, query.inner.clone()))?;
+    PyCreateTableAs::object(py, Box::new(create))
 }
 
 relation_options!(PyCreateTableAs);

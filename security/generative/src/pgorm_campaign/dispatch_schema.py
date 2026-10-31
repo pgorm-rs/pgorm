@@ -28,7 +28,7 @@ def dispatch(name, i, d, p):
 
     match name:
         case "schema.create":
-            query = schema.CreateTable(i["table"])
+            query = schema.create_table(i["table"])
             for column in d["columns"]:
                 value = schema.ColumnDef(
                     column["name"], datatype(column["kind"], p, schema)
@@ -51,7 +51,7 @@ def dispatch(name, i, d, p):
             ]
         case "schema.index":
             first, *rest = d["columns"]
-            query = schema.CreateIndex(i["table"], first, name=d["name"])
+            query = schema.create_index(i["table"], first, name=d["name"])
             for column in rest:
                 query = query.column(column)
             return (query.unique() if d["unique"] else query), [

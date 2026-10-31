@@ -19,7 +19,7 @@ use crate::{
 /// A registered entity's column, itself the column's expression: every
 /// `Expr` method reads it as written, and its comparisons and membership are
 /// the column's own `ColumnTrait` methods.
-// [spec:pgorm:req:bindings.column-operators]
+// [spec:pgorm:req:bindings.column-operators+1]
 #[derive(Clone, Debug)]
 #[pyclass(name = "EntityColumn", module = "pgorm", frozen, from_py_object, extends = PyExpr)]
 pub struct PyEntityColumn {
@@ -83,18 +83,6 @@ impl PyEntityColumn {
     #[getter]
     fn entity_name(&self) -> &str {
         &self.entity.info().name
-    }
-
-    fn describe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        py.import("json")?.call_method1(
-            "loads",
-            (self
-                .entity
-                .info()
-                .column(&self.name)?
-                .describe()?
-                .to_string(),),
-        )
     }
 
     fn expr(&self) -> PyResult<PyExpr> {

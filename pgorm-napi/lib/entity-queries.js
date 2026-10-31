@@ -30,7 +30,7 @@ export let registeredColumn;
  * `in_subquery`; an expression, and `any(..)` or `all(..)`, are compared as
  * written.
  */
-// [spec:pgorm:req:bindings.column-operators]
+// [spec:pgorm:req:bindings.column-operators+1]
 export class EntityColumn extends Expr {
   /** @type {unknown} */
   #entity;

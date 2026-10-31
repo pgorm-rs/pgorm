@@ -31,18 +31,21 @@ pub struct PyCreateDomain;
 
 ddl_class!(PyCreateDomain, CreateDomain, DomainCreateStatement, with);
 
+/// A domain over `base`: any column type, another domain's `TypeName`
+/// included.
+// [spec:pgorm:req:bindings.schema-domains+2]
+#[pyfunction]
+pub(super) fn create_domain<'py>(
+    py: Python<'py>,
+    name: &Bound<'_, PyAny>,
+    base: &Bound<'_, PyAny>,
+) -> PyResult<Bound<'py, PyCreateDomain>> {
+    let created = Domain::create(type_ref(name)?, PyDataType::coerce(base)?.inner);
+    PyCreateDomain::object(py, created)
+}
+
 #[pymethods]
 impl PyCreateDomain {
-    /// A domain over `base`: any column type, another domain's `TypeName`
-    /// included.
-    // [spec:pgorm:req:bindings.schema-domains+2]
-    #[new]
-    fn new(name: &Bound<'_, PyAny>, base: &Bound<'_, PyAny>) -> PyResult<PyClassInitializer<Self>> {
-        let created = Domain::create(type_ref(name)?, PyDataType::coerce(base)?.inner);
-        let statement = Statement::CreateDomain(created);
-        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
-    }
-
     // [spec:pgorm:req:bindings.schema-domains+2]
     #[pyo3(signature=(name, *, schema=None))]
     fn collate<'py>(

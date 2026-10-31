@@ -11,7 +11,7 @@ from pgorm import schema as s
 class SchemaObjectConstruction(unittest.TestCase):
     # [spec:pgorm:req:bindings.schema/test]    every complete statement is a DDL the terminals
     # take, and an ALTER with no action yet is none, with no inspect()
-    # [spec:pgorm:req:bindings.schema-api/test]
+    # [spec:pgorm:req:bindings.schema-api+2/test]
     def test_statements_are_ddl_pending_alters_not(self):
         statements = [
             s.create_table("t").column(s.ColumnDef("a", "integer")),
@@ -33,10 +33,37 @@ class SchemaObjectConstruction(unittest.TestCase):
             with self.subTest(pending=pending):
                 self.assertNotIsInstance(pending, s.DDL)
                 self.assertFalse(hasattr(pending, "inspect"))
-        for constructor in (s.DDL, s.AlterTable, s.PendingAlterTable, s.AlterSequence, s.RenameAttribute):
-            with self.subTest(constructor=constructor), self.assertRaises(TypeError):
-                constructor()
         self.assertEqual(s.drop_table(["a", p.Table("b", schema="x")]).inspect().sql, 'DROP TABLE "a", "x"."b"')
+
+    # [spec:pgorm:req:bindings.schema-api+2/test]    a statement is made by its factory, never by
+    # its class, which is exported for annotations and isinstance alone
+    def test_statements_are_made_by_their_factories(self):
+        query = p.select(p.col("a")).from_(p.Table("t"))
+        made = {
+            s.CreateTable: (s.create_table, ("t",)),
+            s.CreateIndex: (s.create_index, ("t", "a")),
+            s.CreateType: (s.create_type, ("mood",)),
+            s.CreateDomain: (s.create_domain, ("d", "text")),
+            s.CreateSequence: (s.create_sequence, ("ticket",)),
+            s.CreateView: (s.create_view, ("v", query)),
+            s.CreateRecursiveView: (s.create_recursive_view, ("r", ["a"], query)),
+            s.CreateMaterializedView: (s.create_materialized_view, ("m", query)),
+            s.CreateTableAs: (s.create_table_as, ("c", query)),
+        }
+        for cls, (factory, arguments) in made.items():
+            with self.subTest(cls=cls.__name__):
+                self.assertNotIsInstance(factory, type)
+                self.assertIs(type(factory(*arguments)), cls)
+                with self.assertRaises(TypeError):
+                    cls(*arguments)
+        # A column and a type are parts of a statement, made by calling their classes.
+        parts = {s.ColumnDef, s.DataType}
+        classes = [getattr(s, name) for name in s.__all__ if isinstance(getattr(s, name), type)]
+        self.assertTrue(set(made) | {s.DDL, s.AlterTable, s.PendingAlterTable} <= set(classes))
+        for cls in classes:
+            if cls not in parts:
+                with self.subTest(cls=cls.__name__), self.assertRaises(TypeError):
+                    cls()
 
     # [spec:pgorm:req:bindings.schema-tables/test]
     # [spec:pgorm:req:bindings.schema-alter/test]

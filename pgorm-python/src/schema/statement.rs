@@ -139,7 +139,8 @@ where
 }
 
 /// The refusal of a subclass whose base holds another kind of statement,
-/// which only the subclass's own constructors make, so it cannot happen.
+/// which only the subclass's own factory and methods make, so it cannot
+/// happen.
 pub(super) fn mismatch(class: &str) -> PyErr {
     ConstructionError::new_err(format!("a {class} holds a statement of another kind"))
 }

@@ -31,7 +31,7 @@ def accounts():
 
 
 class ModelConstruction(unittest.TestCase):
-    # [spec:pgorm:req:bindings.models+2/test]
+    # [spec:pgorm:req:bindings.models+3/test]
     def test_descriptor_names_and_values_are_owned(self):
         from pgorm.models.columns import MODEL_KINDS
 
@@ -70,7 +70,41 @@ class ModelConstruction(unittest.TestCase):
         self.assertEqual(write.inspect().params[-1].value, ["a"])
         self.assertEqual(write.inspect().params[0].kind, "i32")
 
-    # [spec:pgorm:req:bindings.models+2/test]
+    # [spec:pgorm:req:bindings.models+3/test]
+    def test_describe_reports_each_fields_declaration(self):
+        model = p.Model(
+            "accounts",
+            {
+                "id": p.Column("i64", primary_key=True, generated="always"),
+                "display_name": p.Column("text", name="display name", default=True),
+                "mood": p.Column(p.TypeName("Mood", schema="app"), nullable=True, values=["calm"]),
+                "tags": p.Column("text", array=True, nullable=True),
+            },
+            schema="app",
+        ).as_("a")
+        described = model.describe()
+        self.assertEqual(
+            {key: described[key] for key in ("schema", "table", "alias", "primary_key")},
+            {"schema": "app", "table": "accounts", "alias": "a", "primary_key": ["id"]},
+        )
+        self.assertEqual(described["columns"], {
+            "id": {"column": "id", "type": {"kind": "i64"}, "nullable": False, "primary_key": True,
+                   "default": False, "generated": "always", "values": None},
+            "display_name": {"column": "display name", "type": {"kind": "text"}, "nullable": False,
+                             "primary_key": False, "default": True, "generated": None, "values": None},
+            "mood": {"column": "mood", "type": {"kind": "enum", "name": "Mood", "schema": "app"},
+                     "nullable": True, "primary_key": False, "default": False, "generated": None,
+                     "values": ["calm"]},
+            "tags": {"column": "tags", "type": {"kind": "array", "element": {"kind": "text"}},
+                     "nullable": True, "primary_key": False, "default": False, "generated": None,
+                     "values": None},
+        })
+        for name in ("describe", "validate", "value"):
+            with self.subTest(method=name):
+                self.assertFalse(hasattr(model.columns["id"], name))
+        self.assertFalse(hasattr(model.col("id"), "describe"))
+
+    # [spec:pgorm:req:bindings.models+3/test]
     def test_unknown_fields_and_collisions_fail_early(self):
         model = accounts()
         for operation in (
@@ -114,7 +148,9 @@ class ModelConstruction(unittest.TestCase):
             lambda: model.insert([("id", 1)]),
             lambda: p.ModelQuery(p.Insert(model.table)),
             lambda: p.ModelRows(model, "SELECT 1", ("id",)),
-            lambda: p.ModelWrite(model, p.Select(p.literal(1))),
+            lambda: p.ModelInsert(model, p.Select(p.literal(1))),
+            lambda: p.ModelUpdate(model, p.Insert(model.table)),
+            lambda: p.ModelDelete(model, p.Update(model.table)),
             lambda: model.insert(["id"]),
             lambda: model.insert_many({"id": 1}),
             lambda: model.find().where("id = 1"),
@@ -187,7 +223,7 @@ class ModelConstruction(unittest.TestCase):
         with self.assertRaises(p.ConstructionError):
             model.col("id") == model.col("display_name")
 
-    # [spec:pgorm:req:bindings.column-operators/test]
+    # [spec:pgorm:req:bindings.column-operators+1/test]
     def test_columns_are_expressions_converting_every_value_operator(self):
         model = accounts().as_("a")
         column, plain = model.col("id"), model.table.col("id")
@@ -247,7 +283,7 @@ class ModelConstruction(unittest.TestCase):
         with self.assertRaises(TypeError):
             p.ModelColumn("id", p.Column("i32"), "id")
 
-    # [spec:pgorm:req:bindings.model-writes/test]
+    # [spec:pgorm:req:bindings.model-writes+1/test]
     def test_crud_preserves_omission_and_write_guards(self):
         model = accounts()
         omitted = model.insert({"id": 1}).inspect()
@@ -291,7 +327,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.execute(p.RawSQL("DROP SCHEMA python_models CASCADE"))
         await self.pool.close()
 
-    # [spec:pgorm:req:bindings.model-writes/test]
+    # [spec:pgorm:req:bindings.model-writes+1/test]
     # [spec:pgorm:req:bindings.model-records/test]
     async def test_crud_returns_declared_field_records(self):
         with patch(
@@ -330,7 +366,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         row["tags"].append("local mutation")
         self.assertEqual(row["tags"], ["a", None])
 
-    # [spec:pgorm:req:bindings.column-operators/test]
+    # [spec:pgorm:req:bindings.column-operators+1/test]
     async def test_value_operators_bind_the_declared_kind(self):
         for name, mood, tags in (("A", "calm", ["a", "b"]), ("B", "busy", ["b"]), ("C", "busy", None)):
             await self.model.insert(
@@ -353,7 +389,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await names(column("display_name").like(p.LikePattern("_"))), ["A", "B", "C"])
         self.assertEqual(await names(column("id") % 2 == 0), ["B"])
 
-    # [spec:pgorm:req:bindings.model-writes/test]
+    # [spec:pgorm:req:bindings.model-writes+1/test]
     async def test_json_null_and_defaults_stay_distinct(self):
         omitted = await self.model.insert({}).returning().one(self.pool)
         sql_null = (
