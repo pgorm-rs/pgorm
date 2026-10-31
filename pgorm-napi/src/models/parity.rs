@@ -488,15 +488,3 @@ fn model_family_matches_its_golden_file() {
     let cases = [queries(), writes(), graphs(), cursors()].concat();
     check(include_str!("../../tests/parity/models.json"), cases);
 }
-
-/// The graph writer's bounded alias, which the binding composes itself, is
-/// the one pgorm's `SelectGraph` writes for a long column.
-#[test]
-fn result_names_compose_as_the_graph_writer_does() {
-    let column = "column_with_a_name_long_enough_to_need_bounding_in_a_graph_xx";
-    let (sql, _) = built(&long_names::Entity::graph());
-    let alias = super::result_column_name("s0_", column);
-    assert_eq!(alias.len(), 63);
-    assert!(sql.contains(&format!("AS \"{alias}\"")), "{sql}");
-    assert_eq!(super::result_column_name("s1_", "id"), "s1_id");
-}

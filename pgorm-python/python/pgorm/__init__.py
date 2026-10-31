@@ -132,7 +132,10 @@ from ._native import (
 )
 from .runtime import STATEMENT_CACHE_CHANNEL, Connection, Pool, PoolStatus, connect
 from .results import Record, Field, RowStream, Query
-from .models import Column, ModelColumn, Model, ModelRecord, ModelQuery, ModelRows, ModelWrite
+from .models import (
+    Column, ModelColumn, Model, ModelRecord, ModelQuery, ModelRows, ModelWrite, Relation, Graph,
+    Cursor, Paginator,
+)
 from .transactions import Transaction, TransactionMode, IsolationLevel
 from .copy import CopyOutStream, CopyRows, CopyRowStream, CopySource
 from .listen import Listener
@@ -178,6 +181,10 @@ __all__ = [
     "ModelQuery",
     "ModelRows",
     "ModelWrite",
+    "Relation",
+    "Graph",
+    "Cursor",
+    "Paginator",
     "UnsupportedCapabilityError",
     "TypeName",
     "DataType",

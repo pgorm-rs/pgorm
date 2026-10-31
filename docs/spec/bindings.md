@@ -812,18 +812,27 @@ pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 > alias. Its columns are qualified as pgorm qualifies an entity's, by the
 > table's alias or else its name, never its schema.
 
-> [spec:pgorm:req:bindings.model-columns]
-> `col(field)` MUST be a model field's column as an expression, qualified as
-> the model's columns are. Its comparisons and every other operator that
-> takes a value — `eq`, `ne`, `lt`, `lte`, `gt`, `gte`, `between`,
-> `not_between`, `is_distinct_from`, `is_not_distinct_from`, `is_in`,
-> `is_not_in`, `contains`, `contained_by`, `overlaps` and the range position
-> operators — MUST convert the value through the field's declared kind, an
-> enum's label bound cast to its type as pgorm's column comparisons cast
-> through `save_as`. An expression, or `any(..)` / `all(..)`, is taken as
-> written; a `Value` only of the field's own kind; and null never, which
-> `is_null()` tests. The column is an expression, so every other expression
-> method applies to it as written.
+> [spec:pgorm:req:bindings.model-columns+1]
+> `col(field)` MUST be a model field's column, qualified as the model's
+> columns are. Its comparisons `eq`, `ne`, `lt`, `lte`, `gt` and `gte`, and
+> `is_in` and `is_not_in` over a list, MUST convert each value through the
+> field's declared kind, an enum's label bound cast to its type as pgorm's
+> column comparisons cast through `save_as`. An expression, or `any(..)` /
+> `all(..)` beside a comparison, is taken as written; a `Value` only of the
+> field's own kind; and null never, which `is_null()` tests.
+
+> [spec:pgorm:req:bindings.column-operators]
+> A model's column and a registered entity's column MUST each be an
+> expression: every expression method applies to it, reading the column as
+> written, and it goes wherever an expression goes. A model column's other
+> operators that take a value — `between` and `not_between`,
+> `is_distinct_from` and `is_not_distinct_from`, `contains`, `contained_by`
+> and `overlaps`, and `strictly_left_of`, `strictly_right_of`,
+> `not_extend_right_of`, `not_extend_left_of` and `adjacent_to` — MUST
+> convert their values as the column's comparisons do
+> (`bindings.model-columns`). Every other method takes its operands as
+> `bindings.expressions` does, and a registered column's comparisons are
+> those `bindings.entity-reads` names.
 
 > [spec:pgorm:req:bindings.model-records]
 > A model's terminals MUST decode each row into a record keyed by field, in

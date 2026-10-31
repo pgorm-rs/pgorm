@@ -20,6 +20,7 @@ pub use graph::*;
 pub use insert::*;
 pub use paginator::*;
 pub use query::*;
+pub use result_name::result_column_name;
 pub use select::*;
 pub use verify::*;
 pub use versions::*;

@@ -100,7 +100,11 @@ fn manifest() -> Value {
             "model.insert": {"rust_api": "pgorm::pgorm_query::InsertStatement", "features": [], "python_convenience": true},
             "model.update": {"rust_api": "pgorm::pgorm_query::UpdateStatement", "features": [], "python_convenience": true},
             "model.delete": {"rust_api": "pgorm::pgorm_query::DeleteStatement", "features": [], "python_convenience": true},
-            "model.records": {"rust_api": "pgorm::ConnectionTrait::{query_all, query_one} / pgorm_python::results", "features": ["runtime-tokio"], "python_convenience": true}
+            "model.records": {"rust_api": "pgorm::ConnectionTrait::{query_all, query_one} / pgorm_python::results", "features": ["runtime-tokio"], "python_convenience": true},
+            "model.relation": {"rust_api": "pgorm::RelationDef, join_condition", "features": [], "python_convenience": true},
+            "model.graph": {"rust_api": "pgorm::SelectGraph, result_column_name", "features": [], "python_convenience": true},
+            "model.cursor": {"rust_api": "pgorm::Cursor", "features": [], "python_convenience": true},
+            "model.paginate": {"rust_api": "pgorm::Paginator", "features": [], "python_convenience": true}
         },
         "value_types": crate::values::SCALAR_NAMES.iter().copied().chain(crate::values::range_kind_names()).chain(["enum", "created_range", "created_multirange", "array"]).collect::<Vec<_>>(),
         "value_policy": {
@@ -168,14 +172,14 @@ fn manifest() -> Value {
         },
         "model_policy": {
             "declarations": "Python metadata over native runtime statements; no compiled entity derives or hooks",
-            "field_identity": "declared Python field keys become native projection aliases",
+            "field_identity": "each field is read from the result column its statement projected it under: its SQL column, or a graph source's s{i}_ name",
             "values": "declared native Value tags, exact nullability and qualified enum/array identity",
             "scalar_kinds": scalar_kinds,
             "enum": "schema-qualified TypeName required", "array_dimensions": 1,
             "writes": "missing mapping entry is omitted; None is SQL NULL; Value.json(None) is JSON null",
             "one": "strict dynamic Record cardinality; explicit limit selects a first row",
             "unsupported_kinds": ["u64", "char"],
-            "stream": false, "automatic_ddl": false
+            "stream": true, "automatic_ddl": false
         },
         "tls": {"modes": ["verify-full", "disable"], "default": "verify-full unless DSN explicitly disables TLS", "ca": "PEM, or the platform's trust store"},
         "pipeline_policy": {

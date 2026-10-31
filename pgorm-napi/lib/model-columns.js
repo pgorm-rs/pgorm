@@ -3,7 +3,7 @@
 // A model's columns: each one's declared kind, nullability and key, what a
 // value written to it or compared with it becomes, and the expression that
 // reads it.
-// [spec:pgorm:req:bindings.model-columns]
+// [spec:pgorm:req:bindings.model-columns+1]
 
 import { TRUSTED } from "./builder.js";
 import { ConstructionError } from "./errors.js";
@@ -201,8 +201,10 @@ export function columnValue(column, field, input) {
  * named. A value it is compared with converts to the column's declared kind,
  * as pgorm's `ColumnTrait` comparisons cast through the column's type, so an
  * enum's label binds cast to its type; an expression, and `any(..)` or
- * `all(..)`, are compared as written.
+ * `all(..)`, are compared as written. A value any other operator takes
+ * converts the same way.
  */
+// [spec:pgorm:req:bindings.column-operators]
 export class ModelColumn extends Expr {
   /** @type {Column} */
   #column;

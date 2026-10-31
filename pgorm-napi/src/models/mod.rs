@@ -92,37 +92,14 @@ fn kind_key_of_value(mut cx: FunctionContext) -> JsResult<JsString> {
     }
 }
 
-/// PostgreSQL's identifier bound: `NAMEDATALEN - 1` bytes.
-const IDENT_MAX_BYTES: usize = 63;
-
-/// The result-set name of `column` under `prefix`, composed as pgorm's graph
-/// writer composes it (`result_column_name`): the plain concatenation when it
-/// is under 63 bytes, otherwise its longest whole-character head within 47
-/// bytes, padded with `_` to 47, and the 64-bit FNV-1a hash of the whole name
-/// in 16 hex digits. The parity tests hold this to the aliases pgorm's own
-/// `SelectGraph` writes.
+/// `modelResultName(prefix, column)`: the result-set name of `column` under
+/// `prefix`, composed by pgorm's own `result_column_name`, so a model graph's
+/// aliases are the ones `SelectGraph` writes.
 // [spec:pgorm:req:bindings.graphs]
-pub(crate) fn result_column_name(prefix: &str, column: &str) -> String {
-    let full = format!("{prefix}{column}");
-    if full.len() < IDENT_MAX_BYTES {
-        return full;
-    }
-    let head = IDENT_MAX_BYTES - 16;
-    let mut end = head;
-    while !full.is_char_boundary(end) {
-        end -= 1;
-    }
-    let hash = full.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
-        (hash ^ u64::from(byte)).wrapping_mul(0x0000_0100_0000_01b3)
-    });
-    format!("{}{}{hash:016x}", &full[..end], "_".repeat(head - end))
-}
-
-/// `modelResultName(prefix, column)`.
 fn result_name(mut cx: FunctionContext) -> JsResult<JsString> {
     let prefix = cx.argument::<JsString>(0)?.value(&mut cx);
     let column = cx.argument::<JsString>(1)?.value(&mut cx);
-    Ok(cx.string(result_column_name(&prefix, &column)))
+    Ok(cx.string(pgorm::result_column_name(&prefix, &column)))
 }
 
 /// The statement counting the rows `query` reads, as pgorm's paginator

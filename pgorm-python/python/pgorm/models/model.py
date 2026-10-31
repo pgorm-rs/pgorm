@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
@@ -11,7 +11,9 @@ from .. import _native as p
 from .columns import Column, ModelColumn
 
 if TYPE_CHECKING:
+    from .graphs import Graph
     from .queries import ModelQuery, ModelWrite
+    from .relations import Relation
 
 
 # [spec:pgorm:req:bindings.models]
@@ -36,7 +38,9 @@ class Model:
             native = table
         else:
             native = p.Table(table, schema=schema)
-        if not isinstance(columns, Mapping) or not columns:
+        if not isinstance(columns, Mapping):
+            raise TypeError("a model's columns are a mapping of fields to Columns")
+        if not columns:
             raise p.ConstructionError("model columns require a non-empty mapping")
         declarations = {}
         physical = set()
@@ -45,9 +49,7 @@ class Model:
             if identity in declarations:
                 raise p.ConstructionError("duplicate model field identity")
             if not isinstance(column, Column):
-                raise p.ConstructionError(
-                    "each model field requires a Column declaration"
-                )
+                raise TypeError("each model field is a Column declaration")
             column = replace(
                 column, name=identity if column.name is None else column.name
             )
@@ -65,16 +67,31 @@ class Model:
             tuple(name for name, column in declarations.items() if column.primary_key),
         )
 
+    @property
+    def qualifier(self) -> str:
+        """What the model's columns are qualified by: its alias, or else its
+        table's name, never its schema, as pgorm qualifies an entity's."""
+        return self.table.alias or self.table.name
+
     def as_(self, alias: str) -> Model:
         return Model(self.table.as_(alias), self.columns)
 
     def col(self, field: str) -> ModelColumn:
+        return self._column(field, self.qualifier)
+
+    def _column(self, field: str, qualifier: str) -> ModelColumn:
         name = p.Identifier(field).name
         if name not in self.columns:
-            raise p.ConstructionError("unknown model field")
-        declaration = self.columns[name]
-        assert declaration.name is not None
-        return ModelColumn(name, declaration, self.table.col(declaration.name))
+            raise p.ConstructionError(f"{self.table.name} has no field {name!r}")
+        return ModelColumn(name, self.columns[name], p.col(self._sql(name), table=qualifier))
+
+    def _sql(self, field: str) -> str:
+        return cast(str, self.columns[field].name)
+
+    def _projected(self, field: str, column: p.Expr) -> p.Expr | p.Aliased:
+        """``column`` projected under the field's name: as it is when the
+        field is its column's name, aliased otherwise."""
+        return column if field == self._sql(field) else column.as_(field)
 
     def _selection(self, fields: tuple[str, ...]) -> tuple[str, ...]:
         selected = tuple(self.columns) if not fields else fields
@@ -83,23 +100,24 @@ class Model:
             raise p.ConstructionError("duplicate model output identity")
         return names
 
-    def _projection(self, fields: tuple[str, ...]) -> tuple[p.Aliased, ...]:
-        return tuple(self.col(name).expression.as_(name) for name in fields)
-
     def select(self, *fields: str) -> ModelQuery:
-        from .queries import ModelQuery
+        from .queries import ModelQuery, Recipe
 
-        selected = self._selection(fields)
-        statement = p.Select(*self._projection(selected)).from_(self.table)
-        return ModelQuery(self, statement, selected)
+        return ModelQuery(Recipe(self, self._selection(fields)))
 
     def find(self) -> ModelQuery:
         return self.select()
 
+    def find_by_key(self, values: Mapping[str, Any]) -> ModelQuery:
+        """The row whose primary key ``values`` gives."""
+        return self.find().where(self.key(values))
+
     def key(self, values: Mapping[str, Any]) -> p.Condition:
         if not self.primary_key:
             raise p.ConstructionError("model has no declared primary key")
-        if not isinstance(values, Mapping) or set(values) != set(self.primary_key):
+        if not isinstance(values, Mapping):
+            raise TypeError("a key is a mapping of the key's fields")
+        if set(values) != set(self.primary_key):
             raise p.ConstructionError(
                 "key lookup requires every declared primary-key field and no others"
             )
@@ -107,52 +125,60 @@ class Model:
             *(self.col(name).eq(values[name]) for name in self.primary_key)
         )
 
-    def _assignments(
-        self, values: Mapping[str, Any]
-    ) -> tuple[tuple[str, p.Value], ...]:
-        if not isinstance(values, Mapping):
-            raise p.ConstructionError("model writes require a field mapping")
-        for name in values:
-            self.col(name)
-        # Use declaration order so mapping order cannot change SQL/parameter layout.
-        return tuple(
-            (cast(str, column.name), column.value(values[name]))
-            for name, column in self.columns.items()
-            if name in values
-        )
-
     def insert(self, values: Mapping[str, Any]) -> ModelWrite:
-        from .queries import ModelWrite
+        from .writes import inserted
 
-        if self.table.alias is not None:
-            raise p.ConstructionError("model inserts require an unaliased table")
-        assignments = self._assignments(values)
-        statement = p.Insert(self.table)
-        if assignments:
-            statement = statement.columns(*(name for name, _ in assignments)).values(
-                *(value for _, value in assignments)
-            )
-        else:
-            statement = statement.default_values()
-        return ModelWrite(self, statement)
+        return inserted(self, [values], many=False)
+
+    def insert_many(self, rows: Sequence[Mapping[str, Any]]) -> ModelWrite:
+        """An INSERT of rows that each set the same fields; no rows writes
+        nothing and sends nothing."""
+        from .writes import inserted
+
+        if not isinstance(rows, (list, tuple)):
+            raise TypeError("insert_many takes a list or tuple of rows")
+        return inserted(self, rows, many=True)
 
     def update(self, values: Mapping[str, Any]) -> ModelWrite:
-        from .queries import ModelWrite
+        from .writes import updated
 
-        assignments = self._assignments(values)
-        if not assignments:
-            raise p.ConstructionError(
-                "model update requires at least one assigned field"
-            )
-        statement = p.Update(self.table)
-        for column, value in assignments:
-            statement = statement.set(column, value)
-        return ModelWrite(self, statement)
+        return updated(self, values)
 
     def delete(self) -> ModelWrite:
         from .queries import ModelWrite
 
         return ModelWrite(self, p.Delete(self.table))
+
+    def belongs_to(
+        self, target: Model, *, from_: str | Sequence[str], to: str | Sequence[str]
+    ) -> Relation:
+        """A relation from this model's foreign key to the key of ``target``."""
+        from .relations import Relation
+
+        return Relation("belongs_to", self, target, from_, to)
+
+    def has_one(
+        self, target: Model, *, from_: str | Sequence[str], to: str | Sequence[str]
+    ) -> Relation:
+        """A relation from this model's key to at most one row of ``target``."""
+        from .relations import Relation
+
+        return Relation("has_one", self, target, from_, to)
+
+    def has_many(
+        self, target: Model, *, from_: str | Sequence[str], to: str | Sequence[str]
+    ) -> Relation:
+        """A relation from this model's key to any number of rows of ``target``."""
+        from .relations import Relation
+
+        return Relation("has_many", self, target, from_, to)
+
+    def graph(self) -> Graph:
+        """A graph rooted at this model, decoding its records alone until a
+        slot is joined."""
+        from .graphs import Graph, State, Table
+
+        return Graph(State((Table(self, self.qualifier, "root", False),)))
 
     def describe(self) -> dict[str, Any]:
         return {

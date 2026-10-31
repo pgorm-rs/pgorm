@@ -52,3 +52,10 @@ async def invalid(connection: p.Connection) -> None:
         p.select(p.literal(1))
     )
     sqlstate: str = p.DatabaseError("client failure").sqlstate  # expected-error: assignment
+    accounts = p.Model("accounts", {"id": p.Column("i64", primary_key=True)})
+    p.Column("i32", generated="sometimes")  # expected-error: arg-type
+    accounts.graph().join_one(accounts.col("id"))  # expected-error: arg-type
+    accounts.find().cursor("id").first("2")  # expected-error: arg-type
+    accounts.find().join(accounts.col("id"))  # expected-error: arg-type
+    accounts.col("id").between(1, 2, symmetric="yes")  # expected-error: arg-type
+    rows: list[p.ModelRecord] = await accounts.graph().all_grouped(connection)  # expected-error: assignment

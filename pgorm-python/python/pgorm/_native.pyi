@@ -119,8 +119,9 @@ from ._query_types import (
     Compiled as Compiled, LikePattern as LikePattern,
     Aliased as Aliased, OrderBy as OrderBy,
 )
+from ._models import _model_result_names as _model_result_names, _model_count as _model_count
 from ._expressions import (
-    Expr as Expr, Condition as Condition, col as col, bind as bind,
+    Expr as Expr, _DeclaredColumn as _DeclaredColumn, Condition as Condition, col as col, bind as bind,
     literal as literal, call as call, tuple_expr as tuple_expr, domain_value as domain_value,
 )
 from ._statements import (

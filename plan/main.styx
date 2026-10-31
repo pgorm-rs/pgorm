@@ -14584,7 +14584,7 @@ children (
         title "Python's declared model columns take the operators JavaScript's do"
         kind @feat
         implements {
-            python ([spec:pgorm:req:bindings.model-columns])
+            python ([spec:pgorm:req:bindings.model-columns] [spec:pgorm:req:bindings.column-operators])
         }
         deps (binding-renames)
         log (
@@ -14616,6 +14616,13 @@ children (
                 kind @note
                 text "Reads done after binding-coverage-per-impl (2026-10-30) though nothing is built: Python's code annotates bindings.model-columns for the comparisons it has, so the python claim is covered. The work starts spec-first: split what Python lacks out of bindings.model-columns into a rule of its own (the twelve value operators, and per decision (8) every expression method on ModelColumn and EntityColumn), annotate JavaScript's code that already does it, and claim the python side here, so the node is open until Python's code lands."
                 after_done true
+            }
+
+            {
+                at 2026-10-30T16:09:07.724602Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Spec split 2026-10-30: bindings.model-columns+1 keeps col(field), its six comparisons and is_in / is_not_in converting through the declared kind; the new bindings.column-operators requires a model's and a registered entity's column to be an expression (every expression method, wherever an expression goes) and the twelve other value operators of a model column to convert as its comparisons do. Python claims bindings.column-operators here; JavaScript's side (ModelColumn and EntityColumn extend Expr, lib/model-columns.js and lib/entity-queries.js) is claimed by binding-spec-consolidation. bindings-surface.json now lists every Expr method on ModelColumn and EntityColumn, the columns question and its undecided names gone: Python's missing members are gaps of this node; ModelColumn.expr and EntityColumn.expr stay Python-only, since the generated campaign's model.column and entity.column operations read a column's plain expression (python.expressions); EntityColumn.describe joins the shapes question beside Column.describe / validate / value."
             }
         )
     }
@@ -14768,6 +14775,7 @@ children (
                 [spec:pgorm:req:bindings.schema-types]
                 [spec:pgorm:req:bindings.with]
                 [spec:pgorm:req:bindings.writes]
+                [spec:pgorm:req:bindings.column-operators]
                 [spec:pgorm:req:bindings.schema-api]
             )
             main ([spec:pgorm:req:bindings.connections] [spec:pgorm:req:bindings.pipeline] [spec:pgorm:req:bindings.pipeline-expressions])

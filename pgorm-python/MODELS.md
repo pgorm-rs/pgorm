@@ -11,11 +11,16 @@ available through [compiled entity registrations](ENTITIES.md).
 from pgorm import Column, Model, TypeName
 
 Accounts = Model("accounts", {
-    "id": Column("i32", primary_key=True),
-    "display_name": Column("text", name="display name"),
+    "id": Column("i32", primary_key=True, generated="by_default"),
+    "display_name": Column("text", name="display name", default=True),
     "note": Column("text", nullable=True),
-    "mood": Column(TypeName("Mood", schema="application")),
+    "mood": Column(TypeName("Mood", schema="application"), values=["calm", "busy"]),
     "tags": Column("text", array=True, nullable=True),
+}, schema="application")
+Posts = Model("posts", {
+    "id": Column("i64", primary_key=True),
+    "account_id": Column("i32"),
+    "title": Column("text"),
 }, schema="application")
 ```
 
@@ -24,6 +29,17 @@ column name and defaults to its mapping key. Table, schema, physical column and
 output names use native identifier validation and Rust quoting. Duplicate
 physical columns, duplicate selected field identities and unknown fields fail
 before execution. Descriptors copy their input mapping and remain immutable.
+
+Beside its kind and `name`, a column declares whether it is `nullable`, an
+`array`, part of the `primary_key`, filled by a `default` when an insert
+leaves it out, or `generated` by the server — `"always"`, which no write sets,
+or `"by_default"`, an identity an insert may leave out — and an enum column
+its `values`, the labels every value it reads or writes is one of. A
+non-boolean flag, a `generated` or `values` of the wrong type is a
+`TypeError`; an unknown `generated` and an empty or repeated label list a
+`ValueError`; a nullable key, a generated column with a default and labels on
+a column that is no enum a `ConstructionError`. An unknown option is Python's
+own `TypeError`.
 
 ## Query and write
 
@@ -38,7 +54,7 @@ async def example(connection):
     key = Accounts.key({"id": created["id"]})
     changed = await (
         Accounts.update({"display_name": "Updated"})
-        .where(key).returning("id", "display_name").one(connection)
+        .where(key).returning_change(connection)
     )
     rows = await (
         Accounts.select("id", "display_name")
@@ -46,63 +62,138 @@ async def example(connection):
         .order_by(Accounts.col("id").asc()).limit(20).all(connection)
     )
     deleted = await Accounts.delete().where(key).execute(connection)
-    return changed, rows, deleted
+    return changed.old, changed.new, rows, deleted
 ```
 
-`find()` selects every declared field; `select(*fields)` selects a subset.
-Queries provide `where`, `order_by`, `limit`, `offset` and `join`. Reusing a
-query preserves its original state. `as_(alias)` produces another descriptor
-whose native expressions use that alias, including self-joins:
+`find()` selects every declared field, `select(*fields)` a subset and
+`find_by_key(mapping)` the row of a primary key. A query projects each field's
+column qualified by the table's alias or else its name, never its schema, as
+pgorm qualifies an entity's columns. Queries provide `where`, `order_by`,
+`limit`, `offset` and `join(relation, *, kind=Join.Inner, alias=None)`, which
+joins a relation's far end — from the query's model or a table it joined,
+`Join.Inner` or `Join.Left` — without reading its columns. Reusing a query
+preserves its original state. `as_(alias)` produces another descriptor whose
+native expressions use that alias, including self-joins:
 
 ```python
 left, right = Accounts.as_("a"), Accounts.as_("b")
-query = left.select("id").join(right, left.col("id") == right.col("id"))
+query = left.select("id").join(left.has_one(right, from_="id", to="id"))
 ```
 
-The joined query projects the selected fields from its root descriptor. Use
-the native statement APIs when selecting an arbitrary cross-source
-shape. `col(field)` validates the field and converts comparison inputs through
-its declared native Value tag. `eq`, `ne`, ordering comparisons, `is_in`,
-`is_not_in`, `is_null` and `is_not_null` produce native expressions — a
-comparison takes `any_(..)` or `all_(..)` as written, and membership a list or
-tuple of values or a `Select`'s rows; `asc`/`desc` produce
-native orderings. `col(field).expr()` exposes the native expression for further
-composition. Explicit native expressions keep their existing binding semantics.
-Use `is_null()` for a NULL test on a non-nullable declaration.
+`all`, `one` and `optional` run on a pool, a connection or a transaction;
+`count` counts the rows as pgorm's paginator does, `SELECT COUNT(*) AS
+"num_items" FROM (..) AS "sub_query"` with the limit, offset and ordering
+dropped, and `inspect(terminal="count")` shows that statement. `await
+query.stream(db)` on a pool or a connection gives a `RowStream` of records.
+
+`col(field)` validates the field and is itself an `Expr`, so it goes wherever
+an expression goes. Every operator that takes a value converts it through the
+field's declared native Value tag: `eq`, `ne` and the ordering comparisons,
+`is_in` and `is_not_in`, `between` and `not_between`, `is_distinct_from` and
+`is_not_distinct_from`, `contains`, `contained_by`, `overlaps` and the range
+position operators. A comparison takes `any_(..)` or `all_(..)` as written,
+membership a list or tuple of values or a `Select`'s rows, and every operator
+an expression as written. Every other `Expr` method — `+`, `like`, `cast`,
+`as_`, `asc`/`desc` — reads the column as written and binds its operands as an
+`Expr`'s do. `col(field).expr()` gives the plain expression, whose operators
+bind as an `Expr`'s do. `None` is refused as a compared value: use
+`is_null()`.
 
 `key(mapping)` constructs a native conjunction over all declared primary-key
 fields, in declaration order. It requires every key field and rejects extras.
 Keys may be composite. Nullable primary-key declarations are rejected. A key
 declaration alone neither creates a constraint nor checks the database schema.
 
-`insert(mapping)`, `update(mapping)` and `delete()` return write builders.
-`execute(connection)` returns affected rows. `returning(*fields)` selects
-declared output fields and returns a row-producing builder; no arguments means
-all fields. Updates and deletes require `where(predicate)` or explicit
-`all_rows()`, using the native write guard. An empty update is an error. An empty
-insert requests the Rust builder's default row. Inserts require an unaliased
-table.
+`insert(mapping)`, `insert_many(rows)`, `update(mapping)` and `delete()` return
+write builders. `execute(connection)` returns affected rows. `returning(*fields)`
+selects declared output fields and returns a row-producing builder; no
+arguments means all fields. Updates and deletes require `where(predicate)` or
+explicit `all_rows()`, using the native write guard. An empty update is an
+error. An insert that sets no field requests the Rust builder's default row; an
+insert must set every field neither nullable, defaulted nor generated, and no
+write sets a field generated always. Every row of `insert_many` sets the same
+fields; a batch of none sends nothing, `execute` giving 0 and the returning
+terminals no rows. Inserts require an unaliased table and take
+`on_conflict(action)` as an `Insert` does.
+
+`returning_change` and `returning_changes` on an update, and
+`returning_upsert` and `returning_upserts` on an insert, read each written
+row's two versions as pgorm's `exec_returning_change(s)` and
+`exec_returning_upsert(s)` do: a `Change` of `old` and `new` records, and an
+upsert `Inserted(model)` or `Updated(change)`; a row an insert's conflict
+clause held back is None from `returning_upsert` and left out of
+`returning_upserts`. `inspect(terminal=...)` shows the statement each runs.
 
 Missing mapping entries stay omitted, allowing database defaults on INSERT and
 leaving fields unchanged on UPDATE. `None` is an explicit SQL NULL and requires
 a nullable column. For JSON, `Value.json(None)` is JSON null, including in a
-non-nullable JSON column. Plain lists/dicts in a JSON field are JSON values.
-Values are copied into native owned Values at construction; later mutation of
-the input mapping or containers cannot change the query.
+non-nullable JSON column. Plain lists/dicts in a JSON field are JSON values. An
+expression is written as it stands. Values are copied into native owned Values
+at construction; later mutation of the input mapping or containers cannot
+change the query.
+
+## Relations, graphs, cursors and pages
+
+```python
+author = Posts.belongs_to(Accounts, from_="account_id", to="id")
+posts = Accounts.has_many(Posts, from_="id", to="account_id")
+
+async def related(connection):
+    accounts = await Accounts.find().order_by(Accounts.col("id").asc()).all(connection)
+    per_account = await posts.load(connection, accounts)
+    rows = await Posts.graph().join_one(author).order_by(Posts.col("id").asc()).all(connection)
+    grouped = await Accounts.graph().join_maybe(posts).all_grouped(connection)
+    page = await Accounts.find().cursor("display_name", "id").first(20).all(connection)
+    pages = Accounts.find().order_by(Accounts.col("id").asc()).paginate(20)
+    return per_account, rows, grouped, page, await pages.num_items_and_pages(connection)
+```
+
+`belongs_to`, `has_one` and `has_many` pair fields of each model — one, or
+equal-length lists — in order; a join along a relation is the condition
+pgorm's `join_condition` writes, each pair equal. `relation.find(row)` reads
+the far end's rows matching a record, none when one of its key fields is None.
+`relation.load(db, rows)` reads the far end of every row in one query: a list
+per row for `has_many`, otherwise a record per row or None where the row's key
+holds a None; a key nothing matches, or a `has_one` key two rows match, is a
+`DecodeError`.
+
+`graph()` reads a model's rows with the rows its relations reach, written as
+pgorm's `SelectGraph` writes it. `join_one` is an INNER JOIN decoded as a
+record, `join_maybe` a LEFT JOIN decoded as a record or None, and `via` a LEFT
+JOIN of a table no record reads; each takes `alias=` and `from_=`, the decoded
+source the relation starts at. Every decoded source is projected under its
+own prefix, `s0_` for the root and `s{i}_` for the i-th slot, bounded to
+PostgreSQL's identifier limit by pgorm's own `result_column_name`. A graph
+with no slot decodes as the root's record, otherwise as a tuple of each
+source's; `col(source, field)` qualifies a field as its source is named.
+`all_grouped` reads a graph of one slot as each root with its slot's records.
+
+`cursor(*fields)` on a query or a graph pages by keyset as pgorm's `Cursor`
+does, a graph's root key and each slot's key as tiebreaks: `after` and
+`before` take the order fields' values, `after_with` and `before_with` those
+or the whole key's, `first(n)` and `last(n)` the window and `asc()` and
+`desc()` the direction. `paginate(page_size)` reads page `n` with a limit of
+`page_size` and an offset of `page_size × n`, as pgorm's `Paginator` does;
+`fetch_page`, `num_items`, `num_pages`, `num_items_and_pages` and the
+asynchronous iterator `pages` run it.
 
 ## Records and types
 
-`all`, `one` and `optional` accept a Pool or acquired Connection. They return
-`ModelRecord` views over detached native Records, keyed by declared Python
-identities. `record.model` identifies the descriptor, `record.native` retains
-PostgreSQL field metadata and `record.tagged(field)` preserves native tags.
-Mutable values returned by record lookup are independent copies.
+`all`, `one` and `optional` accept a Pool, an acquired Connection or a
+Transaction. They return `ModelRecord` views over detached native Records,
+keyed by declared Python identities. Each field is read from the result column
+its statement projected it under — its SQL column, or a graph source's
+prefixed name, which `record.columns` lists. `record.model` identifies the
+descriptor, `record.native` retains PostgreSQL field metadata and
+`record.tagged(field)` preserves native tags. Mutable values returned by record
+lookup are independent copies.
 
-Output names, native Value types, enum qualifications and nullability must
-match the declaration. A mismatch raises `DecodeError`; it is never interpreted
-as an absent row. Dynamic `one` requires exactly one row and `optional` at most
-one, so multiple rows raise `DatabaseError`. Use explicit `limit(1)` to select
-a first row. Errors do not imply rollback of a write already executed.
+Result columns, native Value types, enum qualifications, nullability and an
+enum's listed labels must match the declaration. A mismatch raises
+`DecodeError`; it is never interpreted as an absent row. Dynamic `one`
+requires exactly one row and `optional` at most one, so multiple rows raise
+`DatabaseError`. Use explicit `limit(1)` to select a first row. Errors do not
+imply rollback of a write already executed.
 
 Supported scalar kinds match the native Record decoder: `bool`, `i8`, `i16`,
 `i32`, `i64`, `u32`, `f32`, `f64`, `text`, `bytes`, `decimal`, `uuid`, `json`,
@@ -130,11 +221,14 @@ builders. `inspect()` uses their Rust SQL/parameter output. Descriptor methods
 lower to `NamedTable`, `Expr`/`SimpleExpr`, `Value`, `SelectStatement`,
 `InsertStatement`, `UpdateStatement`, `DeleteStatement` and the existing native
 Record execution path. Python contains no SQL renderer or optimizer.
+`tests/test_models_parity.py` holds every model statement to the SQL and values
+pgorm's own entities, `SelectGraph`, `Cursor` and `Paginator` build for the
+same tables, the golden file pgorm-napi's Rust parity test writes.
 
 Run the installed-wheel descriptor suite with the existing PostgreSQL fixture:
 
 ```sh
 target/python-dev/bin/python pgorm-python/tests/with_postgres.py \
   target/python-check/bin/python -m unittest discover \
-  -s pgorm-python/tests -p test_models.py -v
+  -s pgorm-python/tests -p 'test_mode*.py' -v
 ```

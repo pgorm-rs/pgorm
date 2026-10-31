@@ -15,10 +15,14 @@ def accounts():
     return p.Model(
         'accounts "log',
         {
-            "id": p.Column("i32", primary_key=True),
-            "display_name": p.Column("text", name="display name"),
+            "id": p.Column("i32", primary_key=True, generated="by_default"),
+            "display_name": p.Column("text", name="display name", default=True),
             "note": p.Column("text", nullable=True),
-            "mood": p.Column(p.TypeName("Mood", schema="python_models")),
+            "mood": p.Column(
+                p.TypeName("Mood", schema="python_models"),
+                default=True,
+                values=["calm", "busy"],
+            ),
             "data": p.Column("json", nullable=True),
             "tags": p.Column("text", array=True, nullable=True),
         },
@@ -42,14 +46,19 @@ class ModelConstruction(unittest.TestCase):
             "model.update",
             "model.delete",
             "model.records",
+            "model.relation",
+            "model.graph",
+            "model.cursor",
+            "model.paginate",
         ):
             p.require_capability(operation)
         fields = {"identity": p.Column("i32", name='id"雪', primary_key=True)}
         model = p.Model('t"表', fields, schema='s"文')
         fields.clear()
         self.assertEqual(model.primary_key, ("identity",))
-        self.assertIn(
-            '"s""文"."t""表"."id""雪" AS "identity"', model.find().inspect().sql
+        self.assertEqual(
+            model.find().inspect().sql,
+            'SELECT "t""表"."id""雪" AS "identity" FROM "s""文"."t""表"',
         )
         with self.assertRaises(TypeError):
             model.columns["other"] = p.Column("text")
@@ -76,15 +85,43 @@ class ModelConstruction(unittest.TestCase):
                 "t", {"a": p.Column("i32", name="x"), "b": p.Column("i32", name="x")}
             ),
             lambda: p.Column("i32", nullable=True, primary_key=True),
-            lambda: p.Column("i32", nullable=1),
             lambda: p.Column(p.TypeName("Unqualified")),
+            lambda: p.Column("i32", default=True, generated="always"),
+            lambda: p.Column("text", values=["a"]),
             lambda: model.as_("a").insert({"id": 1}),
-            lambda: p.ModelColumn("id", "i32", p.col("id")),
-            lambda: p.ModelQuery(model, p.Insert(model.table), ("id",)),
-            lambda: p.ModelRows(model, "SELECT 1", ("id",)),
-            lambda: p.ModelWrite(model, p.Select(p.literal(1))),
+            lambda: model.insert({"note": "no mood"}).returning("note", "note"),
+            lambda: p.Model("t", {"a": p.Column("i32", generated="always")}).insert({"a": 1}),
+            lambda: p.Model("t", {"a": p.Column("i32"), "b": p.Column("i32")}).insert({"a": 1}),
+            lambda: model.insert_many([{"note": "a"}, {"mood": "calm"}]),
+            lambda: model.insert_many([{}, {}]),
+            lambda: model.insert({"mood": "wild"}),
+            lambda: model.col("mood").eq("wild"),
+            lambda: model.col("note").eq(None),
         ):
             with self.assertRaises(p.ConstructionError):
+                operation()
+        for operation in (
+            lambda: p.Column("i32", nullable=1),
+            lambda: p.Column("i32", default="yes"),
+            lambda: p.Column("i32", generated=True),
+            lambda: p.Column(p.TypeName("Mood", schema="s"), values="calm"),
+            lambda: p.Column("i32", invented=True),
+            lambda: p.ModelQuery(p.Insert(model.table)),
+            lambda: p.ModelRows(model, "SELECT 1", ("id",)),
+            lambda: p.ModelWrite(model, p.Select(p.literal(1))),
+            lambda: model.insert(["id"]),
+            lambda: model.insert_many({"id": 1}),
+            lambda: model.find().where("id = 1"),
+            lambda: model.find().order_by(model.col("id")),
+        ):
+            with self.assertRaises(TypeError):
+                operation()
+        for operation in (
+            lambda: p.Column("i32", generated="sometimes"),
+            lambda: p.Column(p.TypeName("Mood", schema="s"), values=[]),
+            lambda: p.Column(p.TypeName("Mood", schema="s"), values=["a", "a"]),
+        ):
+            with self.assertRaises(ValueError):
                 operation()
         for kind in ("u64", "char", "made-up"):
             with (
@@ -108,12 +145,11 @@ class ModelConstruction(unittest.TestCase):
             .limit(3)
         )
         native = p.Select(
-            model.table.col("id").as_("id"),
-            model.table.col("display name").as_("display_name"),
+            p.col("id", table="a"), p.col("display name", table="a").as_("display_name")
         ).from_(model.table)
         native = (
-            native.where(model.table.col("id") >= p.Value(2, "i32"))
-            .order_by(model.table.col("id").desc())
+            native.where(p.col("id", table="a") >= p.Value(2, "i32"))
+            .order_by(p.col("id", table="a").desc())
             .limit(3)
         )
         self.assertEqual(query.inspect().sql, native.inspect().sql)
@@ -137,7 +173,7 @@ class ModelConstruction(unittest.TestCase):
             model.col("id").eq(quantified).inspect().sql,
             (model.table.col("id") == quantified).inspect().sql,
         )
-        with self.assertRaises(p.ConstructionError):
+        with self.assertRaises(TypeError):
             model.col("id").is_in("12")
         self.assertIn("IS NULL", model.col("note").is_null().inspect().sql)
         for value in (model.col("id"), query, accounts().delete()):
@@ -145,6 +181,66 @@ class ModelConstruction(unittest.TestCase):
                 bool(value)
         with self.assertRaises(p.ConstructionError):
             model.col("id") == model.col("display_name")
+
+    # [spec:pgorm:req:bindings.column-operators/test]
+    def test_columns_are_expressions_converting_every_value_operator(self):
+        model = accounts().as_("a")
+        column, plain = model.col("id"), model.table.col("id")
+        self.assertIsInstance(column, p.Expr)
+        typed = p.Value(2, "i32"), p.Value(5, "i32")
+        for method in (
+            "is_distinct_from", "is_not_distinct_from", "contains", "contained_by",
+            "overlaps", "strictly_left_of", "strictly_right_of", "not_extend_right_of",
+            "not_extend_left_of", "adjacent_to",
+        ):
+            with self.subTest(method=method):
+                built = getattr(column, method)(2).inspect()
+                expected = getattr(plain, method)(typed[0]).inspect()
+                self.assertEqual((built.sql, built.params), (expected.sql, expected.params))
+        for method in ("between", "not_between"):
+            for symmetric in (False, True):
+                with self.subTest(method=method, symmetric=symmetric):
+                    built = getattr(column, method)(2, 5, symmetric=symmetric).inspect()
+                    expected = getattr(plain, method)(*typed, symmetric=symmetric).inspect()
+                    self.assertEqual((built.sql, built.params), (expected.sql, expected.params))
+        mood = model.col("mood").is_distinct_from("calm").inspect()
+        self.assertIn('CAST($1::text AS python_models."Mood")', mood.sql)
+        tags = model.col("tags").contains(["a"]).inspect()
+        self.assertEqual(tags.params, [p.Value.array("text", ["a"])])
+        for operation in (
+            lambda: column.between(1, None),
+            lambda: column.contains(p.Value(2, "i64")),
+            lambda: column.adjacent_to("2"),
+            lambda: column.overlaps(p.any_(p.Value.array("i32", [1]))),
+        ):
+            with self.assertRaises(p.ConstructionError):
+                operation()
+        self.assertEqual(
+            column.between(plain, model.col("id")).inspect().sql,
+            plain.between(plain, plain).inspect().sql,
+        )
+        self.assertEqual((column + 1).inspect().params, (plain + 1).inspect().params)
+        self.assertEqual(
+            model.col("display_name").like(p.LikePattern("N%")).inspect().sql,
+            model.table.col("display name").like(p.LikePattern("N%")).inspect().sql,
+        )
+        self.assertEqual(column.cast(p.TypeName("int8")).inspect().sql, plain.cast(p.TypeName("int8")).inspect().sql)
+        self.assertEqual(
+            p.Select(column.as_("key")).from_(model.table).inspect().sql,
+            p.Select(plain.as_("key")).from_(model.table).inspect().sql,
+        )
+        self.assertEqual(type(column.expr()), p.Expr)
+        self.assertEqual(
+            (column.expr() == 1).inspect().params, (plain == 1).inspect().params
+        )
+        with self.assertRaises(p.ConstructionError):
+            column == None  # noqa: E711
+        with self.assertRaises(FrozenInstanceError):
+            column.field_name = "other"
+        with self.assertRaises(TypeError):
+            p.ModelColumn("id", "i32", p.col("id"))
+        with self.assertRaises(TypeError):
+            p.ModelColumn("id", p.Column("i32"), "id")
 
     # [spec:pgorm:req:bindings.model-writes/test]
     def test_crud_preserves_omission_and_write_guards(self):
@@ -229,6 +325,29 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         row["tags"].append("local mutation")
         self.assertEqual(row["tags"], ["a", None])
 
+    # [spec:pgorm:req:bindings.column-operators/test]
+    async def test_value_operators_bind_the_declared_kind(self):
+        for name, mood, tags in (("A", "calm", ["a", "b"]), ("B", "busy", ["b"]), ("C", "busy", None)):
+            await self.model.insert(
+                {"display_name": name, "mood": mood, "tags": tags}
+            ).execute(self.pool)
+
+        async def names(predicate):
+            query = self.model.select("display_name").where(predicate)
+            rows = await query.order_by(self.model.col("id").asc()).all(self.pool)
+            return [row["display_name"] for row in rows]
+
+        column = self.model.col
+        self.assertEqual(await names(column("id").between(2, 3)), ["B", "C"])
+        self.assertEqual(await names(column("id").not_between(3, 1, symmetric=True)), [])
+        self.assertEqual(await names(column("mood").is_distinct_from("calm")), ["B", "C"])
+        self.assertEqual(await names(column("tags").is_not_distinct_from(["b"])), ["B"])
+        self.assertEqual(await names(column("tags").contains(["b"])), ["A", "B"])
+        self.assertEqual(await names(column("tags").contained_by(["b", "c"])), ["B"])
+        self.assertEqual(await names(column("tags").overlaps(["a"])), ["A"])
+        self.assertEqual(await names(column("display_name").like(p.LikePattern("_"))), ["A", "B", "C"])
+        self.assertEqual(await names(column("id") % 2 == 0), ["B"])
+
     # [spec:pgorm:req:bindings.model-writes/test]
     async def test_json_null_and_defaults_stay_distinct(self):
         omitted = await self.model.insert({}).returning().one(self.pool)
@@ -283,9 +402,10 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         for name in ("A", "B"):
             await self.model.insert({"display_name": name}).execute(self.pool)
         left, right = self.model.as_("a"), self.model.as_("b")
+        same = left.has_one(right, from_="id", to="id")
         rows = (
             await left.select("display_name")
-            .join(right, left.col("id") == right.col("id"))
+            .join(same)
             .order_by(left.col("id").asc())
             .all(self.pool)
         )
