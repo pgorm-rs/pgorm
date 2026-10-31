@@ -52,7 +52,15 @@ pub(crate) fn operations() -> Map<String, Value> {
             "pgorm_query::SelectStatement::from, FromItem",
         ),
         ("select.where", "pgorm_query::SelectStatement::cond_where"),
-        ("select.join", "pgorm_query::SelectStatement::join, FromItem"),
+        (
+            "select.join",
+            "pgorm_query::SelectStatement::{join, join_lateral}, FromItem",
+        ),
+        ("select.as_", "pgorm_query::FromItem::SubQuery"),
+        (
+            "select.lock",
+            "pgorm_query::SelectStatement::{lock_with_tables, lock_with_tables_behavior}, LockType, LockBehavior",
+        ),
         (
             "select.cross_join",
             "pgorm_query::SelectStatement::cross_join, FromItem",
@@ -219,7 +227,7 @@ pub(crate) fn operations() -> Map<String, Value> {
             "with",
             "pgorm_query::WithClause::{new, cte}, CommonTableExpression::new",
         ),
-        ("merge", "pgorm_query::Query::merge, PendingMerge"),
+        ("merge", "pgorm_query::Query::merge, PendingMerge, FromItem"),
         (
             "merge.when_matched",
             "pgorm_query::MergeStatement::{when_matched, when_matched_and}",

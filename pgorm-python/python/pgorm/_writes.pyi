@@ -1,7 +1,7 @@
 from typing import Any, Never
 from ._expressions import Expr, Condition
 from ._query_types import Aliased, Compiled, Identifier
-from ._statements import Table
+from ._from_items import Table
 
 class Conflict:
     def __init__(self, _native_only: Never, /) -> None: ...

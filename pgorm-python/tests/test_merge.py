@@ -116,6 +116,19 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.rows(outer), [("UPDATE", 2)])
         self.assertEqual(await self.final(), [(1, "one", 10), (2, "two", 50), (3, "three", 30)])
 
+    # [spec:pgorm:req:bindings.from-subqueries/test]
+    async def test_a_subquery_is_a_source(self):
+        t = self.target
+        staged = (p.Select(p.col("id"), p.col("name")).from_(p.Table(self.source_name))
+                  .where(p.col("visits") > 10).as_("s"))
+        query = (p.merge(t, staged, t.col("id") == staged.col("id"))
+                 .when_matched(p.MergeUpdate("name", staged.col("name")))
+                 .returning_action().returning(t.col("id")))
+        self.assertEqual(await self.rows(query), [("UPDATE", 2)])
+        self.assertEqual(await self.final(), [(1, "one", 10), (2, "dos", 20), (3, "three", 30)])
+        with self.assertRaises(TypeError):
+            p.merge(t, p.Select().from_(p.Table(self.source_name)), p.literal(True))
+
     async def test_renamed_versions_answer_only_to_their_names(self):
         t, s = self.target, self.source
         base = self.pending().when_matched(p.MergeUpdate("visits", s.col("visits")))

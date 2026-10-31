@@ -84,6 +84,7 @@ def statement_samples():
         p.TableFunction(p.call("generate_series", 1, 3)),
         p.TableFunction(p.call("generate_series", 1, 3)).alias("series"),
         p.GroupingElement.empty(), p.Join.Inner, p.SampleMethod.Bernoulli,
+        p.LockStrength.Update, p.LockWait.Nowait,
         p.With("recent", query), p.ReturningRow.Old,
         p.Conflict.do_nothing(), p.ConflictTarget("id"), p.ConflictTarget("id").update("name"),
         p.MatchedAction.Delete, p.NotMatchedAction.DoNothing, p.Overriding.SystemValue,

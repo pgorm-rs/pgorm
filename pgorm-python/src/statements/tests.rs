@@ -12,7 +12,7 @@ use pyo3::{prelude::*, types::PyDict};
 
 use crate::expressions::Compiled;
 
-fn module(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+pub(super) fn module(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     let module = PyModule::new(py, "pgorm")?;
     crate::values::register(&module)?;
     crate::identifiers::register(&module)?;
@@ -24,7 +24,7 @@ fn module(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     Ok(globals)
 }
 
-fn parity(
+pub(super) fn parity(
     py: Python<'_>,
     globals: &Bound<'_, PyDict>,
     source: &str,
@@ -38,6 +38,20 @@ fn parity(
     let executable = super::compile(&object)?;
     assert_eq!(executable.sql, inspected.sql);
     assert_eq!(executable.values, inspected.values);
+    Ok(())
+}
+
+pub(super) fn refused<E: pyo3::PyTypeInfo>(
+    py: Python<'_>,
+    globals: &Bound<'_, PyDict>,
+    sources: &[&str],
+) -> PyResult<()> {
+    for source in sources {
+        let error = py
+            .eval(&CString::new(*source)?, Some(globals), None)
+            .expect_err(source);
+        assert!(error.is_instance_of::<E>(py), "{source}: {error}");
+    }
     Ok(())
 }
 

@@ -129,9 +129,12 @@ from ._expressions import (
     Expr as Expr, _DeclaredColumn as _DeclaredColumn, Condition as Condition, col as col, bind as bind,
     literal as literal, call as call, tuple_expr as tuple_expr, domain_value as domain_value,
 )
+from ._from_items import (
+    Table as Table, FromItem as FromItem, SampleMethod as SampleMethod,
+    TableFunction as TableFunction,
+)
 from ._statements import (
-    Table as Table, FromItem as FromItem, Select as Select, Join as Join,
-    SampleMethod as SampleMethod, TableFunction as TableFunction,
+    Select as Select, Join as Join, LockStrength as LockStrength, LockWait as LockWait,
     GroupingElement as GroupingElement,
 )
 from ._subqueries import (

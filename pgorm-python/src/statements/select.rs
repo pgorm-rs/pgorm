@@ -1,10 +1,11 @@
-use pgorm::pgorm_query::{Asterisk, JoinType, Query, SelectStatement, UnionType};
+use pgorm::pgorm_query::{Asterisk, FromItem, JoinType, Query, SelectStatement, UnionType};
 use pyo3::{prelude::*, types::PyTuple};
 
 use super::{
     common,
-    from_item::from_item,
+    from_item::{PyFromItem, from_item},
     grouping::{self, Grouped},
+    lock::{PyLockStrength, PyLockWait, lock},
     window::window_definition,
 };
 use crate::{errors::ConstructionError, expressions::Compiled, identifiers::PyIdentifier};
@@ -127,11 +128,30 @@ impl PySelect {
         Ok(next)
     }
 
-    #[pyo3(signature = (item, on, *, kind=Join::Inner))]
-    fn join(&self, item: &Bound<'_, PyAny>, on: &Bound<'_, PyAny>, kind: Join) -> PyResult<Self> {
+    // [spec:pgorm:req:bindings.from-subqueries]
+    /// `lateral` reads a subquery `LATERAL`, so it may read the columns of
+    /// the items before it.
+    #[pyo3(signature = (item, on, *, kind=Join::Inner, lateral=false))]
+    fn join(
+        &self,
+        item: &Bound<'_, PyAny>,
+        on: &Bound<'_, PyAny>,
+        kind: Join,
+        lateral: bool,
+    ) -> PyResult<Self> {
+        let (item, on) = (from_item(item)?, common::condition(on)?);
         let mut next = self.clone();
-        next.inner
-            .join(kind.rust_join(), from_item(item)?, common::condition(on)?);
+        match (lateral, item) {
+            (false, item) => next.inner.join(kind.rust_join(), item, on),
+            (true, FromItem::SubQuery(query, alias)) => {
+                next.inner.join_lateral(kind.rust_join(), query, alias, on)
+            }
+            (true, _) => {
+                return Err(ConstructionError::new_err(
+                    "lateral applies to a subquery, a Select made a FROM item with as_(alias)",
+                ));
+            }
+        };
         Ok(next)
     }
 
@@ -236,6 +256,32 @@ impl PySelect {
         let mut next = self.clone();
         next.inner.with(clause.inner.clone());
         next
+    }
+
+    // [spec:pgorm:req:bindings.from-subqueries]
+    /// This query as a FROM item, `(SELECT ..) AS "alias"`, read wherever a
+    /// FROM item is. It is final once read, so its tie limit and windows are
+    /// checked here.
+    fn as_(&self, alias: &Bound<'_, PyAny>) -> PyResult<PyFromItem> {
+        let alias = PyIdentifier::new(alias)?.name();
+        Ok(PyFromItem {
+            inner: FromItem::SubQuery(self.embedded()?, alias),
+        })
+    }
+
+    // [spec:pgorm:req:bindings.row-locks]
+    /// Lock the rows read, replacing any lock set before: `of` names the FROM
+    /// items locked, every one the statement reads when it is absent.
+    #[pyo3(signature = (strength, *, of=None, wait=None))]
+    fn lock(
+        &self,
+        strength: PyLockStrength,
+        of: Option<&Bound<'_, PyAny>>,
+        wait: Option<PyLockWait>,
+    ) -> PyResult<Self> {
+        let mut next = self.clone();
+        lock(&mut next.inner, &strength, of, wait.as_ref())?;
+        Ok(next)
     }
 
     /// `UNION`: the rows of either query, each distinct row once.

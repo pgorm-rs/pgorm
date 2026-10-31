@@ -2385,9 +2385,12 @@ impl_evidence (
         {id bindings.schema-tables, version 0}
         {id bindings.schema-types, version 0}
     )}
-    {id python-select-gaps, rule_versions_seen (
-        {id bindings.from-subqueries, version 0}
-        {id bindings.row-locks, version 0}
+    {id python-select-gaps, covered_rules (
+        bindings.from-subqueries
+        bindings.row-locks
+    ), covered_claims (
+        {impl_name python, rule bindings.from-subqueries}
+        {impl_name python, rule bindings.row-locks}
     )}
     {id python-statement-gaps, covered_rules (
         bindings.merge

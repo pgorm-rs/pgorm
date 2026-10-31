@@ -41,14 +41,26 @@ limits and quoting rules in [EXPRESSIONS.md](EXPRESSIONS.md).
 requires at least one item. `.from_` adds a source; a second is comma-joined.
 `.join` requires both the source and ON expression/condition and accepts
 `Join.Inner`, `Left`, `Right` or `Full`; `.cross_join` takes just its source.
+`.join(item, on, lateral=True)` reads a subquery `LATERAL`, so it may read the
+columns of the items before it; any other item raises `ConstructionError`.
 
 A source is a `Table` or a `FromItem`, a `FROM` item that is not a plain named
-table. `json_table` builds one (see [EXPRESSIONS.md](EXPRESSIONS.md#json_table)),
-as do a `TableFunction` and a table's `tablesample` (below). A value-producing
-`FromItem` always has an alias, as PostgreSQL requires of such items, so
-`item.col(name)` and `item.star()` qualify its columns by a name the caller
-chose; a sampled table is qualified by its alias, or by its unqualified name
-when it has none. Anything else raises `ConstructionError`.
+table. `select.as_(alias)` makes one of a query, `(SELECT ..) AS "alias"`,
+which every place a source goes reads as a subquery. Its tie limit and
+WINDOW clause are checked as `as_` reads it. `json_table` builds one (see
+[EXPRESSIONS.md](EXPRESSIONS.md#json_table)), as do a `TableFunction` and a
+table's `tablesample` (below). A value-producing `FromItem` always has an
+alias, as PostgreSQL requires of such items, so `item.col(name)` and
+`item.star()` qualify its columns by a name the caller chose; a sampled table
+is qualified by its alias, or by its unqualified name when it has none.
+Anything else raises `TypeError`.
+
+`.lock(strength, of=[..], wait=..)` locks the rows read: `LockStrength.Update`,
+`NoKeyUpdate`, `Share` or `KeyShare`, `OF` the sources listed, each by the
+name it answers to in the statement (its alias, or an unaliased table's own
+name), and `LockWait.Nowait` or `LockWait.SkipLocked`. A later call replaces
+the lock. PostgreSQL refuses a tie limit beside `SKIP LOCKED`, which
+`inspect()` and every run refuse with `ConstructionError`.
 
 Repeated `.where` and `.having` calls combine conditions through the Rust
 condition builder. `.order_by` accepts typed `OrderBy` objects, and
@@ -437,7 +449,8 @@ the target and the source have must be qualified (`42702`), and `*` is the
 source's columns followed by the target's. `only()` writes `ONLY` before the
 target, leaving inheriting tables alone.
 
-The source is a `Table`. A query as the source is a common table expression:
+The source is a `Table` or a `FromItem`: `select.as_(alias)` makes a query
+one, read as a subquery. A query may instead be a common table expression:
 `With(name, select)` names it, `merge.with_(With(..))` attaches it, and the
 merge reads `Table(name)`. `With(name, query).cte(name, query)` adds more. A
 MERGE is itself a common table expression's body: `Select(...).with_(With("m",

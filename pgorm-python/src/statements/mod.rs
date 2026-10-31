@@ -6,9 +6,12 @@ mod conflict;
 mod from_item;
 mod grouping;
 mod insert;
+mod lock;
 mod merge;
 mod merge_action;
 mod raw;
+#[cfg(test)]
+mod read_tests;
 mod select;
 mod subquery;
 mod table;
@@ -27,6 +30,7 @@ pub use conflict::{PyConflict, PyConflictTarget, PyConflictUpdate};
 pub use from_item::PyFromItem;
 pub use grouping::PyGroupingElement;
 pub use insert::PyInsert;
+pub use lock::{PyLockStrength, PyLockWait};
 pub use merge::{PyMerge, PyPendingMerge};
 pub use merge_action::{
     PyMatchedAction, PyMergeInsert, PyMergeUpdate, PyNotMatchedAction, PyOverriding,
@@ -105,6 +109,8 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(subquery::quantified_any, module)?)?;
     module.add_function(wrap_pyfunction!(subquery::quantified_all, module)?)?;
     module.add_class::<Join>()?;
+    module.add_class::<PyLockStrength>()?;
+    module.add_class::<PyLockWait>()?;
     module.add_class::<PyInsert>()?;
     module.add_class::<PyUpdate>()?;
     module.add_class::<PyDelete>()?;

@@ -8,6 +8,7 @@ use pyo3::{prelude::*, types::PyTuple};
 
 use super::{
     common,
+    from_item::from_item,
     merge_action::{matched, not_matched},
     table::PyTable,
     with::PyWith,
@@ -25,18 +26,19 @@ pub struct PyPendingMerge {
     inner: PendingMerge,
 }
 
-/// Begin a MERGE. A source that is a query is a common table expression the
-/// statement names in `with_`, read here as a table.
+// [spec:pgorm:req:bindings.from-subqueries]
+/// Begin a MERGE. Its source is a `Table` or any FROM item, a query made one
+/// by `Select.as_` among them.
 #[pyfunction]
 pub(crate) fn merge(
     target: PyRef<'_, PyTable>,
-    source: PyRef<'_, PyTable>,
+    source: &Bound<'_, PyAny>,
     on: &Bound<'_, PyAny>,
 ) -> PyResult<PyPendingMerge> {
     Ok(PyPendingMerge {
         inner: Query::merge(
             target.inner.clone(),
-            source.inner.clone(),
+            from_item(source)?,
             common::condition(on)?,
         ),
     })
