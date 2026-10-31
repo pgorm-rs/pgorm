@@ -81,6 +81,43 @@ class ComparisonTests(unittest.TestCase):
             ).equal
         )
 
+    # [spec:pgorm:req:bindings.errors+3/test]
+    def test_constraint_subclasses_satisfy_their_database_rejection(self):
+        for sqlstate, subclass in c.DATABASE_SUBCLASS_BY_SQLSTATE.items():
+            actual = {
+                "kind": "error",
+                "class": subclass,
+                "cause": "server diagnostic",
+                "sqlstate": sqlstate,
+            }
+            expected = {
+                "class": "DatabaseError",
+                "cause": "sqlstate:" + sqlstate,
+            }
+            self.assertTrue(c.exact_error(actual, expected).equal)
+
+        wrong_subclass = {
+            "kind": "error",
+            "class": "NotNullViolationError",
+            "cause": "server diagnostic",
+            "sqlstate": "23505",
+        }
+        self.assertFalse(
+            c.exact_error(
+                wrong_subclass,
+                {"class": "DatabaseError", "cause": "sqlstate:23505"},
+            ).equal
+        )
+        self.assertFalse(
+            c.exact_error(
+                {**wrong_subclass, "class": "DatabaseError"},
+                {
+                    "class": "NotNullViolationError",
+                    "cause": "sqlstate:23505",
+                },
+            ).equal
+        )
+
     def test_missing_comparison_is_never_success(self):
         with self.assertRaises(c.InvalidOracle):
             c.observation({"kind": "compiled"}, {"kind": "compiled"})

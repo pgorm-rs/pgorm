@@ -1,0 +1,84 @@
+{
+  "counts": {
+    "construction_only_programs_constructed": {
+      "oracle_decided": false,
+      "reached_database": false,
+      "recorded": 150,
+      "scheduled": 150,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 0,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 150
+      }
+    },
+    "control_programs_checked": {
+      "oracle_decided": true,
+      "reached_database": true,
+      "recorded": 23,
+      "scheduled": 23,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 0,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 23
+      }
+    },
+    "invalid_input_programs_checked": {
+      "oracle_decided": true,
+      "reached_database": true,
+      "recorded": 6,
+      "scheduled": 6,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 6,
+        "incomplete": 0,
+        "invalid-control": 0,
+        "pass": 0
+      }
+    },
+    "live_database_programs_checked": {
+      "oracle_decided": true,
+      "reached_database": true,
+      "recorded": 30,
+      "scheduled": 30,
+      "verdicts": {
+        "defect": 0,
+        "expected-rejection": 0,
+        "incomplete": 2,
+        "invalid-control": 0,
+        "pass": 28
+      }
+    },
+    "note": "run classes are counted separately and are never summed"
+  },
+  "coverage_outstanding": [
+    "family.model"
+  ],
+  "dirty": true,
+  "fault_kinds": [
+    "coverage-unsatisfied",
+    "unexpected-error",
+    "unexpected-verdict"
+  ],
+  "findings": [
+    {
+      "item": "runtime-22",
+      "program_sha256": "2e3af5ad6951f04da74cebd5c75788a8051affd2046920cd77bf412853e715a0",
+      "run_class": "runtime",
+      "verdict": "incomplete"
+    },
+    {
+      "item": "runtime-7",
+      "program_sha256": "fdabecefa791d964e2b934e174d312bf1f6efca999dd966b903b76e4a5cf70c2",
+      "run_class": "runtime",
+      "verdict": "incomplete"
+    }
+  ],
+  "output": "target/generative-campaign/smoke-2d95a8b24bb4",
+  "passed": false,
+  "profile": "smoke",
+  "revision": "083c88c4757591a7c3fd4991c8fa051fa005ccf6"
+}

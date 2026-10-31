@@ -15238,6 +15238,20 @@ children (
                         kind @note
                         text "Acceptance: the generative invalid-input oracle treats the intentional constraint subclasses as compatible with their generic reference errors without weakening SQLSTATE or cause checks; the complete campaign and the full sqlmap plus identifier profiles pass on the final source state; security.sqlmap rules have explicit verification claims."
                     }
+
+                    {
+                        at 2026-10-31T18:44:50.234996Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-31T18:49:30.296612Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Smoke validation found a second stale campaign path after the constraint-subclass comparator was fixed: ModelQuery values fell through to Connection.query and were refused as non-statements. Added ModelQuery beside ModelRows in the live and emitted terminal dispatchers. Run smoke-a843ef923f08 passed all 209 scheduled items: 150 construction, 30 live, six expected invalid-input rejections and 23 controls; the preceding smoke-2d95a8b24bb4 retains the two incomplete ModelQuery findings."
+                    }
                 )
             }
 

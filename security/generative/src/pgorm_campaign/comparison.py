@@ -18,6 +18,15 @@ class Comparison:
     reason: str
 
 
+DATABASE_SUBCLASS_BY_SQLSTATE = {
+    "23505": "UniqueViolationError",
+    "23503": "ForeignKeyViolationError",
+    "23514": "CheckViolationError",
+    "23502": "NotNullViolationError",
+    "23P01": "ExclusionViolationError",
+}
+
+
 # [spec:pgorm:req:generative.comparison+1]
 def value_key(value):
     """The identity two observed values must share to compare equal.
@@ -115,15 +124,25 @@ def exact_error(actual, expected):
     wire.fields(expected, {"class", "cause"})
     if not isinstance(expected["cause"], str) or not expected["cause"]:
         raise InvalidOracle("expected rejection requires a specific cause")
-    if actual.get("kind") != "error" or actual.get("class") != expected["class"]:
+    if actual.get("kind") != "error":
         return Comparison(False, "error category differs")
     cause = expected["cause"]
     if cause.startswith("sqlstate:"):
         code = cause.removeprefix("sqlstate:")
         if len(code) != 5 or not code.isascii() or not code.isalnum():
             raise InvalidOracle("expected SQLSTATE must be exactly five characters")
+        expected_classes = {expected["class"]}
+        if (
+            expected["class"] == "DatabaseError"
+            and code in DATABASE_SUBCLASS_BY_SQLSTATE
+        ):
+            expected_classes.add(DATABASE_SUBCLASS_BY_SQLSTATE[code])
+        if actual.get("class") not in expected_classes:
+            return Comparison(False, "error category differs")
         equal = actual.get("sqlstate") == code
     else:
+        if actual.get("class") != expected["class"]:
+            return Comparison(False, "error category differs")
         equal = actual.get("cause") == cause
     return Comparison(equal, "equal" if equal else "error cause differs")
 

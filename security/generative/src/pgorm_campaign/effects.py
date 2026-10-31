@@ -6,7 +6,7 @@ from . import observations
 
 
 async def fetch(query, mode, connection, p):
-    from pgorm.models.queries import ModelRows
+    from pgorm.models.queries import ModelQuery, ModelRows
     from pgorm.pipeline import Pipeline, SelectedSources
 
     for category, prefix in (
@@ -15,6 +15,7 @@ async def fetch(query, mode, connection, p):
         (p.EntityGraphCursor, "pgorm::Cursor"),
         (Pipeline, "pgorm::pipeline::Pipeline"),
         (SelectedSources, "pgorm::pipeline::SelectedSources"),
+        (ModelQuery, "pgorm::ConnectionTrait::query_raw"),
         (ModelRows, "pgorm::ConnectionTrait::query_raw"),
     ):
         if isinstance(query, category):
@@ -24,7 +25,9 @@ async def fetch(query, mode, connection, p):
                 )
             value = await getattr(query, mode)(connection)
             rust = "one_opt" if mode == "optional" else mode
-            path = prefix if category is ModelRows else prefix + "::" + rust
+            path = (
+                prefix if category in (ModelQuery, ModelRows) else prefix + "::" + rust
+            )
             break
     else:
         value = await getattr(connection, "query" if mode == "all" else mode)(query)

@@ -135,6 +135,7 @@ async def _fetch(query, mode, connection):
         (p.EntityGraphCursor, "pgorm::Cursor"),
         (pl.Pipeline, "pgorm::pipeline::Pipeline"),
         (pl.SelectedSources, "pgorm::pipeline::SelectedSources"),
+        (p.ModelQuery, "pgorm::ConnectionTrait::query_raw"),
         (p.ModelRows, "pgorm::ConnectionTrait::query_raw"),
     ):
         if isinstance(query, category):
@@ -144,7 +145,11 @@ async def _fetch(query, mode, connection):
                 )
             value = await getattr(query, mode)(connection)
             rust = "one_opt" if mode == "optional" else mode
-            path = prefix if category is p.ModelRows else prefix + "::" + rust
+            path = (
+                prefix
+                if category in (p.ModelQuery, p.ModelRows)
+                else prefix + "::" + rust
+            )
             break
     else:
         value = await getattr(connection, "query" if mode == "all" else mode)(query)
