@@ -46,16 +46,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Install cargo-deny
-        # The latest release, `--locked` so its own dependency resolution is
-        # the one it shipped with: a tool that audits supply chain should not
-        # float its own dependencies. A release that reads deny.toml
-        # differently fails the audit below, and that is when the policy is
-        # revisited.
-        run: cargo install cargo-deny --locked
+        # Keep the policy engine and its command-line contract reviewable.
+        # `--locked` also preserves the dependency resolution shipped with
+        # this release.
+        run: cargo install cargo-deny --version 0.19.9 --locked
       - name: Fetch the advisory database
         # Once, so that every workspace below is judged against one snapshot of
         # it rather than whatever was published between two of their checks.
-        run: cargo deny --config deny.toml fetch db
+        run: cargo deny fetch --config deny.toml db
       - name: Resolve the root dependency tree
         # The root Cargo.lock is not tracked (see .gitignore), so there is
         # nothing on disk to audit until it is resolved here.
@@ -88,7 +86,7 @@ jobs:
             echo "::group::$workspace"
             if ! cargo fetch --locked --manifest-path "$workspace/Cargo.toml" ||
                 ! cargo deny --offline --locked --manifest-path "$workspace/Cargo.toml" \
-                  --config deny.toml check; then
+                  check --config deny.toml; then
               failed+=("$workspace")
               echo "::error file=$workspace/Cargo.toml::cargo deny check failed for $workspace"
             fi
