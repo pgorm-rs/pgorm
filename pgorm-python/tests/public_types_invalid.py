@@ -29,6 +29,16 @@ async def invalid(connection: p.Connection) -> None:
     s.DataType("not_a_type")  # expected-error: arg-type
     p.DataType("not_a_type")  # expected-error: arg-type
     s.create_table(p.Table("t")).column("raw SQL")  # expected-error: arg-type
+    s.CreateTable(p.Table("t"))  # expected-error: arg-type
+    s.CreateIndex(p.Table("t"))  # expected-error: arg-type
+    s.CreateType("mood")  # expected-error: arg-type
+    s.CreateDomain("code")  # expected-error: arg-type
+    s.CreateSequence("ticket")  # expected-error: arg-type
+    view = p.select(p.literal(1))
+    s.CreateView(view)  # expected-error: arg-type
+    s.CreateRecursiveView(view)  # expected-error: arg-type
+    s.CreateMaterializedView(view)  # expected-error: arg-type
+    s.CreateTableAs(view)  # expected-error: arg-type
     p.select(p.literal(1)).limit("3")  # expected-error: arg-type
     p.select(p.literal(1)).limit_with_ties(None)  # expected-error: arg-type
     await connection.copy_in_rows(p.CopyFrom(p.Table("t"), "text"), [[1]])  # expected-error: arg-type

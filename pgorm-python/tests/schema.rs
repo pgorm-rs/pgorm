@@ -725,10 +725,10 @@ unordered = p.Select(p.col('id')).from_(account).limit_with_ties(2)
 undeclared = p.Select(p.call('count', p.col('id')).over('w')).from_(account)
 step = p.Select(p.col('n')).from_(p.Table('r'))
 builders = {
-    'create_view': lambda q: p.CreateView(p.Table('v'), q),
-    'create_recursive_view': lambda q: p.CreateRecursiveView(p.Table('r'), ['n'], q.union_all(step)),
-    'create_materialized_view': lambda q: p.CreateMaterializedView(p.Table('m'), q),
-    'create_table_as': lambda q: p.CreateTableAs(p.Table('t'), q),
+    'create_view': lambda q: p.create_view(p.Table('v'), q),
+    'create_recursive_view': lambda q: p.create_recursive_view(p.Table('r'), ['n'], q.union_all(step)),
+    'create_materialized_view': lambda q: p.create_materialized_view(p.Table('m'), q),
+    'create_table_as': lambda q: p.create_table_as(p.Table('t'), q),
 }",
             Some(&globals),
             None,

@@ -20,15 +20,17 @@ pub struct PyCreateTable;
 
 ddl_class!(PyCreateTable, CreateTable, TableCreateStatement, with);
 
+// [spec:pgorm:req:bindings.schema-tables]
+#[pyfunction]
+pub(super) fn create_table<'py>(
+    py: Python<'py>,
+    table: &Bound<'_, PyAny>,
+) -> PyResult<Bound<'py, PyCreateTable>> {
+    PyCreateTable::object(py, Table::create(relation(table)?))
+}
+
 #[pymethods]
 impl PyCreateTable {
-    // [spec:pgorm:req:bindings.schema-tables]
-    #[new]
-    fn new(table: &Bound<'_, PyAny>) -> PyResult<PyClassInitializer<Self>> {
-        let statement = Statement::CreateTable(Table::create(relation(table)?));
-        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
-    }
-
     /// A column, which needs its type.
     fn column<'py>(slf: &Bound<'py, Self>, column: &PyColumnDef) -> PyResult<Bound<'py, Self>> {
         let column = column.typed("a column a table is created with")?;

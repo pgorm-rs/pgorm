@@ -62,7 +62,8 @@ transaction until it finishes. Transaction row streaming is not exposed.
 
 The stubs mark positional-only parameters and keyword-only options. An opaque
 native result such as `Record`, `Compiled` or `Expr` is obtained from its
-builder/operation. Its stub constructor takes `Never` to reject direct
+builder/operation, and a DDL statement such as `CreateTable` from its function
+(`create_table`). Its stub constructor takes `Never` to reject direct
 construction, matching the native runtime's `TypeError`.
 
 ## Dynamic columns and concrete application models

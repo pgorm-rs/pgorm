@@ -40,15 +40,16 @@ Every complete statement is a `s.DDL`: `CreateTable`, `AlterTable`,
 `CreateIndex`, `CreateType`, `AlterComposite`, `RenameAttribute`,
 `CreateDomain`, `CreateSequence`, `AlterSequence`, the view builders and the
 plain statements the other functions give all extend it, and every terminal
-takes one. Builder methods return new objects. The classes Python constructs by
-calling them are also spelled as functions: `create_table` is `CreateTable`,
-and so are `create_index`, `create_type`, `create_domain`, `create_sequence`,
+takes one. Builder methods return new objects. A statement is made by its
+function, never by its class: `create_table` gives a `CreateTable`, and
+`create_index`, `create_type`, `create_domain`, `create_sequence`,
 `create_view`, `create_recursive_view`, `create_materialized_view` and
-`create_table_as`. An `ALTER` that names its object and no action yet —
-`s.alter_table(table)`, `s.alter_type(name)`, `s.alter_domain(name)` and
-`s.alter_sequence(name)` — is a pending object of its own, no `DDL`: it has no
-`inspect()`, every terminal refuses it with `ConstructionError`, and its first
-action gives the statement.
+`create_table_as` give theirs. The classes are exported for annotations and
+`isinstance`, and calling one is a `TypeError`. An `ALTER` that names its
+object and no action yet — `s.alter_table(table)`, `s.alter_type(name)`,
+`s.alter_domain(name)` and `s.alter_sequence(name)` — is a pending object of
+its own, no `DDL`: it has no `inspect()`, every terminal refuses it with
+`ConstructionError`, and its first action gives the statement.
 
 A table or sequence is named by a `str`, a `p.Identifier` or a `p.Table`
 without an alias, whose `schema=` qualifies it; a type or domain by a name or a
@@ -175,7 +176,7 @@ not introspect the database or compute migrations.
 
 ## Indexes
 
-`CreateIndex(table, on, name=None, order=None, operator_class=None)` is an
+`create_index(table, on, name=None, order=None, operator_class=None)` is an
 index over its first entry, a column's name or an expression;
 `.column(on, order=None, operator_class=None)` appends another, `order` being
 `"asc"` or `"desc"`. `.unique()`, `.nulls_not_distinct()` (which PostgreSQL
@@ -227,7 +228,7 @@ pair = (
 span = s.create_type("floatrange").as_range("double", subtype_diff="float8mi")
 ```
 
-`CreateType(name)` is a shell type until a kind is chosen, and what a type is,
+`create_type(name)` is a shell type until a kind is chosen, and what a type is,
 is one slot: `as_enum()` and `values(labels)`, which appends labels and makes
 the type an enumeration; `as_composite()` and `attribute(name, kind,
 collation=None)`; or `as_range(subtype, collation=None, subtype_opclass=None,
@@ -275,7 +276,7 @@ statements = [
 ]
 ```
 
-`CreateSequence(name)` takes `if_not_exists()`, `as_type("smallint" |
+`create_sequence(name)` takes `if_not_exists()`, `as_type("smallint" |
 "integer" | "bigint")`, `options(**options)` — at least one, merged into those
 set, a later one for a clause replacing the earlier — and `owned_by(table,
 column)`, or `owned_by(None)` for `OWNED BY NONE`. `s.alter_sequence(name)`
@@ -333,14 +334,14 @@ statements = [
 ]
 ```
 
-`CreateDomain(name, base)`, also spelled `create_domain`, builds as
-`CreateTable` does, each method returning a new builder: the base is any type
-`ColumnDef` takes, `collate(name, schema=None)` names a collation for a base
-type that has one (`42804` otherwise), `default(value)` and the pair
-`not_null()` / `null()` are one slot each, the later call winning, and
-`check(condition, name=None)` adds a check, in order. A check's condition is an
-expression over `p.domain_value()`, the keyword `VALUE`: inside a domain's
-check PostgreSQL reads it as the value tested.
+`create_domain(name, base)` builds as `create_table` does, each method
+returning a new builder: the base is any type `ColumnDef` takes, `collate(name,
+schema=None)` names a collation for a base type that has one (`42804`
+otherwise), `default(value)` and the pair `not_null()` / `null()` are one slot
+each, the later call winning, and `check(condition, name=None)` adds a check,
+in order. A check's condition is an expression over `p.domain_value()`, the
+keyword `VALUE`: inside a domain's check PostgreSQL reads it as the value
+tested.
 
 `s.alter_domain(domain)` gives a `PendingAlterDomain`, whose actions each give
 the whole statement, PostgreSQL taking one action per `ALTER DOMAIN`:
@@ -390,7 +391,7 @@ statements = [
 ]
 ```
 
-`CreateView(name, query)` takes `or_replace()`, `columns(names)`,
+`create_view(name, query)` takes `or_replace()`, `columns(names)`,
 `check_option("local" | "cascaded")`, `security_barrier()` and
 `security_invoker()`. Rows written through an automatically updatable view
 reach its table; with a check option a row the view would not show is refused
@@ -398,7 +399,7 @@ reach its table; with a check option a row the view would not show is refused
 add columns after the view's own and replaces its options. `security_barrier`
 evaluates the view's conditions before a caller's, and `security_invoker` reads
 the underlying tables with the querying role's privileges.
-`CreateRecursiveView(name, columns, query)` names one column or a non-empty
+`create_recursive_view(name, columns, query)` names one column or a non-empty
 list of them and has every method but `check_option`, which PostgreSQL refuses
 on a recursive view. Its query is a non-recursive term joined by `union` or
 `union_all` to an arm that reads the view (see
@@ -415,13 +416,13 @@ counting = s.create_recursive_view(counter, "n", p.Select(p.literal(1).as_("n"))
 
 `drop_view(names, if_exists=False, behavior=None)` drops views.
 
-`CreateMaterializedView(name, query)` stores the query's rows, or none until a
+`create_materialized_view(name, query)` stores the query's rows, or none until a
 refresh with `with_no_data()`, and takes `if_not_exists()` and `columns(names)`;
 `refresh_materialized_view(name, concurrently=False, with_no_data=False)`
 replaces them. A concurrent refresh needs a unique index on the view and a
 populated view, and cannot be combined with `with_no_data`, which is refused
 as the statement is built. `drop_materialized_view(names, ...)` drops them.
-`CreateTableAs(name, query)` takes the same three methods and creates an
+`create_table_as(name, query)` takes the same three methods and creates an
 ordinary table from the query's columns and, unless `with_no_data()`, its
 rows. Neither has `or_replace`, and a view has no `if_not_exists`.
 

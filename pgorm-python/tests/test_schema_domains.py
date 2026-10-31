@@ -44,7 +44,7 @@ class DomainConstruction(unittest.TestCase):
         )
         self.assertEqual(create.params, [])
         self.assertEqual(
-            s.CreateDomain("code", "text").collate("C").null().default(p.literal(1) + 2).inspect().sql,
+            s.create_domain("code", "text").collate("C").null().default(p.literal(1) + 2).inspect().sql,
             'CREATE DOMAIN "code" AS text COLLATE "C" DEFAULT (1 + 2) NULL',
         )
         self.assertEqual(
