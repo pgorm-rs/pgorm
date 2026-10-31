@@ -43,6 +43,8 @@ the SQL; its wire parameter retains the underlying Rust string/array tag.
 | `exists(select)` | `Expr::exists`; `EXISTS (select)` |
 | `scalar(select)` | `SimpleExpr::SubQuery`; `(select)`, the subquery's one value |
 | `any_(source)` / `all_(source)` | `Expr::any` / `Expr::all` over a `Select`, `Func::any` / `Func::all` over an array |
+| `case_when(condition, result)` | `Expr::case`; a searched `CASE`, `SearchedCase.when` adding arms through `CaseStatement::case` |
+| `case_of(operand).when(value, result)` | `Expr::case_of` and `CaseOperand::when`; a simple `CASE`, `SimpleCase.when` adding arms |
 | `expr.at(index)` | `Expr::index`; `a[index]` |
 | `expr.slice(lower, upper)` | `Expr::subscript(Subscript::Slice)`; `a[lower:upper]`, `None` an open end |
 | `LikePattern(pattern, escape=...)` | `LikeExpr::new` and optional `escape`; `escape=""` is `no_escape` |
@@ -89,7 +91,7 @@ Combine expressions with `&`, `|` and `~`. Parenthesize comparisons because
 Python's operator precedence still applies. SQL expressions, conditions,
 projection aliases, orderings, `format_json`'s `JsonInput`, `window_function`'s
 `WindowFunction`, a windowed call, a `LikePattern`, `any_` and `all_`'s
-`Quantified`, `Direction`, `Nulls` and
+`Quantified`, `case_of`'s `CaseOperand`, `Direction`, `Nulls` and
 the SQL/JSON kinds, behaviours, defaults and `JSON_TABLE` columns raise
 `ConstructionError` on Python truth testing. Python `and`, `or`, `not`, chained comparisons and implicit truth
 tests cannot compose SQL.
@@ -185,6 +187,39 @@ on the column, and a strict-mode path that would raise answers NULL.
 (`_expr_comparison.pyi`, `_expr_patterns.pyi` and the rest), which exist for
 the type checker alone: at runtime `Expr` has no base but `object`, so
 `help(Expr)` and `dir(Expr)` list every method on the class itself.
+
+## CASE
+
+`case_when(condition, result)` is a searched `CASE` with its first arm, Rust's
+`Expr::case`, and `case_of(operand)` begins a simple `CASE`, Rust's
+`Expr::case_of`, which compares its operand with each arm's value by `=`:
+
+```python
+from pgorm import Condition, case_of, case_when, col
+
+band = (case_when(col("score") > 10, "high")
+        .when(Condition.any(col("score").is_null(), col("score") < 0), "none")
+        .else_("low"))
+assert band.inspect().sql == (
+    'SELECT (CASE WHEN ("score" > $1) THEN $2 '
+    'WHEN ("score" IS NULL OR "score" < $3) THEN $4 ELSE $5 END)'
+)
+calm = case_of(col("mood")).when("calm", 1).when("glad", 2).else_(0)
+```
+
+A `SearchedCase` and a `SimpleCase` are each an `Expr`, so a CASE goes
+wherever an expression goes — a projection, `WHERE`, `ORDER BY`, a written
+value — and is compared, combined and cast as one. Each takes further `when`
+arms, tried in order, and one `else_`, after which it is a plain `Expr` that
+takes neither. A searched arm's condition is an expression or a `Condition`;
+every value and result is bound unless it is an expression. `case_of` gives a
+`CaseOperand`, which is no expression until its first `when`, as PostgreSQL's
+grammar requires a `WHEN`: given where an expression goes, it is refused as
+any other non-expression is. Without an `else_`, a row no arm matches is
+NULL, and so is a simple CASE whose operand is NULL, which equals no value.
+PostgreSQL types a CASE from its results, and reads one whose results are all
+bound values, which carry no type to it, as text: give one a type, a column,
+a `literal` or `bind(1).cast(TypeName("int4"))`, where the CASE is not text.
 
 ## Text and functions
 

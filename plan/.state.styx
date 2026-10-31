@@ -2319,8 +2319,10 @@ impl_evidence (
         {id bindings.operands, version 0}
         {id bindings.row-count, version 0}
     )}
-    {id python-case-expressions, rule_versions_seen (
-        {id bindings.case, version 0}
+    {id python-case-expressions, covered_rules (
+        bindings.case
+    ), covered_claims (
+        {impl_name python, rule bindings.case}
     )}
     {id python-model-column-operators, covered_rules (
         bindings.column-operators

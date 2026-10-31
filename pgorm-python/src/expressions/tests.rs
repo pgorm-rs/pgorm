@@ -389,6 +389,74 @@ fn conditions_keep_rust_empty_and_grouping_semantics() -> PyResult<()> {
     })
 }
 
+// [spec:pgorm:req:bindings.case/test]    case_when and case_of, with further arms and an
+// else_, are Rust's Expr::case and Expr::case_of, each value and result bound unless it is an
+// expression; a CASE goes where an expression goes, and an operand with no arm does not
+#[test]
+fn case_expressions_match_rust_builders() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let x = || Expr::col(Name::runtime("x"));
+        let kind = || Expr::col(Name::runtime("kind"));
+        let searched = Expr::case(x().gt(0i64), "positive").case(
+            Condition::all()
+                .add(x().lt(0i64))
+                .add(Expr::col(Name::runtime("y")).is_not_null()),
+            "negative",
+        );
+        let cases = [
+            (
+                "p.case_when(p.col('x') > 0, 'positive').when(p.Condition.all(p.col('x') < 0, p.col('y').is_not_null()), 'negative')",
+                searched.into(),
+            ),
+            (
+                "p.case_when(p.col('x').is_null(), 0).else_(p.col('x'))",
+                Expr::case(x().is_null(), 0i64).finally(x()).into(),
+            ),
+            (
+                "p.case_of(p.col('kind')).when('a', 1).when(p.literal('b'), p.col('x') + 1)",
+                Expr::case_of(kind())
+                    .when("a", 1i64)
+                    .when(SimpleExpr::Constant("b".into()), x().add(1i64))
+                    .into(),
+            ),
+            (
+                "p.case_of(p.col('kind')).when('a', 1).else_(-1) + 1",
+                SimpleExpr::from(Expr::case_of(kind()).when("a", 1i64).finally(-1i64)).add(1i64),
+            ),
+            (
+                "p.case_when(p.col('x') > 0, 1).eq(p.case_of(p.col('kind')).when('a', 1))",
+                Into::<SimpleExpr>::into(Expr::case(x().gt(0i64), 1i64))
+                    .binary(BinOper::Equal, Expr::case_of(kind()).when("a", 1i64)),
+            ),
+        ];
+        for (source, expected) in cases {
+            parity(py, &globals, source, expected)?;
+        }
+        for (source, class) in [
+            ("p.case_when(1, 'x')", "TypeError"),
+            ("p.case_when(p.col('x') > 0, 1).when('x', 2)", "TypeError"),
+            ("p.case_of(p.col('x')).inspect()", "AttributeError"),
+            ("p.case_of(p.col('x')).else_(1)", "AttributeError"),
+            (
+                "p.case_when(p.col('x') > 0, 1).else_(0).when(p.col('x') < 0, 2)",
+                "AttributeError",
+            ),
+            ("p.col('x') == p.case_of(p.col('x'))", "ConstructionError"),
+            ("p.case_when(p.col('x') > 0, None)", "ConstructionError"),
+            ("bool(p.case_of(p.col('x')))", "ConstructionError"),
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            let name = error.get_type(py).name()?;
+            assert_eq!(name.to_string(), class, "{source}: {error}");
+        }
+        Ok(())
+    })
+}
+
 // [spec:pgorm:req:bindings.expressions+2/test]
 // [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    both forms through LikePattern, its
 // ESCAPE carried, and a plain string refused as LIKE's is

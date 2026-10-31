@@ -6,6 +6,7 @@
 
 mod arithmetic;
 mod capabilities;
+mod case;
 mod comparison;
 mod compiled;
 mod construct;
@@ -60,6 +61,11 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<Aliased>()?;
     module.add_class::<OrderBy>()?;
     module.add_class::<Compiled>()?;
+    module.add_class::<case::PySearchedCase>()?;
+    module.add_class::<case::PySimpleCase>()?;
+    module.add_class::<case::PyCaseOperand>()?;
+    module.add_function(wrap_pyfunction!(case::case_when, module)?)?;
+    module.add_function(wrap_pyfunction!(case::case_of, module)?)?;
     module.add_function(wrap_pyfunction!(construct::col, module)?)?;
     module.add_function(wrap_pyfunction!(construct::bind, module)?)?;
     module.add_function(wrap_pyfunction!(construct::literal, module)?)?;

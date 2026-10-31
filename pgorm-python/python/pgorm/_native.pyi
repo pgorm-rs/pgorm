@@ -138,6 +138,10 @@ from ._subqueries import (
     array as array, exists as exists, scalar as scalar,
     Quantified as Quantified, any_ as any_, all_ as all_,
 )
+from ._case import (
+    SearchedCase as SearchedCase, SimpleCase as SimpleCase, CaseOperand as CaseOperand,
+    case_when as case_when, case_of as case_of,
+)
 from ._windows import (
     FrameType as FrameType, FrameExclusion as FrameExclusion, Frame as Frame,
     FramePrecedingStart as FramePrecedingStart, FrameCurrentRowStart as FrameCurrentRowStart,

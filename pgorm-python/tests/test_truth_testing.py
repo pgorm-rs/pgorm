@@ -103,6 +103,7 @@ def expression_samples():
         p.JsonKind.Object, p.JsonExistsBehavior.Error, p.JsonValueBehavior.Null,
         p.JsonQueryBehavior.Null, p.JsonDefault("x"), p.JsonTableBehavior.Empty,
         p.JsonTableColumn.ordinality("n"), p.any_(p.col("ids")),
+        p.case_when(expression, 1), p.case_of(p.col("id")), p.case_of(p.col("id")).when(1, 2),
         _native._DeclaredColumn(p.col("id")),
     ]
 
