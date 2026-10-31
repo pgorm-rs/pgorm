@@ -1,6 +1,16 @@
 name: generative
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '**/*.rs'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - 'security/generative/**'
+      - 'pgorm-python/**'
+      - '.github/workflows/generative*.yml'
+      - '.config/nspec/config.styx'
   pull_request:
     paths:
       - '**/*.rs'
@@ -18,21 +28,21 @@ permissions:
   contents: read
 
 # A pull request's runs share one group, so a newer push cancels the superseded
-# smoke run. A scheduled or dispatched run gets a group of its own: a full
-# campaign runs for hours, and no later trigger may cancel it or displace it
-# from a queue.
+# smoke run. Main pushes, scheduled runs and dispatched runs get groups of their
+# own: no later trigger may cancel evidence for a landed revision or displace a
+# full campaign from its queue.
 concurrency:
   group: generative-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   smoke:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     uses: ./.github/workflows/generative-run.yml
     with:
       profile: smoke
   full:
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && github.event_name != 'push'
     uses: ./.github/workflows/generative-run.yml
     with:
       profile: full

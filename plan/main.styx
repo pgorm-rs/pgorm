@@ -14892,6 +14892,13 @@ children (
                 kind @note
                 text "Re-read after python-binding-decisions (f44f9ba2) folded the per-binding argument-error, row-count and operand rules into bindings.argument-errors, bindings.row-count and bindings.operands, moved bindings.errors to +3, bindings.connections, bindings.results, bindings.identifiers, bindings.select, bindings.expressions, bindings.models, bindings.entities, bindings.entity-versions, bindings.pipeline-expressions, bindings.schema-views, bindings.schema-domains and napi.application to +2, python.capabilities to +2, python.values to +7 and python.lifecycle to +3. bindings.errors lost its clause reading every shared ConstructionError as the argument's value; bindings.argument-errors states the wrong-type class once (TypeError in both, a closed choice's string outside its set included, a listener capacity out of range Python's ValueError and JavaScript's RangeError), and the rules that said anything else is a ConstructionError, with schema-views' check option and schema-domains' non-expression check, now say any other value. bindings.entity-versions states the update_many guard for both (napi.update-many-guard deleted), bindings.entities lists entities(), graphs() and pipeline.source_tuples() (taken out of napi.application), napi.pipeline-operands' table-name source is napi.pipeline-table-names and python.pipeline-operands' own terminals and null() are python.pipeline. This node's javascript claims of napi.argument-errors, napi.row-count and napi.pipeline-operands are re-keyed to the three shared rules and napi.update-many-guard's to napi.pipeline-table-names; its python claims of python.argument-errors, python.row-count and python.input-boundaries are dropped (python-binding-decisions claims the shared rules' python side) and python.pipeline-operands' becomes python.pipeline. Every reference to these rules in both bindings and pgorm's own code is pinned at the current version; JavaScript's code changed only its pins and one napi.pipeline-table-names annotation."
             }
+
+            {
+                at 2026-10-31T19:59:42.515046Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-10-31: \"do all those things\", on three shapes under decision (7). (A) Python's one ModelWrite becomes ModelInsert, ModelUpdate and ModelDelete as JavaScript's are, each with only its own methods, and ModelWrite is deleted. (B) Column.validate and Column.value become private, and Column.describe and EntityColumn.describe are deleted, a column's details read through Model.describe() and Entity.describe() as JavaScript reads them. (C) Python's DDL builders are made only by their factory functions (create_table, alter_table and the rest), as JavaScript's are and as Python's Expr is made only by col() and bind(); the classes stay for annotations and isinstance but cannot be called."
+            }
         )
     }
 
@@ -15274,12 +15281,34 @@ children (
                 id security-remediation-2026-10-31.automation
                 title "Run code scanning and security campaigns on every relevant main push"
                 kind @ci
+                sealed true
                 log (
                     {
                         at 2026-10-31T18:30:19.036839Z
                         author "brendan@necessary.nu"
                         kind @note
                         text "Acceptance: CodeQL scans Rust, Python and JavaScript where GitHub supports them; sqlmap and the generative campaign run on relevant pushes to main as well as their existing triggers; workflow permissions remain minimal and actions remain commit-pinned."
+                    }
+
+                    {
+                        at 2026-10-31T19:59:16.091116Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-31T20:00:23.422688Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Added relevant main-push smoke triggers to generative and sqlmap without turning scheduled/dispatched exhaustive runs into push jobs. Added advanced CodeQL SAST for Actions, JavaScript/TypeScript, Python and Rust on every PR and main push plus weekly/on-demand runs, using security-extended queries and the signed v4.39.1 commit pin. actionlint passes all three touched workflows; repository-wide actionlint only reports three pre-existing shellcheck style/info diagnostics in untouched workflows."
+                    }
+
+                    {
+                        at 2026-10-31T20:00:23.88082Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }
@@ -15316,6 +15345,34 @@ children (
                         text "Acceptance: GitHub secret scanning and push protection are enabled where the repository plan supports them; main is protected against force-push and deletion and requires the repository's stable security checks. Apply enforcement only after those checks are green and their exact check names are known."
                     }
                 )
+            }
+        )
+    }
+
+    {
+        id python-model-shapes
+        title "Python's model writes are ModelInsert, ModelUpdate and ModelDelete, and a column's conversion and description are no public methods of its own, as JavaScript's are"
+        kind @refactor
+        log (
+            {
+                at 2026-10-31T20:00:20.040537Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Decisions (A) and (B) of the operator's 2026-10-31 answer (binding-spec-consolidation). (A) Split pgorm-python's ModelWrite (pgorm-python/python/pgorm/models/writes.py, queries.py) into ModelInsert, ModelUpdate and ModelDelete, each with only its own methods — an insert's on_conflict and upsert terminals, an update's where / all_rows and change terminals, a delete's where / all_rows — so mypy refuses a method of another kind, as TypeScript refuses it in pgorm-napi; delete ModelWrite. (B) Make Column.validate and Column.value private (they are write and decode machinery; Value(data, kind) is the public conversion), and delete Column.describe and EntityColumn.describe in favour of Model.describe() and Entity.describe(). Settle both under the shapes question in docs/spec/bindings-surface.json, update the generative campaign's emitters and dispatchers where they call any of these, and state the shapes in the shared rules."
+            }
+        )
+    }
+
+    {
+        id python-ddl-factories
+        title "Python's DDL builders are made only by their factory functions, as JavaScript's are"
+        kind @refactor
+        log (
+            {
+                at 2026-10-31T20:00:25.282718Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Decision (C) of the operator's 2026-10-31 answer (binding-spec-consolidation). pgorm-python's DDL builder classes (CreateTable, CreateIndex, CreateType, CreateDomain, CreateSequence, CreateView, CreateRecursiveView, CreateMaterializedView, CreateTableAs and the rest) are constructible through #[new], and each factory is the class under a second name (create_table = CreateTable in pgorm-python/python/pgorm/schema/__init__.py). Make the factories real functions and the only way to build, and the classes non-constructible from Python, as pgorm-napi's are and as Python's Expr is (col() / bind()); the classes stay exported for annotations and isinstance. The stubs say so (a class's __init__ taking a Never, as Expr's does), the signature test and typing rejection cases cover it, and the shared schema rule states it for both bindings."
             }
         )
     }
