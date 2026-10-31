@@ -1302,15 +1302,18 @@ placeholders belong to the stage that minted them.
 > `ConstructionError`, and its first action gives the statement. A
 > `ColumnDef` is no statement, and a terminal refuses it likewise.
 
-> [spec:pgorm:req:bindings.schema-api]
+> [spec:pgorm:req:bindings.schema-api+2]
 > Each binding MUST spell the DDL `bindings.schema` describes as these
-> constructors and builders, every complete statement of the `DDL` class or a
-> class extending it, so a statement the terminals take; no class is named
-> `SchemaStatement`. Python constructs `CreateTable`, `CreateIndex`,
-> `CreateType`, `CreateDomain`, `CreateSequence`, `CreateView`,
-> `CreateRecursiveView`, `CreateMaterializedView` and `CreateTableAs` by
-> calling them, and each is also the function named for it, the factory
-> JavaScript constructs it through:
+> functions and the builders they give, every complete statement of the `DDL`
+> class or a class extending it, so a statement the terminals take; no class
+> is named `SchemaStatement`. A statement is made by its factory, never by its
+> class: `DDL`, each builder, each pending `ALTER` and `EntitySchema` are
+> exported for annotations and `isinstance` (`instanceof`) and cannot be
+> called, a call being a `TypeError`, as Python's `Expr` is made only by
+> `col()` and `bind()`. Python's stubs give each such class an `__init__`
+> taking `Never`, and JavaScript's declarations a private or protected
+> constructor. A `ColumnDef` and a `DataType` are parts of a statement, not
+> statements, and are made by calling their classes. The factories are:
 >
 > - `create_table(table)` gives a `CreateTable` with `column`, `primary_key`,
 >   `unique`, `foreign_key`, `check` and `if_not_exists`, and

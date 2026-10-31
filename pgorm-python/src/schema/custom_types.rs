@@ -27,15 +27,18 @@ pub struct PyCreateType;
 
 ddl_class!(PyCreateType, CreateType, TypeCreateStatement, with);
 
+/// `CREATE TYPE` naming its type, a shell type until a kind is chosen.
+// [spec:pgorm:req:bindings.schema-types]
+#[pyfunction]
+pub(super) fn create_type<'py>(
+    py: Python<'py>,
+    name: &Bound<'_, PyAny>,
+) -> PyResult<Bound<'py, PyCreateType>> {
+    PyCreateType::object(py, Type::create(type_ref(name)?))
+}
+
 #[pymethods]
 impl PyCreateType {
-    // [spec:pgorm:req:bindings.schema-types]
-    #[new]
-    fn new(name: &Bound<'_, PyAny>) -> PyResult<PyClassInitializer<Self>> {
-        let statement = Statement::CreateType(Type::create(type_ref(name)?));
-        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
-    }
-
     /// An enumeration, with no labels until `values` appends them.
     fn as_enum<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, Self>> {
         let mut statement = Self::statement(slf)?;

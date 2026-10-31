@@ -21,7 +21,7 @@ def programs(p):
         **indexes(p, booking),
         **types(p, mood),
         **sequences(p, booking),
-        "create_view_repeated": p.CreateView(app("large_room"), query).or_replace()
+        "create_view_repeated": p.create_view(app("large_room"), query).or_replace()
             .columns(["booking"]).columns(["room_no"]).check_option("local")
             .check_option("cascaded").security_barrier().security_invoker(),
         "drop_views": p.drop_view(["large_room", app("other")], if_exists=True, behavior="cascade"),
@@ -37,7 +37,7 @@ def programs(p):
 
 def tables(p, booking, room, mood):
     return {
-        "create_table_columns": p.CreateTable(booking)
+        "create_table_columns": p.create_table(booking)
             .column(p.ColumnDef("id", "bigint").identity("always", start_with=10, increment_by=2, max_value=None))
             .column(p.ColumnDef("legacy", "integer").auto_increment())
             .column(
@@ -51,7 +51,7 @@ def tables(p, booking, room, mood):
             .column(p.ColumnDef("doubled", "integer").generated(p.col("seats") * 2, "stored"))
             .column(p.ColumnDef("halved", "integer").generated(p.col("seats") / 2, "virtual"))
             .column(p.ColumnDef("serial", "bigint").identity("by_default")),
-        "create_table_keys": p.CreateTable(booking)
+        "create_table_keys": p.create_table(booking)
             .if_not_exists()
             .column(p.ColumnDef("id", "bigint"))
             .column(p.ColumnDef("room", "integer"))
@@ -66,7 +66,7 @@ def tables(p, booking, room, mood):
             )
             .foreign_key("room", room, "id", period=("during", "open"))
             .check(p.col("room") < 1000, name="room_small", no_inherit=True, enforcement="enforced"),
-        "create_table_typed_columns": p.CreateTable("feeling")
+        "create_table_typed_columns": p.create_table("feeling")
             .column(p.ColumnDef("mood", mood).default(p.Value("calm", mood)))
             .column(p.ColumnDef("moods", p.DataType(mood).array()))
             .column(p.ColumnDef("tags", p.DataType("varchar", length=20).array()))
@@ -98,7 +98,7 @@ def tables(p, booking, room, mood):
 
 def indexes(p, booking):
     return {
-        "create_index_entries": p.CreateIndex(
+        "create_index_entries": p.create_index(
             booking, p.call("lower", p.col("note")), name="booking_note", order="desc",
             operator_class="text_pattern_ops",
         )
@@ -109,25 +109,25 @@ def indexes(p, booking):
             .include(["seats"])
             .where(p.col("seats") > 0)
             .where(~p.col("room").is_null()),
-        "create_index_methods": p.CreateIndex("doc", p.col("body")).using("gin").column(p.col("tags")),
-        "create_index_access_method": p.CreateIndex(booking, "during").using("gist"),
+        "create_index_methods": p.create_index("doc", p.col("body")).using("gin").column(p.col("tags")),
+        "create_index_access_method": p.create_index(booking, "during").using("gist"),
         "drop_index": p.drop_index(booking, "booking_note", if_exists=True),
     }
 
 
 def types(p, mood):
     return {
-        "create_shell_type": p.CreateType("later"),
-        "create_enum": p.CreateType(mood).values(["calm", "O'Brien"]).values([""]),
-        "create_composite": p.CreateType("pair").attribute("a", "integer")
+        "create_shell_type": p.create_type("later"),
+        "create_enum": p.create_type(mood).values(["calm", "O'Brien"]).values([""]),
+        "create_composite": p.create_type("pair").attribute("a", "integer")
             .attribute("b", "text", collation={"name": "C", "schema": "pg_catalog"})
             .attribute("c", mood),
-        "create_empty_composite": p.CreateType("nothing").values(["x"]).as_composite(),
-        "create_range": p.CreateType(p.TypeName("floatrange", schema="app")).as_range(
+        "create_empty_composite": p.create_type("nothing").values(["x"]).as_composite(),
+        "create_range": p.create_type(p.TypeName("floatrange", schema="app")).as_range(
             "double", subtype_diff="float8mi", subtype_opclass="float8_ops",
             multirange_type_name=p.TypeName("floatmultirange", schema="app"),
         ),
-        "create_text_range": p.CreateType("textrange").as_range("text", collation="C"),
+        "create_text_range": p.create_type("textrange").as_range("text", collation="C"),
         "alter_enum_add_value": p.alter_type(mood).add_value("tense", after="calm"),
         "alter_composite": p.alter_type("pair")
             .add_attribute("d", "bigint")
@@ -144,7 +144,7 @@ def types(p, mood):
 
 def sequences(p, booking):
     return {
-        "create_sequence": p.CreateSequence(p.Table("ticket", schema="app"))
+        "create_sequence": p.create_sequence(p.Table("ticket", schema="app"))
             .if_not_exists()
             .as_type("integer")
             .options(increment_by=5, min_value=None, max_value=9_007_199_254_740_991, start_with=-3, cache=2)

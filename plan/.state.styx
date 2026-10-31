@@ -1191,6 +1191,7 @@ assertions (
     {id python-created-range-domain-subtype, kind @complete, author "brendan@necessary.nu", at 2026-10-26T14:07:08.379524Z}
     {id python-created-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:45:27.273279Z}
     {id python-datatype-export, kind @complete, author "brendan@necessary.nu", at 2026-10-19T12:56:06.241222Z}
+    {id python-ddl-factories, kind @doing, author "brendan@necessary.nu", at 2026-10-31T20:01:13.485576Z}
     {id python-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:34:09.315805Z}
     {id python-listen-header-duplicate, kind @complete, author "brendan@necessary.nu", at 2026-10-26T00:02:49.425118Z}
     {id python-merge-and-row-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:16:36.872555Z}
@@ -1260,6 +1261,11 @@ assertions (
     {id seaography-feature-build, kind @complete, author "brendan@necessary.nu", at 2026-09-06T00:46:08.718488Z}
     {id seaquery-doc-branding, kind @complete, author "brendan@necessary.nu", at 2026-09-06T10:57:15.3319Z}
     {id searched-case-needs-arm, kind @complete, author "brendan@necessary.nu", at 2026-09-25T03:10:12.098266Z}
+    {id security-remediation-2026-10-31.advisories, kind @complete, author "brendan@necessary.nu", at 2026-10-31T18:38:37.536743Z}
+    {id security-remediation-2026-10-31.automation, kind @complete, author "brendan@necessary.nu", at 2026-10-31T20:00:23.88082Z}
+    {id security-remediation-2026-10-31.campaign-evidence, kind @complete, author "brendan@necessary.nu", at 2026-10-31T19:58:29.008215Z}
+    {id security-remediation-2026-10-31.disclosure, kind @complete, author "brendan@necessary.nu", at 2026-10-31T20:00:58.026393Z}
+    {id security-remediation-2026-10-31.github-enforcement, kind @complete, author "brendan@necessary.nu", at 2026-10-31T21:01:53.412104Z}
     {id select-named-windows, kind @complete, author "brendan@necessary.nu", at 2026-10-18T20:35:11.610602Z}
     {id select-one-zero-limit, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:57:45.040473Z}
     {id select-sources-read-casts, kind @complete, author "brendan@necessary.nu", at 2026-09-07T14:35:42.050401Z}
@@ -1326,11 +1332,6 @@ assertions (
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id view-check-dedup, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:16:21.425085Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
-    {id security-remediation-2026-10-31.advisories, kind @complete, author "brendan@necessary.nu", at 2026-10-31T18:38:37.536743Z}
-    {id security-remediation-2026-10-31.campaign-evidence, kind @complete, author "brendan@necessary.nu", at 2026-10-31T19:58:29.008215Z}
-    {id security-remediation-2026-10-31.automation, kind @complete, author "brendan@necessary.nu", at 2026-10-31T20:00:23.88082Z}
-    {id security-remediation-2026-10-31.disclosure, kind @complete, author "brendan@necessary.nu", at 2026-10-31T20:00:58.026393Z}
-    {id security-remediation-2026-10-31.github-enforcement, kind @complete, author "brendan@necessary.nu", at 2026-10-31T21:01:53.412104Z}
 )
 
 impl_evidence (

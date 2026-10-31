@@ -866,7 +866,7 @@ class Emitter:
                 qualifiers = f"qualifiers={literal(d['qualifiers'])}"
                 return call(var(i["query"]), "select_sources", [selection, qualifiers])
             case "schema.create":
-                query = f"sch.CreateTable({var(i['table'])})"
+                query = f"sch.create_table({var(i['table'])})"
                 for column in d["columns"]:
                     kind = datatype_source(column["kind"])
                     definition = f"sch.ColumnDef({literal(column['name'])}, {kind})"
@@ -893,7 +893,7 @@ class Emitter:
                     raise UnsupportedInstruction("schema.index needs a first column")
                 first, *rest = d["columns"]
                 query = (
-                    f"sch.CreateIndex({var(i['table'])}, {literal(first)}, "
+                    f"sch.create_index({var(i['table'])}, {literal(first)}, "
                     f"name={literal(d['name'])})"
                 )
                 for column in rest:

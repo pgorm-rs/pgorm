@@ -68,7 +68,9 @@ pub(crate) fn refusal(value: &Bound<'_, PyAny>) -> Option<&'static str> {
     }
 }
 
-// [spec:pgorm:req:bindings.schema-api]
+/// A statement is made by its factory, never by its class: no `DDL` class
+/// has a `#[new]`.
+// [spec:pgorm:req:bindings.schema-api+2]
 pub(crate) fn install(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyDataType>()?;
     module.add_class::<PyColumnDef>()?;
@@ -92,6 +94,15 @@ pub(crate) fn install(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<view::PyCreateTableAs>()?;
     module.add_class::<PyEntitySchema>()?;
     module.add_function(wrap_pyfunction!(entity::schema_from_entity, module)?)?;
+    module.add_function(wrap_pyfunction!(table::create_table, module)?)?;
+    module.add_function(wrap_pyfunction!(index::create_index, module)?)?;
+    module.add_function(wrap_pyfunction!(custom_types::create_type, module)?)?;
+    module.add_function(wrap_pyfunction!(domain::create_domain, module)?)?;
+    module.add_function(wrap_pyfunction!(sequence::create_sequence, module)?)?;
+    module.add_function(wrap_pyfunction!(view::create_view, module)?)?;
+    module.add_function(wrap_pyfunction!(view::create_recursive_view, module)?)?;
+    module.add_function(wrap_pyfunction!(view::create_materialized_view, module)?)?;
+    module.add_function(wrap_pyfunction!(view::create_table_as, module)?)?;
     module.add_function(wrap_pyfunction!(alter::alter_table, module)?)?;
     module.add_function(wrap_pyfunction!(table::drop_table, module)?)?;
     module.add_function(wrap_pyfunction!(table::rename_table, module)?)?;

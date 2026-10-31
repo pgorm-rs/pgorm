@@ -162,15 +162,17 @@ pub struct PyCreateSequence;
 
 ddl_class!(PyCreateSequence, CreateSequence, SequenceCreateStatement);
 
+// [spec:pgorm:req:bindings.schema-sequences]
+#[pyfunction]
+pub(super) fn create_sequence<'py>(
+    py: Python<'py>,
+    name: &Bound<'_, PyAny>,
+) -> PyResult<Bound<'py, PyCreateSequence>> {
+    PyCreateSequence::object(py, Sequence::create(relation(name)?))
+}
+
 #[pymethods]
 impl PyCreateSequence {
-    // [spec:pgorm:req:bindings.schema-sequences]
-    #[new]
-    fn new(name: &Bound<'_, PyAny>) -> PyResult<PyClassInitializer<Self>> {
-        let statement = Statement::CreateSequence(Sequence::create(relation(name)?));
-        Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
-    }
-
     fn if_not_exists<'py>(slf: &Bound<'py, Self>) -> PyResult<Bound<'py, Self>> {
         let mut statement = Self::statement(slf)?;
         statement.if_not_exists();

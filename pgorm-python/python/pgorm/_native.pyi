@@ -5,7 +5,8 @@ from ._schema import (
     schema_from_entity as schema_from_entity,
 )
 from ._schema_tables import (
-    CreateTable as CreateTable, CreateIndex as CreateIndex, drop_table as drop_table,
+    CreateTable as CreateTable, CreateIndex as CreateIndex,
+    create_table as create_table, create_index as create_index, drop_table as drop_table,
     rename_table as rename_table, rename_column as rename_column,
     rename_constraint as rename_constraint, truncate_table as truncate_table,
     comment_on_table as comment_on_table, comment_on_column as comment_on_column,
@@ -17,17 +18,20 @@ from ._schema_alter import (
 from ._schema_types import (
     CreateType as CreateType, PendingAlterType as PendingAlterType,
     AlterComposite as AlterComposite, RenameAttribute as RenameAttribute,
-    alter_type as alter_type, drop_type as drop_type,
+    create_type as create_type, alter_type as alter_type, drop_type as drop_type,
 )
 from ._schema_sequences import (
     CreateSequence as CreateSequence, PendingAlterSequence as PendingAlterSequence,
-    AlterSequence as AlterSequence, alter_sequence as alter_sequence,
+    AlterSequence as AlterSequence, create_sequence as create_sequence,
+    alter_sequence as alter_sequence,
     drop_sequence as drop_sequence, rename_sequence as rename_sequence,
     create_extension as create_extension, drop_extension as drop_extension,
 )
 from ._schema_views import (
     CreateView as CreateView, CreateRecursiveView as CreateRecursiveView,
     CreateMaterializedView as CreateMaterializedView, CreateTableAs as CreateTableAs,
+    create_view as create_view, create_recursive_view as create_recursive_view,
+    create_materialized_view as create_materialized_view, create_table_as as create_table_as,
     drop_view as drop_view, refresh_materialized_view as refresh_materialized_view,
     drop_materialized_view as drop_materialized_view,
 )
@@ -36,7 +40,7 @@ from ._schema_schemas import (
 )
 from ._schema_domains import (
     CreateDomain as CreateDomain, PendingAlterDomain as PendingAlterDomain,
-    alter_domain as alter_domain, drop_domain as drop_domain,
+    create_domain as create_domain, alter_domain as alter_domain, drop_domain as drop_domain,
 )
 from ._pipeline_builder import Pipeline as Pipeline, PipelineSource as PipelineSource, PipelineGrouped as PipelineGrouped
 from ._pipeline_expr import PipelineExpr as PipelineExpr, PipelineBinder as PipelineBinder, PipelineOver as PipelineOver
