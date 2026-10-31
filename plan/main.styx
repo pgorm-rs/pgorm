@@ -15366,6 +15366,20 @@ children (
                         kind @note
                         text "Acceptance: GitHub secret scanning and push protection are enabled where the repository plan supports them; main is protected against force-push and deletion and requires the repository's stable security checks. Apply enforcement only after those checks are green and their exact check names are known."
                     }
+
+                    {
+                        at 2026-10-31T20:01:13.675207Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-10-31T20:21:30.067496Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "The first CodeQL Python upload found high-severity py/redos alert #1 in test_emit_rust.py: the Rust-literal test regex allowed a backslash-u sequence through both a wildcard escape and a Unicode escape branch. Rewrote the parser regexes with disjoint emitted escape forms; 326 generative tests and Ruff format/lint pass. Enforcement remains in evaluate mode until the fix is rescanned."
+                    }
                 )
             }
         )

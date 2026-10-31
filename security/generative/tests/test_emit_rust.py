@@ -10,8 +10,8 @@ HOSTILE = "O'Brien \\ \" 雪 -- $tag$ ; 💩"
 # Families whose terminals decode into compiled models rather than result rows.
 TYPED = ("entity", "active", "graph", "cursor", "model", "sources")
 ESCAPES = {'"': '"', "\\": "\\"}
-LITERAL = re.compile(r'"((?:[^"\\]|\\.|\\u\{[0-9a-f]+\})*)"')
-PIECE = re.compile(r"\\u\{([0-9a-f]+)\}|\\(.)|([^\\]+)")
+LITERAL = re.compile(r'"(?:[^"\\]|\\(?:["\\]|u\{[0-9a-f]+\}))*"')
+PIECE = re.compile(r'\\u\{([0-9a-f]+)\}|\\(["\\])|([^\\]+)')
 
 
 def unescape(literal):
