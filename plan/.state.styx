@@ -1331,6 +1331,7 @@ assertions (
 impl_evidence (
     {id binding-spec-consolidation, covered_rules (
         bindings.api
+        bindings.argument-errors
         bindings.cancellation
         bindings.case
         bindings.codegen
@@ -1358,6 +1359,7 @@ impl_evidence (
         bindings.model-records
         bindings.model-writes
         bindings.models
+        bindings.operands
         bindings.optional
         bindings.pagination
         bindings.pipeline
@@ -1369,11 +1371,13 @@ impl_evidence (
         bindings.relation-conditions
         bindings.relations
         bindings.results
+        bindings.row-count
         bindings.row-locks
         bindings.rows
         bindings.runtime
         bindings.schema
         bindings.schema-alter
+        bindings.schema-api
         bindings.schema-domains
         bindings.schema-from-entity
         bindings.schema-indexes
@@ -1394,37 +1398,29 @@ impl_evidence (
         bindings.with
         bindings.writes
         napi.application
-        napi.argument-errors
         napi.cancellation
         napi.codegen
         napi.errors
         napi.lifecycle
         napi.naming
-        napi.pipeline-operands
+        napi.pipeline-table-names
         napi.raw
         napi.records
-        napi.row-count
         napi.runtime
-        napi.schema-api
         napi.temporal
         napi.transactions
         napi.typing
-        napi.update-many-guard
         napi.values
         python.api
-        python.argument-errors
         python.cancellation
         python.capabilities
         python.codegen
         python.expressions
-        python.input-boundaries
         python.lifecycle
         python.naming
-        python.pipeline-operands
+        python.pipeline
         python.records
-        python.row-count
         python.runtime
-        python.schema-api
         python.transactions
         python.truth-testing
         python.typing
@@ -1432,6 +1428,7 @@ impl_evidence (
         python.values
     ), covered_claims (
         {impl_name javascript, rule bindings.api}
+        {impl_name javascript, rule bindings.argument-errors}
         {impl_name javascript, rule bindings.cancellation}
         {impl_name javascript, rule bindings.case}
         {impl_name javascript, rule bindings.codegen}
@@ -1459,6 +1456,7 @@ impl_evidence (
         {impl_name javascript, rule bindings.model-records}
         {impl_name javascript, rule bindings.model-writes}
         {impl_name javascript, rule bindings.models}
+        {impl_name javascript, rule bindings.operands}
         {impl_name javascript, rule bindings.optional}
         {impl_name javascript, rule bindings.pagination}
         {impl_name javascript, rule bindings.pipeline}
@@ -1469,11 +1467,13 @@ impl_evidence (
         {impl_name javascript, rule bindings.registered-pools}
         {impl_name javascript, rule bindings.relations}
         {impl_name javascript, rule bindings.results}
+        {impl_name javascript, rule bindings.row-count}
         {impl_name javascript, rule bindings.row-locks}
         {impl_name javascript, rule bindings.rows}
         {impl_name javascript, rule bindings.runtime}
         {impl_name javascript, rule bindings.schema}
         {impl_name javascript, rule bindings.schema-alter}
+        {impl_name javascript, rule bindings.schema-api}
         {impl_name javascript, rule bindings.schema-domains}
         {impl_name javascript, rule bindings.schema-indexes}
         {impl_name javascript, rule bindings.schema-schemas}
@@ -1493,22 +1493,18 @@ impl_evidence (
         {impl_name javascript, rule bindings.with}
         {impl_name javascript, rule bindings.writes}
         {impl_name javascript, rule napi.application}
-        {impl_name javascript, rule napi.argument-errors}
         {impl_name javascript, rule napi.cancellation}
         {impl_name javascript, rule napi.codegen}
         {impl_name javascript, rule napi.errors}
         {impl_name javascript, rule napi.lifecycle}
         {impl_name javascript, rule napi.naming}
-        {impl_name javascript, rule napi.pipeline-operands}
+        {impl_name javascript, rule napi.pipeline-table-names}
         {impl_name javascript, rule napi.raw}
         {impl_name javascript, rule napi.records}
-        {impl_name javascript, rule napi.row-count}
         {impl_name javascript, rule napi.runtime}
-        {impl_name javascript, rule napi.schema-api}
         {impl_name javascript, rule napi.temporal}
         {impl_name javascript, rule napi.transactions}
         {impl_name javascript, rule napi.typing}
-        {impl_name javascript, rule napi.update-many-guard}
         {impl_name javascript, rule napi.values}
         {impl_name main, rule bindings.connections}
         {impl_name main, rule bindings.pipeline}
@@ -1556,19 +1552,15 @@ impl_evidence (
         {impl_name python, rule bindings.values}
         {impl_name python, rule bindings.windows}
         {impl_name python, rule python.api}
-        {impl_name python, rule python.argument-errors}
         {impl_name python, rule python.cancellation}
         {impl_name python, rule python.capabilities}
         {impl_name python, rule python.codegen}
         {impl_name python, rule python.expressions}
-        {impl_name python, rule python.input-boundaries}
         {impl_name python, rule python.lifecycle}
         {impl_name python, rule python.naming}
-        {impl_name python, rule python.pipeline-operands}
+        {impl_name python, rule python.pipeline}
         {impl_name python, rule python.records}
-        {impl_name python, rule python.row-count}
         {impl_name python, rule python.runtime}
-        {impl_name python, rule python.schema-api}
         {impl_name python, rule python.transactions}
         {impl_name python, rule python.truth-testing}
         {impl_name python, rule python.typing}
@@ -2199,6 +2191,15 @@ impl_evidence (
         pipeline.select-sources
     ), covered_claims (
         {impl_name main, rule pipeline.select-sources}
+    )}
+    {id python-binding-decisions, covered_rules (
+        bindings.argument-errors
+        bindings.operands
+        bindings.row-count
+    ), covered_claims (
+        {impl_name python, rule bindings.argument-errors}
+        {impl_name python, rule bindings.operands}
+        {impl_name python, rule bindings.row-count}
     )}
     {id python-case-expressions, covered_rules (
         bindings.case

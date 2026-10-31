@@ -5,6 +5,7 @@
 
 use pgorm::pgorm_query::{Func, JsonArrayAgg, SimpleExpr};
 use pyo3::{
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyDict, PyList, PyTuple},
 };
@@ -31,7 +32,7 @@ fn entries<'py>(
             .collect();
     }
     if !value.is_exact_instance_of::<PyList>() && !value.is_exact_instance_of::<PyTuple>() {
-        return Err(ConstructionError::new_err(
+        return Err(PyTypeError::new_err(
             "json_object requires a dict or a list or tuple of (key, value) pairs",
         ));
     }
@@ -44,9 +45,7 @@ fn entries<'py>(
                 .ok()
                 .filter(|pair| pair.len() == 2)
                 .map(|pair| (pair.get_item(0), pair.get_item(1)))
-                .ok_or_else(|| {
-                    ConstructionError::new_err("json_object pairs are (key, value) tuples")
-                })?;
+                .ok_or_else(|| PyTypeError::new_err("json_object pairs are (key, value) tuples"))?;
             Ok((coerce(&key?)?.inner, member?))
         })
         .collect()
@@ -143,7 +142,7 @@ pub(crate) fn json_objectagg(
 /// than dropped.
 fn order(mut json: JsonArrayAgg, orderings: &Bound<'_, PyAny>) -> PyResult<JsonArrayAgg> {
     if !orderings.is_exact_instance_of::<PyList>() && !orderings.is_exact_instance_of::<PyTuple>() {
-        return Err(ConstructionError::new_err(
+        return Err(PyTypeError::new_err(
             "order_by requires a list or tuple of orderings",
         ));
     }
@@ -151,7 +150,7 @@ fn order(mut json: JsonArrayAgg, orderings: &Bound<'_, PyAny>) -> PyResult<JsonA
         let ordering = ordering?;
         let ordering = ordering
             .extract::<PyRef<'_, OrderBy>>()
-            .map_err(|_| ConstructionError::new_err("order_by requires Expr.asc() or desc()"))?;
+            .map_err(|_| PyTypeError::new_err("order_by requires Expr.asc() or desc()"))?;
         if ordering.nulls.is_some() {
             return Err(ConstructionError::new_err(
                 "JSON_ARRAYAGG's ORDER BY takes no NULLS FIRST or NULLS LAST",

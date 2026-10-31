@@ -58,7 +58,7 @@ def reject_execution_mismatch(project, output, environment):
         )
 
 
-# [spec:pgorm:req:bindings.entities/test]
+# [spec:pgorm:req:bindings.entities+2/test]
 # [spec:pgorm:req:bindings.entity-graphs+2/test]
 # [spec:pgorm:req:bindings.pipeline-sources+2/test]
 def main():

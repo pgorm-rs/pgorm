@@ -93,58 +93,6 @@ waiting on the operator. The WBS root is `napi`.
 > registers with its instance; an instance with none registered rejects with
 > an `Error` of the same name and fields.
 
-> [spec:pgorm:req:napi.argument-errors+2]
-> An argument of a type the call does not take MUST be refused with a
-> `TypeError`, a `ConstructionError` (`bindings.errors`) being left to an
-> argument whose value cannot become what pgorm sends. A `TypeError` is:
->
-> - text that is no string — an identifier, a type's, function's, field's or
->   qualifier's name, a JSON path, a LIKE pattern or escape, a channel, a
->   payload, a connection string, a COPY option — a flag that is no boolean, a
->   count, size, offset or sampling argument that is no number or `bigint`, a
->   list that is no array, a pair of the wrong length, options that are no
->   object, and a value kind that is no kind name, `TypeName`, `CreatedRange`
->   or `CreatedMultirange`;
-> - a string outside a closed choice (`napi.naming`) — a join kind, a lock
->   strength, a frame's mode, start, end or exclusion, a NULLS placement, an
->   SQL/JSON behaviour, a generated or identity mode, a transaction's mode or
->   isolation level, a COPY format, `tls`, `recycle` and the rest — as a value
->   outside the class Python spells a closed choice with is of another type;
-> - an options object holding a key the call does not know, a model's and a
->   column's declaration and a key's fields included, so a misspelt option is
->   never left out;
-> - a builder, or a plain value, where the call takes a builder of another
->   class: a `Select`; an expression where only an expression goes (a
->   projection, a grouping item, a RETURNING item, a table function's call, a
->   CHECK, a side of AND and OR); an expression or a `Condition` where a
->   predicate goes; an ordering; a `Window` or `ExtendedWindow`, a WINDOW
->   entry and OVER's window among them; a frame; a `Table` or FROM item; a WITH
->   clause; a MERGE action; a conflict action; a `ColumnDef`; a `DataType`; a
->   `TypeName` where a type is named; a model's column declaration; a receiver
->   of another class; and `items()` of a `Value` that is no array;
-> - a builder no terminal runs given to one, a COPY given to any terminal but
->   `copyIn` and `copyOut`, and a COPY of another direction or format given to
->   `copyIn`, `copyOut`, `copyInRows` or `copyOutRows`;
-> - a parameter list passed beside a built statement; a COPY source that is a
->   string, rows that are a string or a `Uint8Array`, and a row that is no
->   array; and a binder function that returns a promise or anything but an
->   operand or a list of them.
->
-> A value has no wrong type. A parameter, an operand, a `Value`'s data, the
-> data `Decimal`, `Uuid`, `Interval`, `Range` and `Multirange` are made from,
-> a model field's value, a COPY row's field and a JSON document may each be
-> any JavaScript value, and one that cannot become what pgorm sends is a
-> `ConstructionError`, a builder that is no expression given as an operand,
-> `any(..)` and `all(..)` outside a comparison, among them. So is a name
-> pgorm has nothing for — a function, a value kind, a built-in type, a
-> pipeline cast, a registration, a field or a column — an identifier outside
-> 1–63 bytes, a count or size out of range, an empty list where one is
-> needed, a pending statement or a `ColumnDef` given to a terminal
-> (`bindings.schema`, `bindings.merge`), and a statement PostgreSQL would
-> refuse. A listener's capacity that is a number but not a positive whole one
-> is a `RangeError`, JavaScript's own class for a value out of range, since
-> pgorm sends no capacity.
-
 ## Values
 
 Every kind of value pgorm's `Value` holds crosses into and out of JavaScript
@@ -241,11 +189,6 @@ first rule: a value reaches JavaScript exactly or not at all.
 > notification a frozen `{ channel, payload, processId }`, and a pool's status
 > a plain object.
 
-> [spec:pgorm:req:napi.row-count+2]
-> `one` finding no row or several, `optional` finding several, and the `one`
-> and `optional` of model, entity, graph and source queries finding a count
-> they do not take MUST reject with a `DecodeError`.
-
 ## Connections
 
 > [spec:pgorm:req:napi.lifecycle+2]
@@ -292,31 +235,22 @@ first rule: a value reaches JavaScript exactly or not at all.
 > operation rejects with the signal's reason, and behaves as
 > `bindings.cancellation` requires.
 
-## Operands and literals
+## Pipelines
 
-> [spec:pgorm:req:napi.pipeline-operands+2]
-> A value an operand is given that is not an expression MUST be bound: in a
-> statement as `bindings.expressions` binds it, and in a pipeline inferred or
-> declared with `Value` as a parameter is, an interval included, and minted
-> as a placeholder by the binder of the stage that takes it. Only
-> `literal(value)` writes a value into the SQL text, never by concatenation:
-> the module's, in a statement, through pgorm-query's own rendering of a
-> constant (`SimpleExpr::Constant`), the value read as a parameter is read
-> and cast as its kind needs, an enum's label to its type and a created
-> range's text to its range; the pipeline's as pgorm's pipeline writes a
-> literal. A pipeline's source may also be a table's name as a string.
+> [spec:pgorm:req:napi.pipeline-table-names]
+> A pipeline's source (`bindings.pipeline`) MAY also be a table's name as a
+> string, read as the `Table` of that name.
 
 ## Registered entities
 
-> [spec:pgorm:req:napi.application+1]
+> [spec:pgorm:req:napi.application+2]
 > A downstream application crate registers its entities (`bindings.entities`)
 > in a `Registry` — `entity::<E>(name)`, `graph::<E, S, _>(name, factory)`
 > and `sources::<T>(name)` — and builds its module through
 > `install(cx, registry)`, called from the application's own
 > `#[neon::main]` with the binding's `standalone-module` feature off; the
 > binding's own module is that feature's, with an empty registry. A name
-> outside 1–255 bytes is refused as it is registered. `entities()`,
-> `graphs()` and `pipeline.sourceTuples()` list the module's registrations.
+> outside 1–255 bytes is refused as it is registered.
 >
 > An application crate outside the binding's workspace MUST build the module:
 > it depends on pgorm-napi without default features, on the same checkout's
@@ -328,11 +262,6 @@ first rule: a value reaches JavaScript exactly or not at all.
 > binding's test tables — run its Rust tests, materialize the module beside
 > its library, and run its JavaScript suite against a live server under both
 > `node --test` and `deno test`, failing on any failure; CI runs it.
-
-> [spec:pgorm:req:napi.update-many-guard]
-> A registered entity's `updateMany()` MUST have `where` or `allRows()` before
-> it runs, a `ConstructionError` otherwise, as a statement's UPDATE does
-> (`bindings.writes`).
 
 ## Generated TypeScript
 

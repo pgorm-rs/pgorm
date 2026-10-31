@@ -1,5 +1,6 @@
 use pyo3::{
     basic::CompareOp,
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyList, PyTuple},
 };
@@ -66,7 +67,7 @@ impl PyEntityColumn {
                 .map(|value| Ok(input.coerce(&value?)?.inner));
             Members::Values(values.collect::<PyResult<_>>()?)
         } else {
-            return Err(ConstructionError::new_err(
+            return Err(PyTypeError::new_err(
                 "membership requires a list or tuple of values, or a Select",
             ));
         };

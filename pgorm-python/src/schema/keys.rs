@@ -4,7 +4,7 @@
 use super::args::{self, ACTIONS, DEFERRABILITY, ENFORCEMENT, choice, columns};
 use crate::errors::ConstructionError;
 use pgorm::pgorm_query::{ForeignKeyCreateStatement, TableKey, TableName, Unique};
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 /// A key of either kind over `columns`: a name, `INCLUDE`d columns, its
 /// deferrability and PostgreSQL 18's `WITHOUT OVERLAPS` column, which
@@ -95,7 +95,7 @@ pub(super) fn foreign_key(
     if let Some(period) = options.period {
         let pair = args::names(period, "a PERIOD pair")?;
         let Ok([column, referenced]) = <[_; 2]>::try_from(pair) else {
-            return Err(ConstructionError::new_err(
+            return Err(PyTypeError::new_err(
                 "a PERIOD pair is (column, referenced column), one name each side",
             ));
         };

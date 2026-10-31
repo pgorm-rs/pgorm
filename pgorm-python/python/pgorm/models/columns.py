@@ -64,13 +64,13 @@ def _labels(values: object) -> tuple[str, ...]:
         raise TypeError("an enum column's values are a list or tuple of strings")
     labels = tuple(values)
     if not labels:
-        raise ValueError("an enum column lists at least one value")
+        raise p.ConstructionError("an enum column lists at least one value")
     if len(set(labels)) != len(labels):
-        raise ValueError("an enum column lists each value once")
+        raise p.ConstructionError("an enum column lists each value once")
     return labels
 
 
-# [spec:pgorm:req:bindings.models]
+# [spec:pgorm:req:bindings.models+2]
 @dataclass(frozen=True, slots=True)
 class Column:
     kind: str | p.TypeName | p.CreatedRange
@@ -92,7 +92,7 @@ class Column:
             if type(self.generated) is not str:
                 raise TypeError('a column is generated "always" or "by_default"')
             if self.generated not in GENERATED:
-                raise ValueError('a column is generated "always" or "by_default"')
+                raise TypeError('a column is generated "always" or "by_default"')
             if self.default:
                 raise p.ConstructionError(
                     "a generated column has no default of its own: declare one or the other"
@@ -109,7 +109,11 @@ class Column:
                 raise p.ConstructionError(
                     "an enum or created range column names its type's schema"
                 )
-        elif type(self.kind) is not str or self.kind not in MODEL_KINDS:
+        elif type(self.kind) is not str and not isinstance(self.kind, p.CreatedMultirange):
+            raise TypeError(
+                "a column's kind is a kind name, a TypeName, a CreatedRange or a CreatedMultirange"
+            )
+        elif isinstance(self.kind, p.CreatedMultirange) or self.kind not in MODEL_KINDS:
             raise p.UnsupportedCapabilityError(
                 "column kind is not supported by the native Record decoder"
             )

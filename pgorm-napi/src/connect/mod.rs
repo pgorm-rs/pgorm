@@ -156,7 +156,7 @@ impl Statement {
     /// Run on `db`, a connection or a transaction, and decode the result.
     /// A cardinality the terminal does not admit is a `DecodeError`, decided
     /// after the query and never in place of a database or decode failure.
-    // [spec:pgorm:req:bindings.results]
+    // [spec:pgorm:req:bindings.results+2]
     pub(crate) async fn run<C>(self, db: &C, secrets: &Redactions) -> Result<Outcome, Failure>
     where
         C: ConnectionTrait + ?Sized,
@@ -178,7 +178,7 @@ impl Statement {
             .await
             .map_err(|error| failure(&error, secrets))?;
         let expected = match self.terminal {
-            // [spec:pgorm:req:napi.row-count+2]
+            // [spec:pgorm:req:bindings.row-count]
             Terminal::One if rows.len() != 1 => "exactly one row",
             Terminal::Optional if rows.len() > 1 => "at most one row",
             _ => "",
@@ -401,7 +401,7 @@ impl Drop for ConnectionHandle {
 /// back; dropped unrestored — the operation aborted or cut off — it is
 /// discarded and its JavaScript connection closed, because its state is
 /// unknown.
-// [spec:pgorm:req:bindings.connections]
+// [spec:pgorm:req:bindings.connections+2]
 // [spec:pgorm:req:bindings.cancellation]
 pub(crate) struct Operation {
     slot: OwnedMutexGuard<Option<pgorm::DatabaseConnection>>,
@@ -474,7 +474,7 @@ fn connection<'cx>(cx: &mut FunctionContext<'cx>) -> NeonResult<Arc<ConnectionSt
 
 /// `poolNew(dsn, options)`: a pool, which opens connections as they are
 /// first needed. Nothing is sent before then.
-// [spec:pgorm:req:bindings.connections]
+// [spec:pgorm:req:bindings.connections+2]
 fn pool_new(mut cx: FunctionContext) -> JsResult<JsBox<PoolHandle>> {
     let dsn = cx.argument::<JsValue>(0)?;
     let options = cx.argument::<JsObject>(1)?;
@@ -498,7 +498,7 @@ fn pool_new(mut cx: FunctionContext) -> JsResult<JsBox<PoolHandle>> {
 
 /// `poolClose(pool)`: refuse new work, cancel what runs, and resolve once
 /// every lent connection is released.
-// [spec:pgorm:req:bindings.connections]
+// [spec:pgorm:req:bindings.connections+2]
 fn pool_close(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = pool(&mut cx)?;
     let connections = state.close_now();
@@ -543,7 +543,7 @@ fn pool_status(mut cx: FunctionContext) -> JsResult<JsObject> {
 /// `poolClearStatementCaches(pool)`: mark every connection's cached prepared
 /// statements stale, as `DatabasePool::clear_statement_caches` does. Nothing
 /// is sent, so a closed pool is no reason to refuse it.
-// [spec:pgorm:req:bindings.connections]
+// [spec:pgorm:req:bindings.connections+2]
 // [spec:pgorm:req:conn.pool.statement-cache.clear+1]
 fn pool_clear_statement_caches(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     pool(&mut cx)?.pool.clear_statement_caches();
@@ -552,7 +552,7 @@ fn pool_clear_statement_caches(mut cx: FunctionContext) -> JsResult<JsUndefined>
 
 /// `poolAcquire(pool, abort)`: a connection of the caller's own, until it
 /// closes it.
-// [spec:pgorm:req:bindings.connections]
+// [spec:pgorm:req:bindings.connections+2]
 fn pool_acquire(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = pool(&mut cx)?;
     let abort = abort_argument(&mut cx, 1)?;
@@ -584,7 +584,7 @@ fn pool_acquire(mut cx: FunctionContext) -> JsResult<JsPromise> {
 /// `poolRun(pool, terminal, sql, params, tagged, abort)`: a statement on a
 /// connection the pool lends for it alone. Aborted, or cut off by the pool
 /// closing, the connection is discarded rather than returned.
-// [spec:pgorm:req:bindings.connections]
+// [spec:pgorm:req:bindings.connections+2]
 fn pool_run(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = pool(&mut cx)?;
     let statement = Statement::read(&mut cx, 1)?;
@@ -641,7 +641,7 @@ where
 }
 
 /// `connectionRun(connection, terminal, sql, params, tagged, abort)`.
-// [spec:pgorm:req:bindings.connections]
+// [spec:pgorm:req:bindings.connections+2]
 fn connection_run(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = connection(&mut cx)?;
     let statement = Statement::read(&mut cx, 1)?;
@@ -689,7 +689,7 @@ fn connection_ping(mut cx: FunctionContext) -> JsResult<JsPromise> {
 /// `connectionClose(connection)`: return the connection to the pool, or, if
 /// a transaction or stream holds it, end that and discard it; resolves once
 /// it is released.
-// [spec:pgorm:req:bindings.connections]
+// [spec:pgorm:req:bindings.connections+2]
 // [spec:pgorm:req:napi.lifecycle+2]
 fn connection_close(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let state = connection(&mut cx)?;

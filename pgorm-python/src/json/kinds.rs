@@ -5,7 +5,7 @@ use pgorm::pgorm_query::{
     Expr, JsonExistsBehavior, JsonInput, JsonKind, JsonQueryBehavior, JsonTest, JsonValueBehavior,
     SimpleExpr, Value,
 };
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use crate::{
     errors::ConstructionError,
@@ -218,7 +218,7 @@ pub(super) fn value_behavior(value: &Bound<'_, PyAny>) -> PyResult<JsonValueBeha
     match value.extract::<PyJsonValueBehavior>() {
         Ok(PyJsonValueBehavior::Null) => Ok(JsonValueBehavior::Null),
         Ok(PyJsonValueBehavior::Error) => Ok(JsonValueBehavior::Error),
-        Err(_) => Err(ConstructionError::new_err(
+        Err(_) => Err(PyTypeError::new_err(
             "JSON_VALUE's behaviour requires a JsonValueBehavior or JsonDefault",
         )),
     }
@@ -234,7 +234,7 @@ pub(super) fn query_behavior(value: &Bound<'_, PyAny>) -> PyResult<JsonQueryBeha
         Ok(PyJsonQueryBehavior::Error) => Ok(JsonQueryBehavior::Error),
         Ok(PyJsonQueryBehavior::EmptyArray) => Ok(JsonQueryBehavior::EmptyArray),
         Ok(PyJsonQueryBehavior::EmptyObject) => Ok(JsonQueryBehavior::EmptyObject),
-        Err(_) => Err(ConstructionError::new_err(
+        Err(_) => Err(PyTypeError::new_err(
             "JSON_QUERY's behaviour requires a JsonQueryBehavior or JsonDefault",
         )),
     }

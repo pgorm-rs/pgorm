@@ -41,8 +41,8 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
 /// into one module: what an application's own `#[neon::main]` calls, having
 /// registered its entities, in a crate that depends on this one without its
 /// `standalone-module` feature.
-// [spec:pgorm:req:bindings.entities]
-// [spec:pgorm:req:napi.application+1]
+// [spec:pgorm:req:bindings.entities+2]
+// [spec:pgorm:req:napi.application+2]
 pub fn install(cx: &mut ModuleContext, registry: Registry) -> NeonResult<()> {
     runtime::runtime(cx)?;
     cx.export_function("setErrorFactory", errors::set_error_factory)?;
@@ -56,7 +56,7 @@ pub fn install(cx: &mut ModuleContext, registry: Registry) -> NeonResult<()> {
     probes::export(cx)?;
     let version = cx.string(env!("CARGO_PKG_VERSION"));
     cx.export_value("version", version)?;
-    // [spec:pgorm:req:bindings.connections]    the channel pgorm-migration's runner notifies
+    // [spec:pgorm:req:bindings.connections+2]    the channel pgorm-migration's runner notifies
     let channel = cx.string(pgorm::STATEMENT_CACHE_CHANNEL);
     cx.export_value("statementCacheChannel", channel)?;
     Ok(())

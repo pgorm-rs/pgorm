@@ -5,7 +5,9 @@ native module. Queries own a real `pgorm::Select<E>`; records own `E::Model`;
 writes call `E::ActiveModel` and its `ActiveModelBehavior` hooks. All calls run
 inside Python's process, using PostgreSQL's native protocol.
 
-The standalone wheel has an empty registry. Runtime `Table`, SELECT and CRUD
+`pgorm.entities()`, `pgorm.graphs()` and `pgorm.pipeline.source_tuples()` list
+the names the module registers, in order. The standalone wheel has an empty
+registry, so each lists none. Runtime `Table`, SELECT and CRUD
 builders work without registrations. Applications that already have Rust
 entities can build a wheel containing those types and the common Python API.
 Python cannot create Rust generic instantiations at runtime.
@@ -131,7 +133,7 @@ rollback of a submitted write.
 `all` returns a list of detached models. `one` and `optional` are Rust's `one`
 and `one_opt`, which narrow the query's limit to one row: `LIMIT 1`, including
 when an earlier query limit was larger, and `LIMIT 0` when it was zero, which
-finds no row. `one` raises `DatabaseError` on absence; `optional` returns
+finds no row. `one` raises `DecodeError` on absence; `optional` returns
 `None`. `inspect(terminal="one")` or `inspect(terminal="optional")` includes
 that terminal's limit. A decoding failure remains `DecodeError`. These are the
 registered Rust selector's semantics; the `one` of a pool, connection or
@@ -163,6 +165,7 @@ rows = await Account.insert_many([a, b]).on_conflict(renamed).returning_upserts(
 | --- | --- |
 | `entity.update(active).returning_change(connection)` | `Update::one(active)?.exec_returning_change` |
 | `entity.update_many().set(..).where(..).returning_changes(connection)` | `Update::many(entity).col_expr(..).filter(..).exec_returning_changes` |
+| `entity.update_many().set(..).all_rows().returning_changes(connection)` | `Update::many(entity).col_expr(..).exec_returning_changes` |
 | `entity.insert(active).on_conflict(..).returning_upsert(connection)` | `Insert::one(active).on_conflict(..).exec_returning_upsert` |
 | `entity.insert_many(actives).on_conflict(..).returning_upserts(connection)` | `Insert::many(actives).on_conflict(..).exec_returning_upserts` |
 
@@ -178,8 +181,11 @@ These are statement terminals, as they are in Rust, so no `ActiveModelBehavior`
 hook runs around them: an `update` returning its change does not bump what a
 `before_save` would. With nothing set, `returning_change` sends nothing and
 returns the row its key reads as both versions; a key matching no row raises
-`DatabaseError`, as does `returning_changes` with nothing set (Rust's
-`NothingToSet`). `update_many().set(column, value)` converts a value by the
+`DecodeError`, and `returning_changes` with nothing set `ConstructionError`
+(Rust's `NothingToSet`). An `update_many()` runs only once `where(..)` or
+`all_rows()` has said which rows it writes, as a statement's UPDATE does; with
+neither, `returning_changes` raises `ConstructionError` before anything is sent.
+`update_many().set(column, value)` converts a value by the
 column's declared type and writes it through the column's `save_as`, or takes
 an `Expr` as written. An insert of models that set different columns is
 refused, and a batch of none writes and answers nothing. Rust renames the two

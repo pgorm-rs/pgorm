@@ -2,6 +2,7 @@
 
 use pgorm::pgorm_query::{FromItem, NamedTable, SampleMethod, TableSample};
 use pyo3::{
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyFloat, PyInt},
 };
@@ -44,7 +45,7 @@ fn double(value: &Bound<'_, PyAny>, what: &str) -> PyResult<f64> {
         return value.extract();
     }
     if !value.is_exact_instance_of::<PyInt>() {
-        return Err(ConstructionError::new_err(format!(
+        return Err(PyTypeError::new_err(format!(
             "a sample {what} requires an int or float"
         )));
     }
@@ -59,7 +60,7 @@ fn double(value: &Bound<'_, PyAny>, what: &str) -> PyResult<f64> {
     })
 }
 
-// [spec:pgorm:req:bindings.select]
+// [spec:pgorm:req:bindings.select+2]
 /// `table TABLESAMPLE method (percentage) [REPEATABLE (seed)]`, both numbers
 /// bound; a percentage outside 0 to 100 is the server's refusal (`2202H`).
 pub(super) fn sample(

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from .relations import Relation
 
 
-# [spec:pgorm:req:bindings.models]
+# [spec:pgorm:req:bindings.models+2]
 @dataclass(frozen=True, eq=False, slots=True, init=False)
 class Model:
     table: p.Table

@@ -34,8 +34,8 @@ available in the installed capability manifest.
 | --- | --- | --- |
 | `await execute(query)` | `int` command affected count | PostgreSQL's count, including zero |
 | `await query(query)` | `list[Record]` | Zero or more |
-| `await one(query)` | `Record` | Exactly one, otherwise `DatabaseError` |
-| `await optional(query)` | `Record \| None` | At most one, otherwise `DatabaseError` |
+| `await one(query)` | `Record` | Exactly one, otherwise `DecodeError` |
+| `await optional(query)` | `Record \| None` | At most one, otherwise `DecodeError` |
 | `await stream(query)` | `RowStream` async iterator | Zero or more, one pull at a time |
 
 `query`, `one` and `optional` materialize the complete result through
@@ -161,19 +161,20 @@ the session that listened, which a pooled connection, lent onward once
 returned, cannot be. Closing the pool closes its listeners. `listen`,
 `unlisten` and `unlisten_all` change what it receives and may run while
 another task iterates it. A channel name is exact, sent as a quoted
-identifier, and one longer than 63 bytes raises `ConstructionError` before
-anything is sent.
+identifier, and one longer than 63 bytes raises `ConstructionError`, and one
+that is no `str` `TypeError`, before anything is sent.
 
 Iteration yields `Notification` objects in the order PostgreSQL sent them:
 commit order across transactions, a rolled-back transaction's never. At most
-`capacity` (default 1024) wait unread; one more closes the listener, and
+`capacity` (default 1024, a positive `int`: another type raises `TypeError` and
+a value below 1 `ValueError`) wait unread; one more closes the listener, and
 iteration raises `ConnectionError` after yielding those waiting. A failed or
 terminated connection raises its error the same way. Nothing reconnects,
 since a notification sent while nothing listened is lost and the reader must
 re-read what it tracks. Only one pull may run at a time; a cancelled pull
 loses nothing, while a cancelled `listen`, `unlisten` or `unlisten_all` closes
 the listener, since what the server did is then unknown. Closing the listener
-ends iteration.
+ends iteration, a pull waiting on it included.
 
 `notify(channel, payload)` on a pool, connection or transaction sends
 `SELECT pg_notify($1, $2)` with both values bound, delivered when the

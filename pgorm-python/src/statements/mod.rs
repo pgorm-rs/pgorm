@@ -31,7 +31,7 @@ pub use merge::{PyMerge, PyPendingMerge};
 pub use merge_action::{
     PyMatchedAction, PyMergeInsert, PyMergeUpdate, PyNotMatchedAction, PyOverriding,
 };
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 pub use raw::RawSQL;
 pub use select::{Join, PySelect};
 pub use subquery::PyQuantified;
@@ -74,7 +74,7 @@ pub fn compile(value: &Bound<'_, PyAny>) -> PyResult<crate::expressions::Compile
     } else if let Some(refusal) = crate::schema::refusal(value) {
         Err(crate::errors::ConstructionError::new_err(refusal))
     } else {
-        Err(crate::errors::ConstructionError::new_err(
+        Err(PyTypeError::new_err(
             "execution requires a native statement, Compiled object or explicit RawSQL",
         ))
     }

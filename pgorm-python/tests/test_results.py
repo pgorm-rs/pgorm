@@ -17,28 +17,26 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         await self.pool.close()
 
-    # [spec:pgorm:req:bindings.results/test]
-    # [spec:pgorm:req:python.row-count+2/test]
+    # [spec:pgorm:req:bindings.results+2/test]
+    # [spec:pgorm:req:bindings.row-count/test]
     async def test_cardinality_and_database_errors_are_distinct(self):
         empty = p.Select(p.literal(1).as_("n")).where(p.literal(False))
         self.assertEqual(await self.pool.query(empty), [])
         self.assertIsNone(await self.pool.optional(empty))
-        with self.assertRaises(p.DatabaseError) as missing:
+        with self.assertRaises(p.DecodeError) as missing:
             await self.pool.one(empty)
-        self.assertIsNone(missing.exception.sqlstate)
-        self.assertIsNone(missing.exception.message)
-        self.assertIsNone(missing.exception.constraint)
+        self.assertNotIsInstance(missing.exception, p.DatabaseError)
         self.assertIn("expected exactly one row", str(missing.exception))
         two = p.RawSQL("SELECT generate_series(1, 2) AS n")
         for terminal in (self.pool.one, self.pool.optional):
-            with self.assertRaises(p.DatabaseError):
+            with self.assertRaises(p.DecodeError):
                 await terminal(two)
         with self.assertRaises(p.DatabaseError) as caught:
             await self.pool.optional(p.RawSQL("SELECT 1 / 0 AS n"))
         self.assertEqual(caught.exception.sqlstate, "22012")
         self.assertTrue(await self.pool.ping())
 
-    # [spec:pgorm:req:bindings.results/test]
+    # [spec:pgorm:req:bindings.results+2/test]
     async def test_builder_writes_return_counts_and_records(self):
         name = "python_result_" + uuid4().hex
         table = p.Table(name)
@@ -159,7 +157,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
             self.assertIsNone(null["n"])
             self.assertEqual(null.tagged("n").kind, "interval")
 
-    # [spec:pgorm:req:python.values+6/test]
+    # [spec:pgorm:req:python.values+7/test]
     async def test_floating_special_values_survive(self):
         row = await self.pool.one(p.RawSQL(
             "SELECT '-0'::float8 AS zero, 'NaN'::float8 AS nan, 'Infinity'::float4 AS inf"
@@ -186,7 +184,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(text=text), self.assertRaises(p.DecodeError):
                 await self.pool.optional(p.RawSQL(f"SELECT '{text}'::numeric AS value"))
 
-    # [spec:pgorm:req:python.values+6/test]
+    # [spec:pgorm:req:python.values+7/test]
     async def test_temporal_precision_and_timezone_policy(self):
         row = await self.pool.one(p.RawSQL(
             "SELECT DATE '2024-02-29' AS d, TIME '12:34:56.123456' AS t, "
@@ -244,7 +242,7 @@ class ResultTests(unittest.IsolatedAsyncioTestCase):
 
     # [spec:pgorm:req:python.raw/test]
     async def test_execution_requires_an_explicit_query_object(self):
-        with self.assertRaises(p.ConstructionError):
+        with self.assertRaises(TypeError):
             await self.pool.query("SELECT 1")
         row = await self.pool.one(p.Select(p.literal("O'Brien").as_("value")).inspect())
         self.assertEqual(row["value"], "O'Brien")

@@ -1,5 +1,5 @@
 use pgorm::pgorm_query::{ConflictTarget, ConflictUpdate, OnConflict};
-use pyo3::{prelude::*, types::PyTuple};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyTuple};
 
 use super::common;
 use crate::{errors::ConstructionError, expressions::coerce, identifiers::PyIdentifier};
@@ -146,7 +146,7 @@ pub(crate) fn clause(value: &Bound<'_, PyAny>) -> PyResult<OnConflict> {
     } else if let Ok(value) = value.extract::<PyRef<'_, PyConflictUpdate>>() {
         Ok(value.inner.clone().into())
     } else {
-        Err(ConstructionError::new_err(
+        Err(PyTypeError::new_err(
             "on_conflict requires a completed conflict action",
         ))
     }

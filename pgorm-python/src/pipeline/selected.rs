@@ -11,7 +11,7 @@ use crate::{
     identifiers::validate_name,
 };
 use pgorm::pipeline::SourceList;
-use pyo3::{prelude::*, types::PyString};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyString};
 use std::{marker::PhantomData, sync::Arc};
 
 impl Registry {
@@ -80,11 +80,11 @@ impl PySourceSelection {
         let qualifiers = match qualifiers.filter(|v| !v.is_none()) {
             Some(value) if !value.is_instance_of::<PyString>() => {
                 value.extract::<Vec<String>>().map_err(|_| {
-                    ConstructionError::new_err("qualifiers require a sequence of source names")
+                    PyTypeError::new_err("qualifiers require a sequence of source names")
                 })?
             }
             Some(_) => {
-                return Err(ConstructionError::new_err(
+                return Err(PyTypeError::new_err(
                     "qualifiers require a sequence, not one string",
                 ));
             }

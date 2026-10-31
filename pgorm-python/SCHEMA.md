@@ -57,9 +57,10 @@ objects a drop drops — it takes one name or a non-empty list of them. A closed
 choice is a string: a drop's `behavior` is `"cascade"` or `"restrict"`, and the
 others are spelled in snake_case (`"not_enforced"`,
 `"deferrable_initially_deferred"`, `"set_null"`). An argument of the wrong type
-is a `TypeError`, an integer outside `bigint` a `ValueError`, and a value that
-cannot become what pgorm writes — an empty list, a choice outside its set, an
-aliased `Table`, a label PostgreSQL cannot store — a `ConstructionError`.
+is a `TypeError`, a string outside its closed choice among them, since the
+choice's type is the `Literal` of its strings; a value that cannot become what
+pgorm writes — an empty list, an aliased `Table`, a label PostgreSQL cannot
+store, an integer outside `bigint` — is a `ConstructionError`.
 
 ## Columns
 

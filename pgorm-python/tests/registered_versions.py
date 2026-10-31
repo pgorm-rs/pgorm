@@ -11,7 +11,7 @@ def rows(changes):
     return [(change.old["id"], change.old["note"], change.new["note"]) for change in changes]
 
 
-# [spec:pgorm:req:bindings.entity-versions/test]
+# [spec:pgorm:req:bindings.entity-versions+2/test]
 class RegisteredVersions(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -45,7 +45,7 @@ class RegisteredVersions(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(change.new["display name"], "name 2|before")
             unchanged = await self.account.update(change.new.into_active()).returning_change(connection)
             self.assertEqual(dict(unchanged.old), dict(unchanged.new))
-            with self.assertRaises(p.DatabaseError):
+            with self.assertRaises(p.DecodeError):
                 await self.account.update(
                     self.active(99, "nobody").set("note", "x")).returning_change(connection)
 
@@ -60,8 +60,23 @@ class RegisteredVersions(unittest.IsolatedAsyncioTestCase):
             self.assertEqual([change.new["version"] for change in changes], [11, 11])
             self.assertEqual(await self.account.update_many().where(
                 self.account.col("id") == 99).set("note", "x").returning_changes(connection), [])
-            with self.assertRaises(p.DatabaseError):
+            with self.assertRaises(p.ConstructionError):
                 await self.account.update_many().where(self.account.col("id") == 1).returning_changes(connection)
+
+    # [spec:pgorm:req:bindings.entity-versions+2/test]
+    async def test_update_many_needs_where_or_all_rows(self):
+        async with self.pool.connection() as connection:
+            unguarded = self.account.update_many().set("note", "every")
+            with self.assertRaisesRegex(p.ConstructionError, "where\\(..\\) or all_rows\\(\\)"):
+                await unguarded.returning_changes(connection)
+            notes = [row["note"] for row in await self.account.find().order_by(
+                self.account.col("id").expr().asc()).all(connection)]
+            self.assertEqual(notes, ["one", "two", None])
+            changes = await unguarded.all_rows().returning_changes(connection)
+            self.assertEqual(sorted(change.new["note"] for change in changes), ["every"] * 3)
+            narrowed = (self.account.update_many().set("note", "first").all_rows()
+                        .where(self.account.col("id") == 1))
+            self.assertEqual(rows(await narrowed.returning_changes(connection)), [(1, "every", "first")])
 
     async def test_upsert_says_what_it_did(self):
         renamed = p.ConflictTarget("id").update("display name")

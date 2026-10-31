@@ -71,7 +71,7 @@ pub(crate) fn items<'cx>(
 
 /// An identifier: a JavaScript string of 1–63 UTF-8 bytes without NUL,
 /// minted into a `Name`, which renders quoted — never SQL.
-// [spec:pgorm:req:bindings.identifiers]
+// [spec:pgorm:req:bindings.identifiers+2]
 pub(crate) fn name<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<Name> {
     let text = read::text(cx, value, "an identifier")?;
     if text.is_empty() || text.len() > 63 || text.contains('\0') {
@@ -125,7 +125,7 @@ pub(crate) fn rust_type(named: &values::TypeName) -> TypeName {
 /// `Value`, written as its kind needs — an enum's label cast to the enum, a
 /// created range's text cast to its range type through `Expr::as_range`.
 /// Nothing here interpolates: the value is a placeholder's.
-// [spec:pgorm:req:bindings.expressions]
+// [spec:pgorm:req:bindings.expressions+2]
 pub(crate) fn bound<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonResult<SimpleExpr> {
     let codec = Codec::get(cx)?;
     let Some(tagged) = read::infer(cx, codec, data)? else {
@@ -141,7 +141,7 @@ pub(crate) fn bound<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonRe
 /// A value written into the SQL text by pgorm-query's own rendering of a
 /// constant, read as `bound` reads it and cast as its kind needs. Only
 /// `literal()` asks for one; every other operand is bound.
-// [spec:pgorm:req:napi.pipeline-operands+2]
+// [spec:pgorm:req:bindings.operands]
 pub(crate) fn literal<'cx>(cx: &mut Cx<'cx>, data: Handle<'cx, JsValue>) -> NeonResult<SimpleExpr> {
     let codec = Codec::get(cx)?;
     let Some(tagged) = read::infer(cx, codec, data)? else {
@@ -303,7 +303,7 @@ fn unchecked<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<S
 /// LOCKED — and a WINDOW clause it refuses are refused here, as `compile`
 /// refuses them in a statement run on its own, rather than by the server
 /// once the outer statement is sent.
-// [spec:pgorm:req:bindings.select]
+// [spec:pgorm:req:bindings.select+2]
 // [spec:pgorm:req:bindings.windows]
 pub(crate) fn embedded<'cx>(
     cx: &mut Cx<'cx>,
@@ -352,7 +352,7 @@ pub(crate) fn choice<'cx>(
 /// meaning)`. A closed choice is a type, a union of string literals as
 /// Python's is a class of constants, so anything outside it is a
 /// `TypeError`.
-// [spec:pgorm:req:napi.argument-errors+2]
+// [spec:pgorm:req:bindings.argument-errors]
 pub(crate) fn pick<'cx, T: Clone>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,

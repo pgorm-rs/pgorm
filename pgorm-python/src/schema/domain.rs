@@ -35,7 +35,7 @@ ddl_class!(PyCreateDomain, CreateDomain, DomainCreateStatement, with);
 impl PyCreateDomain {
     /// A domain over `base`: any column type, another domain's `TypeName`
     /// included.
-    // [spec:pgorm:req:bindings.schema-domains]
+    // [spec:pgorm:req:bindings.schema-domains+2]
     #[new]
     fn new(name: &Bound<'_, PyAny>, base: &Bound<'_, PyAny>) -> PyResult<PyClassInitializer<Self>> {
         let created = Domain::create(type_ref(name)?, PyDataType::coerce(base)?.inner);
@@ -43,7 +43,7 @@ impl PyCreateDomain {
         Ok(PyClassInitializer::from(PyDDL::new(statement)).add_subclass(Self))
     }
 
-    // [spec:pgorm:req:bindings.schema-domains]
+    // [spec:pgorm:req:bindings.schema-domains+2]
     #[pyo3(signature=(name, *, schema=None))]
     fn collate<'py>(
         slf: &Bound<'py, Self>,
@@ -83,7 +83,7 @@ impl PyCreateDomain {
 
     /// A check appended, which takes no `not_valid`: PostgreSQL has no `NOT
     /// VALID` at `CREATE DOMAIN`.
-    // [spec:pgorm:req:bindings.schema-domains]
+    // [spec:pgorm:req:bindings.schema-domains+2]
     #[pyo3(signature=(condition, *, name=None))]
     fn check<'py>(
         slf: &Bound<'py, Self>,
@@ -114,7 +114,7 @@ impl PyPendingAlterDomain {
 
 #[pymethods]
 impl PyPendingAlterDomain {
-    // [spec:pgorm:req:bindings.schema-domains]
+    // [spec:pgorm:req:bindings.schema-domains+2]
     fn set_default(&self, value: &Bound<'_, PyAny>) -> PyResult<PyDDL> {
         let value = expressions::coerce(value)?.inner;
         Ok(self.altered(|pending| pending.set_default(value)))
@@ -134,7 +134,7 @@ impl PyPendingAlterDomain {
 
     /// A `CHECK` added: checked against the values already held, or,
     /// `not_valid`, left unchecked until `validate_constraint`.
-    // [spec:pgorm:req:bindings.schema-domains]
+    // [spec:pgorm:req:bindings.schema-domains+2]
     #[pyo3(signature=(condition, *, name=None, not_valid=false))]
     fn add_check(
         &self,
@@ -149,7 +149,7 @@ impl PyPendingAlterDomain {
         }))
     }
 
-    // [spec:pgorm:req:bindings.schema-domains]
+    // [spec:pgorm:req:bindings.schema-domains+2]
     #[pyo3(signature=(name, *, if_exists=false, behavior=None))]
     fn drop_constraint(
         &self,
@@ -186,7 +186,7 @@ impl PyPendingAlterDomain {
 
     /// The domain renamed; the new name is bare, the domain staying in its
     /// schema.
-    // [spec:pgorm:req:bindings.schema-domains]
+    // [spec:pgorm:req:bindings.schema-domains+2]
     fn rename_to(&self, name: &Bound<'_, PyAny>) -> PyResult<PyDDL> {
         let name = args::name(name)?;
         Ok(self.altered(|pending| pending.rename_to(name)))
@@ -201,7 +201,7 @@ impl PyPendingAlterDomain {
 }
 
 /// `alter_domain(name)`: the domain, with no action yet.
-// [spec:pgorm:req:bindings.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains+2]
 #[pyfunction]
 pub(super) fn alter_domain(name: &Bound<'_, PyAny>) -> PyResult<PyPendingAlterDomain> {
     Ok(PyPendingAlterDomain {
@@ -210,7 +210,7 @@ pub(super) fn alter_domain(name: &Bound<'_, PyAny>) -> PyResult<PyPendingAlterDo
 }
 
 /// `DROP DOMAIN` over one domain or a non-empty list of them, in order.
-// [spec:pgorm:req:bindings.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains+2]
 #[pyfunction]
 #[pyo3(signature=(names, *, if_exists=false, behavior=None))]
 pub(super) fn drop_domain(

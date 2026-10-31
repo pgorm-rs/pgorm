@@ -15,6 +15,7 @@ use bytes::{Bytes, BytesMut};
 use pgorm::{CopyRowDecoder, CopyRowEncoder, Error, ValueHolder};
 use pyo3::{
     buffer::PyBuffer,
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyByteArray, PyBytes, PyList, PyString, PyTuple},
 };
@@ -67,7 +68,7 @@ fn rows_columns(rows: bool, binary: bool) -> PyResult<Option<Columns>> {
     match (rows, binary) {
         (false, _) => Ok(None),
         (true, true) => Ok(Some(Arc::new(OnceLock::new()))),
-        (true, false) => Err(ConstructionError::new_err(
+        (true, false) => Err(PyTypeError::new_err(
             "rows travel in binary COPY alone: build the statement with the \"binary\" format",
         )),
     }
@@ -91,20 +92,20 @@ fn copy_from(statement: &Bound<'_, PyAny>) -> PyResult<CopyFrom> {
     statement
         .extract::<PyRef<'_, PyCopyFrom>>()
         .map(|statement| statement.inner.clone())
-        .map_err(|_| ConstructionError::new_err("copy_in requires a CopyFrom statement"))
+        .map_err(|_| PyTypeError::new_err("copy_in requires a CopyFrom statement"))
 }
 
 fn copy_to(statement: &Bound<'_, PyAny>) -> PyResult<CopyTo> {
     statement
         .extract::<PyRef<'_, PyCopyTo>>()
         .map(|statement| statement.inner.clone())
-        .map_err(|_| ConstructionError::new_err("copy_out requires a CopyTo statement"))
+        .map_err(|_| PyTypeError::new_err("copy_out requires a CopyTo statement"))
 }
 
 /// One chunk of COPY FROM data, copied out of any byte buffer.
 fn chunk(value: &Bound<'_, PyAny>) -> PyResult<Bytes> {
     let buffer = PyBuffer::<u8>::get(value)
-        .map_err(|_| ConstructionError::new_err("COPY data must be a bytes-like object"))?;
+        .map_err(|_| PyTypeError::new_err("COPY data must be a bytes-like object"))?;
     Ok(Bytes::from(buffer.to_vec(value.py())?))
 }
 
@@ -412,13 +413,13 @@ fn row_values(row: &Bound<'_, PyAny>) -> PyResult<Vec<Option<ValueHolder>>> {
         || row.is_instance_of::<PyBytes>()
         || row.is_instance_of::<PyByteArray>()
     {
-        return Err(ConstructionError::new_err(
+        return Err(PyTypeError::new_err(
             "a COPY row is a sequence of its columns' values, not text or bytes",
         ));
     }
-    let items = row.try_iter().map_err(|_| {
-        ConstructionError::new_err("a COPY row is a sequence of its columns' values")
-    })?;
+    let items = row
+        .try_iter()
+        .map_err(|_| PyTypeError::new_err("a COPY row is a sequence of its columns' values"))?;
     items
         .map(|item| {
             let item = item?;

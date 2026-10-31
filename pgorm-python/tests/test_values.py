@@ -17,7 +17,7 @@ def bits(value):
 
 
 # [spec:pgorm:req:bindings.values/test]
-# [spec:pgorm:req:python.values+6/test]
+# [spec:pgorm:req:python.values+7/test]
 # [spec:pgorm:req:bindings.value-tags/test]
 class ValueTests(unittest.TestCase):
     def test_scalar_variants_and_typed_nulls(self):
@@ -142,6 +142,8 @@ class ValueTests(unittest.TestCase):
         for invalid in [[True], [2**31], [Value(1, "i64")], [[1]], "1", {1}]:
             with self.assertRaises(ConstructionError):
                 Value.array("i32", invalid)
+        with self.assertRaises(TypeError):
+            Value.array(1, [1])
         jsons = Value.array("json", [Value.json(None), None])
         self.assertEqual([item.is_null for item in jsons.items()], [False, True])
 
@@ -159,9 +161,14 @@ class ValueTests(unittest.TestCase):
         self.assertEqual(array.snapshot()["type"]["element"]["schema"], kind.schema)
         with self.assertRaises(ConstructionError):
             Value.array(kind, [Value(value.value, TypeName("different"))])
-        for name in ["", "a" * 64, "雪" * 22, "nul\0", None, 1, b"bytes"]:
+        for name in ["", "a" * 64, "雪" * 22, "nul\0"]:
             with self.assertRaises(ConstructionError):
                 TypeName(name)
+        for name in [None, 1, b"bytes"]:
+            with self.assertRaises(TypeError):
+                TypeName(name)
+        with self.assertRaises(TypeError):
+            TypeName("Mood", schema=1)
 
     def test_temporal_policies_are_explicit(self):
         naive = dt.datetime(2024, 11, 3, 1, 30, 0, 999999)
@@ -198,7 +205,7 @@ class ValueTests(unittest.TestCase):
             def __str__(self):
                 raise AssertionError("must not stringify")
 
-        for invalid in [None, [1], {"a": 1}, Custom(), complex(1), 2**63]:
+        for invalid in [None, Custom(), complex(1), 2**63, (1, 2), [Custom()]]:
             with self.assertRaises(ConstructionError):
                 Value(invalid)
         for data, kind in [(Custom(), "text"), (1, "text"), (True, "boolz"),
@@ -209,9 +216,44 @@ class ValueTests(unittest.TestCase):
         value = Value(1)
         with self.assertRaises(AttributeError):
             value.kind = "text"
+        for kind in [1, None.__class__, b"i32"]:
+            with self.subTest(kind=kind), self.assertRaises(TypeError):
+                Value(1, kind)
+            with self.subTest(kind=kind), self.assertRaises(TypeError):
+                Value.null(kind)
+
+    # [spec:pgorm:req:python.values+7/test]
+    def test_lists_infer_as_arrays_dicts_as_json(self):
+        cases = [
+            ([1, None, 3], "i64", [1, None, 3]),
+            (["a", "b"], "text", ["a", "b"]),
+            ([True], "bool", [True]),
+            ([1.5, None], "f64", [1.5, None]),
+            ([Decimal("1.5")], "decimal", [Decimal("1.5")]),
+            ([Interval(1, 2, 3)], "interval", [Interval(1, 2, 3)]),
+            ([{"a": 1}, None, {"b": [2]}], "json", [{"a": 1}, None, {"b": [2]}]),
+        ]
+        for data, element, expected in cases:
+            with self.subTest(data=data):
+                value = Value(data)
+                self.assertEqual(value.kind, "array")
+                self.assertEqual(value.element_type, element)
+                self.assertEqual(value.value, expected)
+                self.assertEqual(value, Value.array(element, data))
+        document = {"a": [1, None], "b": {"c": "雪"}}
+        self.assertEqual(Value(document), Value.json(document))
+        self.assertEqual(Value(document).kind, "json")
+        self.assertEqual(Value({}).value, {})
+        for invalid in [
+            [], [None], [None, None], [1, "a"], [1, 1.0], [True, 1], [[1]], [(1,)],
+            [1, [2]], (1,), (), [dt.datetime.now(dt.timezone.utc)],
+            [Value(1, "i32")],
+        ]:
+            with self.subTest(data=invalid), self.assertRaises(ConstructionError):
+                Value(invalid)
 
     # [spec:pgorm:req:bindings.values/test]
-    # [spec:pgorm:req:python.values+6/test]
+    # [spec:pgorm:req:python.values+7/test]
     def test_interval_keeps_three_signed_fields(self):
         interval = Interval(1, -2, 3_000_004)
         self.assertEqual((interval.months, interval.days, interval.microseconds), (1, -2, 3_000_004))

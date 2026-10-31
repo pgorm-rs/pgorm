@@ -1,9 +1,9 @@
 use pgorm::pgorm_query::{Collation, IntoCollation, Name, NullOrdering, Order};
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use crate::errors::ConstructionError;
 
-// [spec:pgorm:req:bindings.identifiers]
+// [spec:pgorm:req:bindings.identifiers+2]
 /// One owned PostgreSQL identifier; punctuation is never parsed as SQL.
 #[pyclass(name = "Identifier", module = "pgorm", frozen, eq, from_py_object)]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -21,7 +21,7 @@ impl PyIdentifier {
         }
         let name = name
             .extract::<String>()
-            .map_err(|_| ConstructionError::new_err("identifier requires a string"))?;
+            .map_err(|_| PyTypeError::new_err("identifier requires a string"))?;
         validate_name(&name)?;
         Ok(Self { name })
     }

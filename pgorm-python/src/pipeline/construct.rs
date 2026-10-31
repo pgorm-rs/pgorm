@@ -1,17 +1,22 @@
+use pgorm::pgorm_query::Value;
 use pyo3::{
+    exceptions::PyTypeError,
     prelude::*,
-    types::{PyInt, PyList, PyTuple},
+    types::{PyBool, PyFloat, PyInt, PyList, PyString, PyTuple},
 };
 
 use super::{
     expression::{PyPipelineExpr, alias_name},
-    recipe::{Function, Recipe},
+    recipe::{Function, Literal, Recipe},
 };
-use crate::{UnsupportedCapabilityError, entities::PyEntityColumn, errors::ConstructionError};
+use crate::{
+    UnsupportedCapabilityError, entities::PyEntityColumn, errors::ConstructionError,
+    values::PyValue,
+};
 
 pub(super) fn integer(value: &Bound<'_, PyAny>) -> PyResult<i64> {
     if !value.is_exact_instance_of::<PyInt>() {
-        return Err(ConstructionError::new_err(
+        return Err(PyTypeError::new_err(
             "pipeline integer argument requires an exact int",
         ));
     }
@@ -20,14 +25,43 @@ pub(super) fn integer(value: &Bound<'_, PyAny>) -> PyResult<i64> {
         .map_err(|_| ConstructionError::new_err("pipeline integer argument exceeds i64"))
 }
 
+/// `literal(value)`: a value written into the SQL as pgorm's pipeline
+/// writes a literal — `None`, a `bool`, an integer within `bigint`, a
+/// finite `float` or a `str`, plain or as a `Value` of that kind.
+// [spec:pgorm:req:bindings.pipeline-expressions+2]
 #[pyfunction]
 pub(super) fn pipeline_literal(value: &Bound<'_, PyAny>) -> PyResult<PyPipelineExpr> {
-    if value.is_instance_of::<PyPipelineExpr>() {
-        return Err(ConstructionError::new_err(
-            "pipeline literal requires a scalar value",
-        ));
-    }
-    PyPipelineExpr::coerce(value)
+    let literal = if value.is_none() {
+        Literal::Null
+    } else {
+        let plain = [
+            value.is_instance_of::<PyValue>(),
+            value.is_exact_instance_of::<PyBool>(),
+            value.is_exact_instance_of::<PyInt>(),
+            value.is_exact_instance_of::<PyFloat>(),
+            value.is_exact_instance_of::<PyString>(),
+        ];
+        if !plain.contains(&true) {
+            return Err(not_literal());
+        }
+        let value = PyValue::coerce(value)?;
+        match value.rust_value() {
+            _ if value.has_named_type() => return Err(not_literal()),
+            Value::Bool(Some(value)) => Literal::Bool(*value),
+            Value::Int(Some(value)) => Literal::Integer(i64::from(*value)),
+            Value::BigInt(Some(value)) => Literal::Integer(*value),
+            Value::Double(Some(value)) if value.is_finite() => Literal::Float(*value),
+            Value::String(Some(value)) => Literal::Text(value.to_string()),
+            _ => return Err(not_literal()),
+        }
+    };
+    PyPipelineExpr::compose(Recipe::Literal(literal), &[])
+}
+
+fn not_literal() -> PyErr {
+    ConstructionError::new_err(
+        "a pipeline literal is None, a bool, an integer within bigint, a finite float or a str; bind any other value",
+    )
 }
 
 #[pyfunction]
@@ -38,7 +72,7 @@ pub(super) fn pipeline_alias(name: &Bound<'_, PyAny>) -> PyResult<PyPipelineExpr
 /// `pl.col(table, column)`: a column qualified by the relation it is read
 /// from. A registered entity's column (`entity.col(name)`) is the entity's
 /// own, compared as the entity types it; any other name only qualifies.
-// [spec:pgorm:req:bindings.pipeline-expressions]
+// [spec:pgorm:req:bindings.pipeline-expressions+2]
 // [spec:pgorm:req:bindings.pipeline-sources+2]
 #[pyfunction]
 pub(super) fn pipeline_col(
@@ -145,7 +179,7 @@ pub(super) fn pipeline_case(
     otherwise: &Bound<'_, PyAny>,
 ) -> PyResult<PyPipelineExpr> {
     if !arms.is_instance_of::<PyList>() && !arms.is_instance_of::<PyTuple>() {
-        return Err(ConstructionError::new_err(
+        return Err(PyTypeError::new_err(
             "pipeline CASE arms require a list or tuple",
         ));
     }
@@ -156,8 +190,8 @@ pub(super) fn pipeline_case(
         let arm = arm?;
         if (!arm.is_instance_of::<PyList>() && !arm.is_instance_of::<PyTuple>()) || arm.len()? != 2
         {
-            return Err(ConstructionError::new_err(
-                "each CASE arm requires condition and value",
+            return Err(PyTypeError::new_err(
+                "each CASE arm is a (condition, value) pair",
             ));
         }
         let condition = PyPipelineExpr::coerce(&arm.get_item(0)?)?;

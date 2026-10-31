@@ -3,7 +3,7 @@
 // Comparison, arithmetic and logic: the operators every expression has. An
 // operand that is not an expression is a value, bound as a parameter; a
 // comparison's may also be `any(..)` or `all(..)`.
-// [spec:pgorm:req:bindings.expressions]
+// [spec:pgorm:req:bindings.expressions+2]
 
 import { arg, Builder, made } from "./builder.js";
 import { native } from "./operations.js";

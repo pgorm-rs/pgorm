@@ -21,12 +21,18 @@ labels = Value.array(mood, [label, None])
 ```
 
 `Value(data, kind)` explicitly chooses a Rust variant. `Value(data)` infers
-`bool`, `i64`, `f64`, `text`, `bytes`, `decimal`, `uuid`, `date`, `time`, or
-naive `datetime` from exact Python types. Inference rejects `None`, containers,
-aware datetimes and custom objects. It never chooses an integer type from a
+`bool`, `i64`, `f64`, `text`, `bytes`, `decimal`, `uuid`, `date`, `time`,
+naive `datetime` or `interval` from exact Python types, `json` from a `dict`,
+and an array from a `list`: an array of the one kind its items other than
+`None` infer as, each `None` an SQL NULL element. Inference rejects `None`, an
+empty or all-`None` list, a list of several kinds or of lists, every `tuple`,
+which reads as a row, aware datetimes and custom objects; `Value.array(kind,
+items)` declares what it cannot. It never chooses an integer type from a
 boolean, calls an arbitrary object's string conversion, or promotes an
 overflowing integer to another width. Passing an existing `Value` clones it;
-supplying a different kind with that value raises `ConstructionError`.
+supplying a different kind with that value raises `ConstructionError`. A kind
+that is no kind name, `TypeName`, `CreatedRange` or `CreatedMultirange` raises
+`TypeError`, and a name pgorm has no kind for `ConstructionError`.
 
 | Kind | Rust variant | Python input/output and limits |
 | --- | --- | --- |

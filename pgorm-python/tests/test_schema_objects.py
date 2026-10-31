@@ -40,6 +40,7 @@ class SchemaObjectConstruction(unittest.TestCase):
 
     # [spec:pgorm:req:bindings.schema-tables/test]
     # [spec:pgorm:req:bindings.schema-alter/test]
+    # [spec:pgorm:req:bindings.argument-errors/test]
     def test_impossible_shapes_refused_as_built(self):
         a = p.col("a")
         for action in (
@@ -48,18 +49,10 @@ class SchemaObjectConstruction(unittest.TestCase):
             lambda: s.create_table(p.Table("t", alias="x")),
             lambda: s.create_table("t").primary_key([]),
             lambda: s.create_table("t").foreign_key(["a", "b"], "u", ["x"]),
-            lambda: s.create_table("t").foreign_key("a", "u", "x", period=("p",)),
             lambda: s.alter_table("t").modify_column(s.ColumnDef("a", "integer").generated(p.col("b"), "stored")),
             lambda: s.alter_table("t").modify_column(s.ColumnDef("a", "integer").auto_increment()),
             lambda: s.alter_table("t").modify_column(s.ColumnDef("a").collate("C")),
             lambda: s.alter_table("t").modify_column(s.ColumnDef("a")),
-            lambda: s.ColumnDef("a", "integer").generated(p.col("b"), "computed"),
-            lambda: s.ColumnDef("a", "integer").identity("sometimes"),
-            lambda: s.ColumnDef("a", "integer").check(a > 0, enforcement="off"),
-            lambda: s.create_table("t").unique("a", deferrability="later"),
-            lambda: s.create_table("t").foreign_key("a", "u", "x", on_delete="explode"),
-            lambda: s.alter_table("t").alter_constraint("c", "valid"),
-            lambda: s.alter_table("t").drop_constraint("c", behavior="maybe"),
             lambda: s.drop_table([]),
             lambda: s.ColumnDef("", "integer"),
         ):
@@ -77,10 +70,18 @@ class SchemaObjectConstruction(unittest.TestCase):
             lambda: s.create_table("t").primary_key(3),
             lambda: s.create_index("t", "a").include("a"),
             lambda: s.create_type("t").as_range("double", collation={"nam": "C"}),
+            lambda: s.create_table("t").foreign_key("a", "u", "x", period=("p",)),
+            lambda: s.ColumnDef("a", "integer").generated(p.col("b"), "computed"),
+            lambda: s.ColumnDef("a", "integer").identity("sometimes"),
+            lambda: s.ColumnDef("a", "integer").check(a > 0, enforcement="off"),
+            lambda: s.create_table("t").unique("a", deferrability="later"),
+            lambda: s.create_table("t").foreign_key("a", "u", "x", on_delete="explode"),
+            lambda: s.alter_table("t").alter_constraint("c", "valid"),
+            lambda: s.alter_table("t").drop_constraint("c", behavior="maybe"),
         ):
             with self.subTest(action=action), self.assertRaises(TypeError):
                 action()
-        with self.assertRaises(ValueError):
+        with self.assertRaises(p.ConstructionError):
             s.ColumnDef("a", "integer").identity("always", max_value=2**63)
 
     # [spec:pgorm:req:bindings.schema-types/test]
@@ -92,10 +93,8 @@ class SchemaObjectConstruction(unittest.TestCase):
             lambda: s.create_type("t").values(["a\0b"]),
             lambda: s.alter_type("t").add_value("x", before="a", after="b"),
             lambda: s.alter_sequence("s").options(),
-            lambda: s.create_sequence("s").as_type("numeric"),
             lambda: s.create_sequence("s").owned_by("t"),
             lambda: s.create_sequence("s").owned_by(None, "id"),
-            lambda: s.create_index("t", "a", order="up"),
             lambda: s.create_extension("e", version="1\0"),
             lambda: s.comment_on_table("t", "a\0b"),
             lambda: s.drop_type([]),
@@ -110,6 +109,8 @@ class SchemaObjectConstruction(unittest.TestCase):
             lambda: s.create_index("t", p.Table("x")),
             lambda: s.alter_sequence("s").restart("1"),
             lambda: s.comment_on_column("t", "c", 3),
+            lambda: s.create_sequence("s").as_type("numeric"),
+            lambda: s.create_index("t", "a", order="up"),
         ):
             with self.subTest(action=action), self.assertRaises(TypeError):
                 action()
@@ -117,7 +118,7 @@ class SchemaObjectConstruction(unittest.TestCase):
             lambda: s.alter_sequence("s").options(cache=2**63),
             lambda: s.alter_sequence("s").restart(-(2**63) - 1),
         ):
-            with self.subTest(action=action), self.assertRaises(ValueError):
+            with self.subTest(action=action), self.assertRaises(p.ConstructionError):
                 action()
 
 

@@ -66,7 +66,7 @@ async function constraints(domain: string): Promise<string[]> {
   return rows.map((row) => String(row.conname));
 }
 
-// [spec:pgorm:req:bindings.schema-domains/test]
+// [spec:pgorm:req:bindings.schema-domains+2/test]
 test("each domain statement names its domain as a type, renders its clauses in order and binds nothing", () => {
   const quantity = new TypeName("quantity", { schema: "billing" });
   assert.deepStrictEqual(
@@ -106,14 +106,14 @@ test("each domain statement names its domain as a type, renders its clauses in o
   assert.throws(() => alterDomain("d").dropConstraint("c", { behavior: "sideways" } as never), mistyped(/behavior is one of/));
 });
 
-// [spec:pgorm:req:bindings.schema-domains/test]
+// [spec:pgorm:req:bindings.schema-domains+2/test]
 test("an ALTER DOMAIN with no action has no SQL, and a terminal refuses it", async () => {
   const pending = alterDomain("quantity");
   assert.equal("inspect" in pending, false);
   await assert.rejects(pool().execute(pending as never), refused(/ALTER DOMAIN needs an action/));
 });
 
-// [spec:pgorm:req:bindings.schema-domains/test]
+// [spec:pgorm:req:bindings.schema-domains+2/test]
 test("a column typed with a domain takes its default and is held to its checks and NOT NULL", async () => {
   await pool().execute(createSchema("billing"));
   const quantity = new TypeName("quantity", { schema: "billing" });
@@ -153,7 +153,7 @@ test("a column typed with a domain takes its default and is held to its checks a
   assert.equal((await pool().one("SELECT 9::billing.small_quantity AS v")).v, 9);
 });
 
-// [spec:pgorm:req:bindings.schema-domains/test]
+// [spec:pgorm:req:bindings.schema-domains+2/test]
 test("each ALTER DOMAIN action changes the domain, a NOT VALID check validated once the values pass", async () => {
   await pool().execute(createDomain("score", "integer"));
   await pool().execute(createTable("game").column(new ColumnDef("points", new TypeName("score"))));
@@ -196,7 +196,7 @@ test("each ALTER DOMAIN action changes the domain, a NOT VALID check validated o
   assert.equal(typed.type, "points");
 });
 
-// [spec:pgorm:req:bindings.schema-domains/test]
+// [spec:pgorm:req:bindings.schema-domains+2/test]
 test("a drop is refused under RESTRICT while a column is typed with the domain, until it cascades", async () => {
   await pool().execute(createDomain("label", "text").collate("C"));
   await pool().execute(createTable("tagged").column(new ColumnDef("id", "integer")).column(new ColumnDef("tag", new TypeName("label"))));
@@ -210,7 +210,7 @@ test("a drop is refused under RESTRICT while a column is typed with the domain, 
   assert.deepStrictEqual(columns.map((row) => row.attname), ["id"]);
 });
 
-// [spec:pgorm:req:bindings.schema-domains/test]
+// [spec:pgorm:req:bindings.schema-domains+2/test]
 test("the server refuses a domain that exists, a missing domain or constraint and a collation its base has none of", async () => {
   await pool().execute(createDomain("amount", "numeric"));
   await assert.rejects(pool().execute(createDomain("amount", "integer")), rejectedWith("42710"));

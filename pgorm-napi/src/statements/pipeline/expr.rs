@@ -46,8 +46,8 @@ pub(super) fn expression<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> 
 
 /// An operand: a pipeline expression, or a value the stage that takes it
 /// binds. A statement builder's expression is no pipeline expression.
-// [spec:pgorm:req:bindings.pipeline-expressions]
-// [spec:pgorm:req:napi.pipeline-operands+2]
+// [spec:pgorm:req:bindings.pipeline-expressions+2]
+// [spec:pgorm:req:bindings.operands]
 pub(super) fn operand<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<PlExpr> {
     if let Some(expr) = expression(cx, value) {
         return Ok(expr);
@@ -92,7 +92,7 @@ fn pipeline_name_at<'cx>(cx: &mut FunctionContext<'cx>, index: usize) -> NeonRes
 
 /// `pipelineCol(table, column)`: a column qualified by the relation it is
 /// read from, as prqlc, which has no catalog, needs.
-// [spec:pgorm:req:bindings.pipeline-expressions]
+// [spec:pgorm:req:bindings.pipeline-expressions+2]
 fn col(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = pipeline_name_at(cx, 0)?;
     let column = pipeline_name_at(cx, 1)?;
@@ -113,7 +113,7 @@ fn registered_col(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `type` names, a string or a `TypeName`, through `ExprOps::compares_as` —
 /// what a column whose domain is over an enum needs where no registration
 /// types it.
-// [spec:pgorm:req:bindings.pipeline-expressions]
+// [spec:pgorm:req:bindings.pipeline-expressions+2]
 fn compares_as(cx: &mut FunctionContext) -> NeonResult<Node> {
     let inner = operand_at(cx, 0)?;
     let named = arg(cx, 1);
@@ -145,7 +145,7 @@ fn role(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `pipelineLiteral(value)`: a value written into the SQL as pgorm's
 /// pipeline writes a literal, which only `literal()` asks for.
-// [spec:pgorm:req:bindings.pipeline-expressions]
+// [spec:pgorm:req:bindings.pipeline-expressions+2]
 fn literal(cx: &mut FunctionContext) -> NeonResult<Node> {
     let value = arg(cx, 0);
     let literal = if value.is_a::<JsNull, _>(cx) {
@@ -239,7 +239,7 @@ const CASTS: &[(&str, pl::CastType)] = &[
 ];
 
 /// `pipelineCast(expr, type)`.
-// [spec:pgorm:req:bindings.pipeline-expressions]
+// [spec:pgorm:req:bindings.pipeline-expressions+2]
 fn cast(cx: &mut FunctionContext) -> NeonResult<Node> {
     let inner = operand_at(cx, 0)?;
     let kind = arg(cx, 1);
@@ -292,7 +292,7 @@ fn offset(cx: &mut FunctionContext, index: usize) -> NeonResult<i64> {
 
 /// `pipelineFunction(name, ..operands)`: the aggregates and window functions
 /// pgorm's pipeline has, at the argument counts each takes.
-// [spec:pgorm:req:bindings.pipeline-expressions]
+// [spec:pgorm:req:bindings.pipeline-expressions+2]
 fn function(cx: &mut FunctionContext) -> NeonResult<Node> {
     let name = arg(cx, 0);
     let name = read::string(cx, name)?;

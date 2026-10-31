@@ -28,7 +28,7 @@ class Listener:
 
     def __init__(self, native: _native._Listener) -> None:
         if not isinstance(native, _native._Listener):
-            raise _native.ConstructionError("listeners must be opened by a pool")
+            raise TypeError("listeners must be opened by a pool")
         self._native = native
         self._ended = False
 
@@ -40,7 +40,8 @@ class Listener:
         """Receive the notifications sent on ``channel``, named exactly.
 
         The name is sent as a quoted identifier, so its case and punctuation
-        are kept; one longer than 63 bytes raises ``ConstructionError``.
+        are kept; one longer than 63 bytes raises ``ConstructionError``, and
+        one that is no ``str`` ``TypeError``.
         Cancelling this closes the listener, since whether the server acted
         on it is then unknown.
         """

@@ -220,7 +220,7 @@ class Graph:
             return p._model_count(self.statement).inspect()
         if terminal == "all_grouped":
             return self._grouped().inspect()
-        raise ValueError('a graph inspects itself, its "count" or its "all_grouped"')
+        raise TypeError('a graph inspects itself, its "count" or its "all_grouped"')
 
     async def count(self, db: Database) -> int:
         """How many rows the graph reads, its limit and offset aside."""

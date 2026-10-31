@@ -69,6 +69,9 @@ class UpdateManyView(Generic[M]):
     def where(self, predicate) -> "UpdateManyView[M]":
         return UpdateManyView(self._update.where(predicate), self._model_class)
 
+    def all_rows(self) -> "UpdateManyView[M]":
+        return UpdateManyView(self._update.all_rows(), self._model_class)
+
     async def returning_changes(self, connection) -> list[Change[M]]:
         changes = await self._update.returning_changes(connection)
         model = self._model_class

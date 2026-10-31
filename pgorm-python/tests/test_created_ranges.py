@@ -97,8 +97,12 @@ class CreatedRangeValueTests(unittest.TestCase):
         value = p.Value(p.Range(1, 2), p.CreatedRange("slot", "i32"))
         with self.assertRaises(p.ConstructionError):
             p.JsonDefault(value)
-        with self.assertRaises(p.UnsupportedCapabilityError):
-            pipeline.literal(value)
+        for operation in (
+            lambda: pipeline.literal(value),
+            lambda: pipeline.from_(p.Table("t")).filter(pipeline.col("t", "slot") == value),
+        ):
+            with self.assertRaises(p.ConstructionError):
+                operation()
 
 
 # [spec:pgorm:req:bindings.created-ranges/test]

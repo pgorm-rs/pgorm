@@ -31,7 +31,7 @@ def accounts():
 
 
 class ModelConstruction(unittest.TestCase):
-    # [spec:pgorm:req:bindings.models/test]
+    # [spec:pgorm:req:bindings.models+2/test]
     def test_descriptor_names_and_values_are_owned(self):
         from pgorm.models.columns import MODEL_KINDS
 
@@ -70,7 +70,7 @@ class ModelConstruction(unittest.TestCase):
         self.assertEqual(write.inspect().params[-1].value, ["a"])
         self.assertEqual(write.inspect().params[0].kind, "i32")
 
-    # [spec:pgorm:req:bindings.models/test]
+    # [spec:pgorm:req:bindings.models+2/test]
     def test_unknown_fields_and_collisions_fail_early(self):
         model = accounts()
         for operation in (
@@ -106,6 +106,12 @@ class ModelConstruction(unittest.TestCase):
             lambda: p.Column("i32", generated=True),
             lambda: p.Column(p.TypeName("Mood", schema="s"), values="calm"),
             lambda: p.Column("i32", invented=True),
+            lambda: p.Column("i32", generated="sometimes"),
+            lambda: p.Column(5),
+            lambda: p.Model("t", [("id", p.Column("i32"))]),
+            lambda: p.Model("t", {"id": "i32"}),
+            lambda: model.key([1]),
+            lambda: model.insert([("id", 1)]),
             lambda: p.ModelQuery(p.Insert(model.table)),
             lambda: p.ModelRows(model, "SELECT 1", ("id",)),
             lambda: p.ModelWrite(model, p.Select(p.literal(1))),
@@ -117,11 +123,10 @@ class ModelConstruction(unittest.TestCase):
             with self.assertRaises(TypeError):
                 operation()
         for operation in (
-            lambda: p.Column("i32", generated="sometimes"),
             lambda: p.Column(p.TypeName("Mood", schema="s"), values=[]),
             lambda: p.Column(p.TypeName("Mood", schema="s"), values=["a", "a"]),
         ):
-            with self.assertRaises(ValueError):
+            with self.assertRaises(p.ConstructionError):
                 operation()
         for kind in ("u64", "char", "made-up"):
             with (
@@ -366,7 +371,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(sql_null.tagged("data").is_null)
         self.assertFalse(json_null.tagged("data").is_null)
         self.assertIsNone(json_null["data"])
-        with self.assertRaises(p.DatabaseError):
+        with self.assertRaises(p.DecodeError):
             await self.model.find().optional(self.pool)
         self.assertEqual(len(await self.model.find().all(self.pool)), 3)
         self.assertEqual(

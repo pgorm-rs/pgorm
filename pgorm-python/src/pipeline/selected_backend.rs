@@ -6,7 +6,7 @@ use pgorm::{
     Error,
     pipeline::{self as pl, SourceList},
 };
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 use std::{fmt::Debug, marker::PhantomData, sync::Arc};
 
 pub(crate) type Row = Vec<Option<PyEntityModel>>;
@@ -39,7 +39,7 @@ impl Terminal {
             "all" => Ok(Self::All),
             "one" => Ok(Self::One),
             "optional" => Ok(Self::Optional),
-            _ => Err(ConstructionError::new_err("unknown pipeline terminal")),
+            _ => Err(PyTypeError::new_err("unknown pipeline terminal")),
         }
     }
 }

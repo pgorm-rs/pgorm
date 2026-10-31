@@ -35,11 +35,10 @@ Beside its kind and `name`, a column declares whether it is `nullable`, an
 leaves it out, or `generated` by the server — `"always"`, which no write sets,
 or `"by_default"`, an identity an insert may leave out — and an enum column
 its `values`, the labels every value it reads or writes is one of. A
-non-boolean flag, a `generated` or `values` of the wrong type is a
-`TypeError`; an unknown `generated` and an empty or repeated label list a
-`ValueError`; a nullable key, a generated column with a default and labels on
-a column that is no enum a `ConstructionError`. An unknown option is Python's
-own `TypeError`.
+non-boolean flag, a `generated` or `values` of the wrong type and an unknown
+`generated` are a `TypeError`; an empty or repeated label list, a nullable key,
+a generated column with a default and labels on a column that is no enum a
+`ConstructionError`. An unknown option is Python's own `TypeError`.
 
 ## Query and write
 
@@ -191,8 +190,8 @@ lookup are independent copies.
 Result columns, native Value types, enum qualifications, nullability and an
 enum's listed labels must match the declaration. A mismatch raises
 `DecodeError`; it is never interpreted as an absent row. Dynamic `one`
-requires exactly one row and `optional` at most one, so multiple rows raise
-`DatabaseError`. Use explicit `limit(1)` to select a first row. Errors do not
+requires exactly one row and `optional` at most one, so any other count
+raises `DecodeError`. Use explicit `limit(1)` to select a first row. Errors do not
 imply rollback of a write already executed.
 
 Supported scalar kinds match the native Record decoder: `bool`, `i8`, `i16`,

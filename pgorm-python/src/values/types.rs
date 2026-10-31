@@ -30,13 +30,10 @@ impl PyTypeName {
         name: &Bound<'_, PyAny>,
         schema: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let name = name
-            .extract::<String>()
-            .map_err(super::construction_error)?;
+        let name = name.extract::<String>()?;
         let schema = schema
             .map(|schema| schema.extract::<String>())
-            .transpose()
-            .map_err(super::construction_error)?;
+            .transpose()?;
         for part in std::iter::once(&name).chain(schema.iter()) {
             if part.is_empty() || part.contains('\0') || part.len() > 63 {
                 return Err(ConstructionError::new_err(
@@ -134,6 +131,7 @@ pub enum Tag {
 }
 
 impl Tag {
+    // [spec:pgorm:req:bindings.argument-errors]
     pub fn parse(value: &Bound<'_, PyAny>) -> PyResult<Self> {
         if let Ok(name) = value.extract::<PyRef<'_, PyTypeName>>() {
             Ok(Self::Enum(name.clone()))

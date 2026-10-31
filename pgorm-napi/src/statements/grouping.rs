@@ -17,7 +17,7 @@ pub(super) const EXPORTS: &[(&str, super::Build)] = &[
 
 /// A `GROUP BY` item: a grouping element, or an expression, which is the set
 /// of that one expression and renders bare, as `add_group_by` writes it.
-// [spec:pgorm:req:bindings.select]
+// [spec:pgorm:req:bindings.select+2]
 pub(super) fn element<'cx>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,
@@ -40,7 +40,7 @@ pub(super) fn element<'cx>(
 /// `groupingNew("set" | "rollup" | "cube", expressions)`: one set,
 /// `("a", "b")` — `()` with no expressions — or `ROLLUP` or `CUBE` over the
 /// expressions, each of which may be a `tuple` standing as one unit.
-// [spec:pgorm:req:bindings.select]
+// [spec:pgorm:req:bindings.select+2]
 fn grouping_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let kind = choice(cx, 0, "a grouping element", &["set", "rollup", "cube"])?;
     let expressions = expressions_at(cx, 1)?;
@@ -55,7 +55,7 @@ fn grouping_new(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `groupingSets(items)`: `GROUPING SETS (..)` over at least one item, each a
 /// grouping element or an expression, as pgorm-query's builder takes its
 /// first element before any other.
-// [spec:pgorm:req:bindings.select]
+// [spec:pgorm:req:bindings.select+2]
 fn grouping_sets(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut items = list(cx, 0)?.into_iter();
     let Some(first) = items.next() else {

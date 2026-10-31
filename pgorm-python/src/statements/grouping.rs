@@ -2,11 +2,11 @@
 //! `GroupingElement`.
 
 use pgorm::pgorm_query::{GroupingElement, SimpleExpr};
-use pyo3::{prelude::*, types::PyTuple};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyTuple};
 
 use crate::{errors::ConstructionError, expressions::PyExpr};
 
-// [spec:pgorm:req:bindings.select]
+// [spec:pgorm:req:bindings.select+2]
 /// One GROUP BY item that is not a bare expression: `()`, a parenthesised
 /// set, `ROLLUP`, `CUBE` or `GROUPING SETS`, each built by the Rust
 /// constructor of the same name. `sets` takes its first element, so the
@@ -39,7 +39,7 @@ pub(super) fn element(value: &Bound<'_, PyAny>) -> PyResult<Grouped> {
     } else if let Ok(expr) = value.extract::<PyRef<'_, PyExpr>>() {
         Ok(Grouped::Expr(expr.inner.clone()))
     } else {
-        Err(ConstructionError::new_err(
+        Err(PyTypeError::new_err(
             "a grouping item requires an expression or GroupingElement",
         ))
     }
@@ -51,7 +51,7 @@ fn expressions(exprs: &Bound<'_, PyTuple>) -> PyResult<Vec<SimpleExpr>> {
         .map(|expr| {
             expr.extract::<PyRef<'_, PyExpr>>()
                 .map(|expr| expr.inner.clone())
-                .map_err(|_| ConstructionError::new_err("a grouping set requires expressions"))
+                .map_err(|_| PyTypeError::new_err("a grouping set requires expressions"))
         })
         .collect()
 }

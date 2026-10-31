@@ -24,7 +24,7 @@ def _fields(model: Model, names: object, side: str) -> tuple[str, ...]:
     if not isinstance(listed, (list, tuple)) or not all(isinstance(name, str) for name in listed):
         raise TypeError(f"a relation's {side} is a field or a list of fields")
     if not listed:
-        raise ValueError(f"a relation's {side} names at least one field")
+        raise p.ConstructionError(f"a relation's {side} names at least one field")
     fields = tuple(model.col(name).field_name for name in listed)
     if len(set(fields)) != len(fields):
         raise p.ConstructionError(f"a relation's {side} names each field once")
@@ -56,7 +56,7 @@ class Relation:
         from .model import Model
 
         if kind not in KINDS:
-            raise ValueError("a relation is belongs_to, has_one or has_many")
+            raise TypeError("a relation is belongs_to, has_one or has_many")
         if not isinstance(origin, Model) or not isinstance(target, Model):
             raise TypeError("a relation joins two models")
         from_fields = _fields(origin, from_, "from_")

@@ -14735,21 +14735,17 @@ children (
                 [spec:pgorm:req:bindings.values]
                 [spec:pgorm:req:bindings.windows]
                 [spec:pgorm:req:napi.application]
-                [spec:pgorm:req:napi.argument-errors]
                 [spec:pgorm:req:napi.cancellation]
                 [spec:pgorm:req:napi.codegen]
                 [spec:pgorm:req:napi.errors]
                 [spec:pgorm:req:napi.lifecycle]
                 [spec:pgorm:req:napi.naming]
-                [spec:pgorm:req:napi.pipeline-operands]
                 [spec:pgorm:req:napi.raw]
                 [spec:pgorm:req:napi.records]
-                [spec:pgorm:req:napi.row-count]
                 [spec:pgorm:req:napi.runtime]
                 [spec:pgorm:req:napi.temporal]
                 [spec:pgorm:req:napi.transactions]
                 [spec:pgorm:req:napi.typing]
-                [spec:pgorm:req:napi.update-many-guard]
                 [spec:pgorm:req:napi.values]
                 [spec:pgorm:req:bindings.case]
                 [spec:pgorm:req:bindings.connections]
@@ -14777,6 +14773,10 @@ children (
                 [spec:pgorm:req:bindings.writes]
                 [spec:pgorm:req:bindings.column-operators]
                 [spec:pgorm:req:bindings.schema-api]
+                [spec:pgorm:req:bindings.argument-errors]
+                [spec:pgorm:req:bindings.operands]
+                [spec:pgorm:req:bindings.row-count]
+                [spec:pgorm:req:napi.pipeline-table-names]
             )
             main ([spec:pgorm:req:bindings.connections] [spec:pgorm:req:bindings.pipeline] [spec:pgorm:req:bindings.pipeline-expressions])
             python (
@@ -14818,17 +14818,13 @@ children (
                 [spec:pgorm:req:bindings.values]
                 [spec:pgorm:req:bindings.windows]
                 [spec:pgorm:def:python.api]
-                [spec:pgorm:req:python.argument-errors]
                 [spec:pgorm:req:python.cancellation]
                 [spec:pgorm:req:python.capabilities]
                 [spec:pgorm:req:python.codegen]
                 [spec:pgorm:req:python.expressions]
-                [spec:pgorm:req:python.input-boundaries]
                 [spec:pgorm:req:python.lifecycle]
                 [spec:pgorm:req:python.naming]
-                [spec:pgorm:req:python.pipeline-operands]
                 [spec:pgorm:req:python.records]
-                [spec:pgorm:req:python.row-count]
                 [spec:pgorm:req:python.runtime]
                 [spec:pgorm:req:python.transactions]
                 [spec:pgorm:req:python.truth-testing]
@@ -14840,6 +14836,7 @@ children (
                 [spec:pgorm:req:bindings.pipeline-expressions]
                 [spec:pgorm:req:bindings.relation-conditions]
                 [spec:pgorm:req:bindings.schema-from-entity]
+                [spec:pgorm:req:python.pipeline]
             )
         }
         log (
@@ -14887,6 +14884,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Another shape for decision (7), found merging python-schema-gaps (2026-10-30): Python's DDL builder classes are constructible (CreateTable(..), with #[new]) and each factory is the class under a second name (create_table = CreateTable, a pattern on main before that node extended it to every builder), while JavaScript's builder classes take a private construction token and only the factory functions make them. The surface test sees both names on both sides, so it does not flag it. Bring it to the operator with the other shapes when the schema area is next worked on."
+            }
+
+            {
+                at 2026-10-31T16:33:22.698631Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-read after python-binding-decisions (f44f9ba2) folded the per-binding argument-error, row-count and operand rules into bindings.argument-errors, bindings.row-count and bindings.operands, moved bindings.errors to +3, bindings.connections, bindings.results, bindings.identifiers, bindings.select, bindings.expressions, bindings.models, bindings.entities, bindings.entity-versions, bindings.pipeline-expressions, bindings.schema-views, bindings.schema-domains and napi.application to +2, python.capabilities to +2, python.values to +7 and python.lifecycle to +3. bindings.errors lost its clause reading every shared ConstructionError as the argument's value; bindings.argument-errors states the wrong-type class once (TypeError in both, a closed choice's string outside its set included, a listener capacity out of range Python's ValueError and JavaScript's RangeError), and the rules that said anything else is a ConstructionError, with schema-views' check option and schema-domains' non-expression check, now say any other value. bindings.entity-versions states the update_many guard for both (napi.update-many-guard deleted), bindings.entities lists entities(), graphs() and pipeline.source_tuples() (taken out of napi.application), napi.pipeline-operands' table-name source is napi.pipeline-table-names and python.pipeline-operands' own terminals and null() are python.pipeline. This node's javascript claims of napi.argument-errors, napi.row-count and napi.pipeline-operands are re-keyed to the three shared rules and napi.update-many-guard's to napi.pipeline-table-names; its python claims of python.argument-errors, python.row-count and python.input-boundaries are dropped (python-binding-decisions claims the shared rules' python side) and python.pipeline-operands' becomes python.pipeline. Every reference to these rules in both bindings and pgorm's own code is pinned at the current version; JavaScript's code changed only its pins and one napi.pipeline-table-names annotation."
             }
         )
     }
@@ -15109,6 +15113,9 @@ children (
         id python-binding-decisions
         title "Python binds every plain operand, infers lists and dicts, reports a wrong row count as DecodeError, guards update_many, lists its registrations and takes PEM data as ca"
         kind @feat
+        implements {
+            python ([spec:pgorm:req:bindings.argument-errors] [spec:pgorm:req:bindings.operands] [spec:pgorm:req:bindings.row-count])
+        }
         deps (binding-renames)
         log (
             {

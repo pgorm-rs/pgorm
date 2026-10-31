@@ -87,7 +87,7 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
             empty = absent.filter(False).select_sources(pl.sources("app.SingleAccount"))
             self.assertIsNone(await empty.optional(connection))
             self.assertEqual(await empty.all(connection), [])
-            with self.assertRaises(p.DatabaseError):
+            with self.assertRaises(p.DecodeError):
                 await empty.one(connection)
 
     # [spec:pgorm:req:bindings.pipeline-sources+2/test]
@@ -138,6 +138,7 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
     async def test_registration_and_shape_rejections(self):
         entries = {x["name"]: x for x in p.capabilities()["registrations"]["sources"]}
         self.assertEqual(len(entries), 6)
+        self.assertEqual(pl.source_tuples(), sorted(entries))
         selection = pl.sources("app.TwoSources")
         self.assertEqual(selection.describe(), entries[selection.name])
         self.assertEqual(selection.describe()["entities"], ["app.Account", "app.Note"])
@@ -148,9 +149,11 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
             ["a", "n", "x"],
             ["a", ""],
             ["a", "bad\0name"],
-            "an",
         ):
             with self.assertRaises(p.ConstructionError):
+                base.select_sources(selection, qualifiers=qualifiers)
+        for qualifiers in ("an", 1):
+            with self.assertRaises(TypeError):
                 base.select_sources(selection, qualifiers=qualifiers)
         for changed in (
             base.select(pl.col("accounts", "id")),

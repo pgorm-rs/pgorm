@@ -35,8 +35,8 @@ security harness. See [schema](SCHEMA.md), [statements](STATEMENTS.md),
 | --- | --- |
 | `pool.execute(query)`, `connection.execute(query)`, `transaction.execute(query)` | `int` affected rows |
 | `query(query)` | `list[Record]` |
-| `one(query)` | `Record`; raises `DatabaseError` unless exactly one row exists |
-| `optional(query)` | `Record \| None`; raises `DatabaseError` if more than one row exists |
+| `one(query)` | `Record`; raises `DecodeError` unless exactly one row exists |
+| `optional(query)` | `Record \| None`; raises `DecodeError` if more than one row exists |
 | `pool.stream(query)`, `connection.stream(query)` | `RowStream`, an `AsyncIterator[Record]` and async context manager |
 | `copy_in(statement, source)` on a pool, connection or transaction | `int` rows inserted |
 | `copy_out(statement)` on a pool, connection or transaction | `CopyOutStream`, an `AsyncIterator[bytes]` and async context manager |
@@ -84,16 +84,18 @@ checked against its installed extension's version and registry metadata.
 
 ## Errors
 
-Python typing does not declare checked exceptions. Invalid argument shapes may
-raise `TypeError`; invalid supported values or builder states raise
-`ConstructionError`. Unsupported installed capabilities raise
-`UnsupportedCapabilityError`. Network/TLS setup uses `ConnectionError`, server
-errors and cardinality failures use `DatabaseError`, and failed decoding uses
-`DecodeError`. `DatabaseError` exposes optional `sqlstate`, `message`, `severity`
-and the diagnostic fields `detail`, `hint`, `schema`, `table`, `column`,
-`datatype` and `constraint`. Server errors populate these fields; client-side
-cardinality failures leave them as `None`. Use `str(error)` for the exception
-text in either case.
+Python typing does not declare checked exceptions. An argument of a type the
+call does not take raises `TypeError`; a value that cannot become what pgorm
+sends, or a builder state that cannot run, raises `ConstructionError`; a
+listener capacity that is an `int` but not a positive one raises `ValueError`.
+Unsupported installed capabilities raise `UnsupportedCapabilityError`, a
+`ConstructionError`. Network/TLS setup uses `ConnectionError`, server errors
+use `DatabaseError`, and failed decoding, a wrong row count from `one` or
+`optional` among it, uses `DecodeError`. `DatabaseError` exposes optional `sqlstate`, `message`,
+`severity` and the diagnostic fields `detail`, `hint`, `schema`, `table`,
+`column`, `datatype` and `constraint`. Server errors populate these fields; a
+`DatabaseError` raised without the server's answer leaves them as `None`. Use
+`str(error)` for the exception text in either case.
 
 A constraint violation raises a subclass of `DatabaseError` named for it:
 `UniqueViolationError` (`23505`), `ForeignKeyViolationError` (`23503`),

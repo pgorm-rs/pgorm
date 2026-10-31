@@ -51,8 +51,8 @@ impl Registry {
     /// Register an entity's real `EntityTrait`, model, columns and
     /// ActiveModel under `name`. A name or a Rust type registered twice is
     /// refused, and nothing is added.
-    // [spec:pgorm:req:bindings.entities]
-    // [spec:pgorm:req:napi.application+1]
+    // [spec:pgorm:req:bindings.entities+2]
+    // [spec:pgorm:req:napi.application+2]
     pub fn entity<E>(&mut self, name: &str) -> Result<&mut Self, RegistrationError>
     where
         E: EntityTrait + Send + Sync + 'static,
@@ -171,7 +171,7 @@ mod tests {
         impl ActiveModelBehavior for ActiveModel {}
     }
 
-    // [spec:pgorm:req:bindings.entities/test]    a name or a Rust entity registered
+    // [spec:pgorm:req:bindings.entities+2/test]    a name or a Rust entity registered
     // twice, a name out of bounds and a graph of an unregistered entity are each
     // refused, and nothing is added
     #[test]

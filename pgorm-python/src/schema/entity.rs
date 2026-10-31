@@ -2,11 +2,11 @@ use super::{
     PyCreateIndex, PyCreateTable, PyCreateType,
     statement::{PyDDL, Statement},
 };
-use crate::{UnsupportedCapabilityError, entities::PyEntity, errors::ConstructionError};
+use crate::{entities::PyEntity, errors::ConstructionError};
 use pgorm::pgorm_query::{
     CommentStatement, IndexCreateStatement, TableCreateStatement, extension::TypeCreateStatement,
 };
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 /// A detached result of Rust's Schema methods for a compiled entity: each
 /// read gives new statement objects over the statements pgorm wrote.
@@ -65,7 +65,7 @@ impl PyEntitySchema {
 #[pyfunction]
 pub(super) fn schema_from_entity(entity: &Bound<'_, PyAny>) -> PyResult<PyEntitySchema> {
     let entity = entity.extract::<PyRef<'_, PyEntity>>().map_err(|_| {
-        UnsupportedCapabilityError::new_err("schema.from_entity requires a registered native Entity; runtime models use explicit DDL builders")
+        PyTypeError::new_err("schema.from_entity requires a registered native Entity; runtime models use explicit DDL builders")
     })?;
     entity
         .backend

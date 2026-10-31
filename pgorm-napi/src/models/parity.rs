@@ -476,7 +476,7 @@ fn cursors() -> Vec<(&'static str, (String, Values))> {
     ]
 }
 
-// [spec:pgorm:req:bindings.models/test]
+// [spec:pgorm:req:bindings.models+2/test]
 // [spec:pgorm:req:bindings.model-reads/test]
 // [spec:pgorm:req:bindings.model-writes/test]
 // [spec:pgorm:req:bindings.relations/test]

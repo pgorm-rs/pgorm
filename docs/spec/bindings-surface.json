@@ -33,7 +33,7 @@
       "EntityInsert": ["on_conflict", "returning_upsert"],
       "EntityQuery": ["all", "inspect", "limit", "offset", "one", "optional", "order_by", "where"],
       "EntityUpdate": ["returning_change"],
-      "EntityUpdateMany": ["returning_changes", "set", "where"],
+      "EntityUpdateMany": ["all_rows", "returning_changes", "set", "where"],
       "ExclusionViolationError": [],
       "Expr": ["add", "adjacent_to", "and", "as", "asc", "at", "between", "cast", "collate", "concat", "contained_by", "contains", "contains_text", "desc", "div", "ends_with", "eq", "gt", "gte", "ilike", "inspect", "iregex", "is_distinct_from", "is_in", "is_not_distinct_from", "is_not_in", "is_not_null", "is_null", "like", "lt", "lte", "matches", "mod", "mul", "ne", "not", "not_between", "not_extend_left_of", "not_extend_right_of", "not_ilike", "not_iregex", "not_like", "not_regex", "not_similar_to", "or", "over", "overlaps", "path_exists", "regex", "similar_to", "slice", "starts_with", "strictly_left_of", "strictly_right_of", "sub"],
       "ExtendedWindow": ["frame", "order_by"],
@@ -99,10 +99,12 @@
       "connect": null,
       "delete": null,
       "domain_value": null,
+      "entities": null,
       "entity": null,
       "exists": null,
       "format_json": null,
       "graph": null,
+      "graphs": null,
       "insert": null,
       "is_json": null,
       "is_not_json": null,
@@ -213,6 +215,7 @@
       "rank_dense": null,
       "row_number": null,
       "source": null,
+      "source_tuples": null,
       "sources": null,
       "stddev": null,
       "sum": null,
@@ -221,10 +224,7 @@
     }
   },
   "questions": {
-    "literal": "Both bindings' statements and pipelines write a value into the SQL through literal() and bind every other operand, as the operator decided on 2026-10-30, except Python's pipeline, which still reads a plain operand as a literal, with null() as literal(None), until python-binding-decisions makes it bind.",
-    "shapes": "One feature offered through differently shaped API: grouping elements, table functions, conflict arbiters, MERGE actions, LIKE patterns, the identifier wrapper, model writes, registered inserts, a model or registered column's helpers and a pipeline's own terminals.",
-    "capabilities": "Python publishes a capability manifest (capabilities(), require_capability(), UnsupportedCapabilityError) and Value.snapshot() for the generated campaign; JavaScript lists registrations with entities(), graphs() and sourceTuples().",
-    "update-many-guard": "JavaScript's registered update_many() needs where or all_rows() before it runs; Python's updates every row when it has no filter."
+    "shapes": "One feature offered through differently shaped API: grouping elements, table functions, conflict arbiters, MERGE actions, LIKE patterns, the identifier wrapper, model writes, registered inserts, a model or registered column's helpers and a pipeline's own terminals."
   },
   "python": {
     "modules": {
@@ -283,7 +283,12 @@
       "pgorm.CancelledError": "asyncio's own CancelledError, re-exported (python.cancellation)",
       "pgorm.ModelColumn.expr": "a declared column's plain expression, its operators binding as an Expr's do rather than through the declared kind, which the generated campaign's model.column and entity.column operations read (python.expressions)",
       "pgorm.EntityColumn.expr": "a declared column's plain expression, its operators binding as an Expr's do rather than through the declared kind, which the generated campaign's model.column and entity.column operations read (python.expressions)",
-      "pgorm.__pgorm_version__": "the pgorm identity python.package requires the module to expose"
+      "pgorm.__pgorm_version__": "the pgorm identity python.package requires the module to expose",
+      "pgorm.capabilities": "the capability manifest the generated campaign reads, a Python-only surface the operator settled on 2026-10-30 (python.capabilities)",
+      "pgorm.require_capability": "the capability manifest's check, a Python-only surface for the generated campaign the operator settled on 2026-10-30 (python.capabilities)",
+      "pgorm.UnsupportedCapabilityError": "the error an operation outside the capability manifest raises, a Python-only surface for the generated campaign the operator settled on 2026-10-30 (python.capabilities)",
+      "pgorm.Value.snapshot": "a value serialized for the generated campaign, a Python-only surface the operator settled on 2026-10-30 (python.value-tags)",
+      "pipeline.null": "literal(None) under a name of its own, which JavaScript cannot give a function since null is a reserved word there; JavaScript writes literal(null)"
     },
     "gaps": {
       "pgorm.CaseOperand": "python-case-expressions",
@@ -304,11 +309,6 @@
       "pgorm.Conflict.on_constraint": "python-statement-gaps"
     },
     "undecided": {
-      "pipeline.null": {"question": "literal"},
-      "pgorm.capabilities": {"question": "capabilities"},
-      "pgorm.require_capability": {"question": "capabilities"},
-      "pgorm.UnsupportedCapabilityError": {"question": "capabilities"},
-      "pgorm.Value.snapshot": {"question": "capabilities"},
       "pgorm.Identifier": {"question": "shapes"},
       "pgorm.LikePattern": {"question": "shapes"},
       "pgorm.TableFunction": {"question": "shapes"},
@@ -386,11 +386,7 @@
       "pgorm.rollup": {"question": "shapes"},
       "pgorm.tableFunction": {"question": "shapes"},
       "pgorm.Conflict.on": {"question": "shapes"},
-      "pgorm.EntityInsert.returningUpserts": {"question": "shapes"},
-      "pgorm.entities": {"question": "capabilities"},
-      "pgorm.graphs": {"question": "capabilities"},
-      "pipeline.sourceTuples": {"question": "capabilities"},
-      "pgorm.EntityUpdateMany.allRows": {"question": "update-many-guard"}
+      "pgorm.EntityInsert.returningUpserts": {"question": "shapes"}
     }
   }
 }

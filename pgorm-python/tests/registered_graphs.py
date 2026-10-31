@@ -57,6 +57,7 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(manifest["graph_policy"]["source_arities"], list(range(1, 8)))
         graphs = {graph["name"]: graph for graph in manifest["registrations"]["graphs"]}
         self.assertEqual(len(graphs), 12)
+        self.assertEqual(p.graphs(), sorted(graphs))
         self.assertEqual([source["slot"] for source in graphs["app.MixedNotes"]["sources"]], ["root", "Req", "Opt"])
         self.assertEqual(graphs["app.AccountNotes"]["terminals"], ["all", "optional", "cursor.all"])
         self.assertEqual(graphs["app.AccountNotes"]["sources"][1]["entity"], "app.Note")
@@ -144,12 +145,18 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
         for capability in ("graph.stream", "graph.cursor.inspect", "graph.cursor_by_on"):
             with self.assertRaises(p.UnsupportedCapabilityError):
                 p.require_capability(capability)
-        for aliases in ([], ["one", "two"], ["accounts"], [""], ["nul\0"], "one"):
+        for aliases in ([], ["one", "two"], ["accounts"], [""], ["nul\0"]):
             with self.subTest(aliases=aliases), self.assertRaises(p.ConstructionError):
                 self.graph.find(aliases=aliases)
+        for aliases in ("one", 1):
+            with self.subTest(aliases=aliases), self.assertRaises(TypeError):
+                self.graph.find(aliases=aliases)
         query = self.graph.find()
-        for source in (True, -1, 2, 1.5):
+        for source in (-1, 2):
             with self.subTest(source=source), self.assertRaises(p.ConstructionError):
+                query.col(source, "id")
+        for source in (True, 1.5):
+            with self.subTest(source=source), self.assertRaises(TypeError):
                 query.col(source, "id")
         with self.assertRaises(p.ConstructionError):
             query.col(0, "missing")
@@ -160,8 +167,10 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
         for value in (True, 2**31, "one"):
             with self.assertRaises(p.ConstructionError):
                 cursor.after(value)
-        for value in (True, -1, None):
-            with self.assertRaises(p.ConstructionError):
+        with self.assertRaises(p.ConstructionError):
+            cursor.first(-1)
+        for value in (True, None, 1.5):
+            with self.assertRaises(TypeError):
                 cursor.first(value)
         for value in (query, cursor):
             with self.assertRaises(p.ConstructionError):

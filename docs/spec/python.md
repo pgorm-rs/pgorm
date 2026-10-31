@@ -60,18 +60,21 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > Distribution-name availability and the chosen ABI policy MUST be established
 > before release; this specification does not assert a reserved registry name.
 
-> [spec:pgorm:req:python.capabilities+1]
+> [spec:pgorm:req:python.capabilities+2]
 > A versioned capability manifest, `capabilities()`, MUST enumerate supported
 > operations, value types, result forms, feature requirements, corresponding
 > Rust APIs and compiled entity, graph and source-tuple registrations, keeping
 > runtime DDL construction apart from schema generation for a registered
 > entity. `require_capability(name)` and every operation outside the manifest
 > MUST fail explicitly with `UnsupportedCapabilityError` before execution, as
-> does a model column of a kind the native record decoder does not offer.
+> does a model column of a kind the native record decoder does not offer. An
+> operation outside the manifest is a value the build has nothing for, so
+> `UnsupportedCapabilityError` is a `ConstructionError` (`bindings.errors`),
+> and a shared rule's `ConstructionError` holds of it.
 
 ## Values
 
-> [spec:pgorm:req:python.values+6]
+> [spec:pgorm:req:python.values+7]
 > The kinds `bindings.values` names MUST cross as these Python types: `bool`;
 > `int` for every integer kind, held to its kind's range; `float` for `f32`
 > and `f64`, signed zero and the non-finite values included; `str` for `text`
@@ -82,13 +85,15 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > enum's label, `ipnetwork` and `mac_address`; and `list` for an array.
 >
 > A plain Python value is inferred as the one kind its type leaves: `bool` as
-> `bool` — never the integer path — `int` as `i64`, `float` as `f64`, `str`
-> as `text`, `bytes`, a naive `datetime` as `datetime`, `date`, `time`,
-> `Decimal`, `UUID` and `Interval` as their kinds. An aware `datetime`, a
-> `list`, a `tuple`, a `dict`, `None` and anything else MUST raise
-> `ConstructionError` asking for an explicit kind; integer overflow is an
-> explicit error. A temporal value keeps its declared timezone policy and
-> precision or is refused.
+> `bool` — never the integer path — `int` as `i64`, `float` as `f64`, `str` as
+> `text`, `bytes`, a naive `datetime` as `datetime`, `date`, `time`,
+> `Decimal`, `UUID` and `Interval` as their kinds, a `dict` as `json`, and a
+> `list` as an array of the one kind its items other than `None` infer as,
+> each `None` an SQL NULL element. An empty or all-`None` list, a list of
+> several kinds or of lists, a `tuple`, which reads as a row, an aware
+> `datetime`, `None` and anything else MUST raise `ConstructionError` asking
+> for an explicit kind; integer overflow is an explicit error. A temporal
+> value keeps its declared timezone policy and precision or is refused.
 >
 > A range is `pgorm.Range(lower, upper, bounds="[)")` or
 > `pgorm.Range.empty()`, and a multirange `pgorm.Multirange(ranges)`:
@@ -109,13 +114,6 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > bound) and its brackets; and a created range with its name, schema and
 > subtype beside its text.
 
-> [spec:pgorm:req:python.input-boundaries+1]
-> Literal-value and binder-value paths MUST remain separately expressible; the
-> binding MUST NOT replace one with the other. `pgorm.literal(value)` writes a
-> value into the statement's SQL text as pgorm-query writes a constant,
-> converted as `Value(value)` converts it, while `bind(value)` and a plain
-> operand bind it (`bindings.expressions`).
-
 > [spec:pgorm:req:python.records]
 > A statement's rows MUST be `Record`s: read-only mappings from column name to
 > value, in column order, whose `fields` describe each column (`Field`: its
@@ -127,21 +125,6 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > `tagged(column)` are the entity operations on the record. A change is a
 > `Change` of `old` and `new`, an upsert an `Upserted` that is `Inserted` or
 > `Updated`, and a notification a `Notification`.
-
-> [spec:pgorm:req:python.row-count+2]
-> `one` finding no row or several, `optional` finding several, and the `one`
-> and `optional` of model, entity, graph and pipeline queries finding a count
-> they do not take MUST raise `DatabaseError` with no SQLSTATE.
-
-> [spec:pgorm:req:python.argument-errors]
-> A value that cannot become what pgorm sends, and an argument a builder
-> cannot use, MUST raise `ConstructionError`: a COPY source or row that is
-> text, bytes or no iterable, a statement of another format given to
-> `copy_in_rows` or `copy_out_rows`, and a listener capacity that is not a
-> positive `int`. A keyword the call does not take is Python's own
-> `TypeError`, and so is a set operation's other operand that is not a
-> `Select`, and a WINDOW entry that is neither a `Window` nor an
-> `ExtendedWindow`.
 
 ## Expressions and statements
 
@@ -183,13 +166,10 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > Neither API may be an implicit fallback for unsupported builder operations.
 > Campaign-generated protected queries MUST obey their stricter raw-slot rules.
 
-> [spec:pgorm:req:python.pipeline-operands+2]
-> In `pgorm.pipeline`, a plain scalar operand — `None`, a `bool`, an `int`, a
-> finite `float`, a `str` — MUST be written into the SQL as a literal, as
-> `literal(value)` writes it, and `null()` is `literal(None)`. A value enters
-> as a parameter only through a stage's binder (`bindings.pipeline-binder`).
-> A pipeline's `all`, `one` and `optional` run it on a connection or a
-> transaction, as the terminals do.
+> [spec:pgorm:req:python.pipeline]
+> A pipeline's `all`, `one` and `optional` MUST run it on a connection or a
+> transaction, as the terminals do, and `pgorm.pipeline.null()` is
+> `literal(None)` under a name of its own.
 
 ## Execution and lifecycle
 
@@ -202,10 +182,11 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > other unsupported cross-owner use, MUST raise `LifecycleError` rather than
 > deadlock or panic.
 
-> [spec:pgorm:req:python.lifecycle+2]
-> `Pool(dsn, *, tls, cafile, max_size, connect_timeout, acquire_timeout,
+> [spec:pgorm:req:python.lifecycle+3]
+> `Pool(dsn, *, tls, ca, cafile, max_size, connect_timeout, acquire_timeout,
 > statement_cache_size, recycle, statement_cache_channel)` builds a pool,
-> `cafile` naming a PEM file to trust and the timeouts given in seconds, and
+> `ca` the PEM certificates to trust as a `str` or `bytes`, `cafile` naming a
+> PEM file to read them from, never both, and the timeouts given in seconds;
 > `await connect(dsn, **options)` gives one whose server answered. A pool, a
 > connection and every stream MUST be closable by `await close()` (`aclose()`
 > on a stream or listener) and MUST be asynchronous context managers that

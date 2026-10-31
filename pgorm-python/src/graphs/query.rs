@@ -8,6 +8,7 @@ use crate::{
 };
 use pgorm::pgorm_query::{Expr, IntoCondition, Name};
 use pyo3::{
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyInt, PyTuple},
 };
@@ -27,7 +28,7 @@ impl PyEntityGraphQuery {
 
     fn col(&self, source: &Bound<'_, PyAny>, column: &str) -> PyResult<PyExpr> {
         if !source.is_exact_instance_of::<PyInt>() {
-            return Err(ConstructionError::new_err(
+            return Err(PyTypeError::new_err(
                 "graph source index requires an integer",
             ));
         }
@@ -60,7 +61,7 @@ impl PyEntityGraphQuery {
         } else if let Ok(expr) = predicate.extract::<PyRef<'_, PyExpr>>() {
             expr.inner.clone().into_condition()
         } else {
-            return Err(ConstructionError::new_err(
+            return Err(PyTypeError::new_err(
                 "graph filters require an Expr or Condition",
             ));
         };
@@ -73,9 +74,9 @@ impl PyEntityGraphQuery {
     fn order_by(&self, ordering: &Bound<'_, PyTuple>) -> PyResult<Self> {
         let mut inner = self.inner.clone();
         for order in ordering {
-            let order = order.extract::<PyRef<'_, OrderBy>>().map_err(|_| {
-                ConstructionError::new_err("order_by requires typed OrderBy values")
-            })?;
+            let order = order
+                .extract::<PyRef<'_, OrderBy>>()
+                .map_err(|_| PyTypeError::new_err("order_by requires typed OrderBy values"))?;
             inner = inner.change(Change::Order(
                 order.expr.inner.clone(),
                 order.direction.rust_order(),
@@ -90,7 +91,7 @@ impl PyEntityGraphQuery {
         let optional = match terminal {
             "all" => false,
             "optional" => true,
-            _ => return Err(ConstructionError::new_err("unknown graph terminal")),
+            _ => return Err(PyTypeError::new_err("unknown graph terminal")),
         };
         let (sql, values) = self.inner.compile(optional);
         if values.0.len() > 65535 {

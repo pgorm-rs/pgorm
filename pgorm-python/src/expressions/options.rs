@@ -1,5 +1,5 @@
 use pgorm::pgorm_query::LikeExpr;
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use super::{PyExpr, construct::require_expr};
 use crate::{
@@ -22,7 +22,7 @@ impl LikePattern {
     fn new(pattern: &Bound<'_, PyAny>, escape: Option<&Bound<'_, PyAny>>) -> PyResult<Self> {
         let pattern: String = pattern
             .extract()
-            .map_err(|_| ConstructionError::new_err("LIKE pattern requires a string"))?;
+            .map_err(|_| PyTypeError::new_err("LIKE pattern requires a string"))?;
         let mut inner = LikeExpr::new(pattern);
         if let Some(escape) = escape {
             let refused = || {
@@ -30,7 +30,9 @@ impl LikePattern {
                     "LIKE escape requires one Unicode scalar, or an empty string to turn escaping off",
                 )
             };
-            let escape: String = escape.extract().map_err(|_| refused())?;
+            let escape: String = escape
+                .extract()
+                .map_err(|_| PyTypeError::new_err("LIKE escape requires a string"))?;
             let mut chars = escape.chars();
             inner = match (chars.next(), chars.next()) {
                 (None, _) => inner.no_escape(),
@@ -110,5 +112,5 @@ pub(super) fn pattern(value: &Bound<'_, PyAny>) -> PyResult<LikeExpr> {
     value
         .extract::<PyRef<'_, LikePattern>>()
         .map(|value| value.inner.clone())
-        .map_err(|_| ConstructionError::new_err("use LikePattern to select SQL pattern semantics"))
+        .map_err(|_| PyTypeError::new_err("use LikePattern to select SQL pattern semantics"))
 }

@@ -5,7 +5,7 @@
  */
 
 // [spec:pgorm:req:napi.typing+1]
-// [spec:pgorm:req:bindings.select]
+// [spec:pgorm:req:bindings.select+2]
 // [spec:pgorm:req:bindings.from-subqueries]
 // [spec:pgorm:req:bindings.row-locks]
 // [spec:pgorm:req:bindings.with]

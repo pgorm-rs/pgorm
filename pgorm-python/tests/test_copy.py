@@ -48,21 +48,28 @@ class CopyStatements(unittest.TestCase):
             (lambda: p.CopyTo(t, "csv").force_null("id"), "COPY FROM"),
             (lambda: p.CopyTo(t, "csv").columns("id"), "Select"),
             (lambda: p.CopyTo(t, "csv").where(p.col("id") > 1), "Select"),
-            (lambda: p.CopyFrom(t, "yaml"), "format"),
             (lambda: p.CopyFrom(t, "csv").delimiter("ab"), "one-character"),
             (lambda: p.CopyFrom(t, "csv").quote(""), "one-character"),
             (lambda: p.CopyFrom(t, "csv").null_string("a\0b"), "NUL"),
-            (lambda: p.CopyFrom(t, "csv").encoding(8), "string"),
             (lambda: p.CopyFrom(t, "csv").on_error_ignore(reject_limit=0), "reject_limit"),
-            (lambda: p.CopyFrom(t, "csv").on_error_ignore(reject_limit=True), "reject_limit"),
-            (lambda: p.CopyFrom(t, "csv").on_error_ignore(log_verbosity="loud"), "log_verbosity"),
             (lambda: p.CopyFrom(t, "csv").columns("id", "id"), "duplicate"),
             (lambda: p.CopyFrom(t.as_("x"), "csv"), "alias"),
-            (lambda: p.CopyTo(p.RawSQL("SELECT 1"), "csv"), "Select"),
             (lambda: p.CopyTo(p.update(t).set("id", 1), "csv"), "where"),
         ]
         for build, reason in refusals:
             with self.subTest(reason=reason), self.assertRaises(p.ConstructionError) as caught:
+                build()
+            self.assertIn(reason, str(caught.exception))
+        mistyped = [
+            (lambda: p.CopyFrom(t, "yaml"), "format"),
+            (lambda: p.CopyFrom(t, "csv").encoding(8), "string"),
+            (lambda: p.CopyFrom(t, "csv").delimiter(1), "string"),
+            (lambda: p.CopyFrom(t, "csv").on_error_ignore(reject_limit=True), "reject_limit"),
+            (lambda: p.CopyFrom(t, "csv").on_error_ignore(log_verbosity="loud"), "log_verbosity"),
+            (lambda: p.CopyTo(p.RawSQL("SELECT 1"), "csv"), "Select"),
+        ]
+        for build, reason in mistyped:
+            with self.subTest(reason=reason), self.assertRaises(TypeError) as caught:
                 build()
             self.assertIn(reason, str(caught.exception))
 
@@ -208,7 +215,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(await connection.ping())
 
     # [spec:pgorm:req:bindings.copy/test]    a raising source aborts and the connection stays usable
-    # [spec:pgorm:req:python.argument-errors/test]
+    # [spec:pgorm:req:bindings.argument-errors/test]
     async def test_raising_source_aborts_and_keeps_connection(self):
         marker = ValueError("source failed")
 
@@ -227,12 +234,12 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
                 await connection.copy_in(statement, failing())
             self.assertIs(caught.exception, marker)
             self.assertEqual(await self.stored(connection), [])
-            with self.assertRaises(p.ConstructionError):
+            with self.assertRaises(TypeError):
                 await connection.copy_in(statement, bad_item())
             for invalid in ("1\tone\n", 7, None):
-                with self.assertRaises(p.ConstructionError):
+                with self.assertRaises(TypeError):
                     await connection.copy_in(statement, invalid)
-            with self.assertRaises(p.ConstructionError):
+            with self.assertRaises(TypeError):
                 await connection.execute(statement)
             self.assertEqual(await self.stored(connection), [])
             self.assertEqual(await connection.copy_in(statement, [b"9\tnine\n"]), 1)
@@ -612,6 +619,7 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
             bool(stream)
 
     # [spec:pgorm:req:bindings.copy-rows/test]    a row of the wrong width or type raises a construction error that aborts the COPY
+    # [spec:pgorm:req:bindings.argument-errors/test]
     async def test_wrong_width_or_type_aborts_copy(self):
         copy = p.CopyFrom(self.rows, "binary").columns("id", "name")
         refusals = [
@@ -619,19 +627,21 @@ class CopyRows(unittest.IsolatedAsyncioTestCase):
             ([[1, "one", 3]], "3 values for the COPY's 2 columns"),
             ([["one", "one"]], "COPY column `id` of type `int4`"),
             ([[1, Decimal("1.5")]], "COPY column `name` of type `text`"),
-            ([[1, "a"], "bc"], "sequence"),
-            ([[1, "a"], 5], "sequence"),
         ]
         for rows, reason in refusals:
             with self.subTest(reason=reason), self.assertRaises(p.ConstructionError) as caught:
                 await self.pool.copy_in_rows(copy, rows)
             self.assertIn(reason, str(caught.exception))
+        for rows in ([[1, "a"], "bc"], [[1, "a"], 5]):
+            with self.subTest(rows=rows), self.assertRaises(TypeError) as caught:
+                await self.pool.copy_in_rows(copy, rows)
+            self.assertIn("sequence", str(caught.exception))
         for source in ("rows", b"rows", 5):
-            with self.subTest(source=source), self.assertRaises(p.ConstructionError):
+            with self.subTest(source=source), self.assertRaises(TypeError):
                 await self.pool.copy_in_rows(copy, source)
-        with self.assertRaisesRegex(p.ConstructionError, "binary"):
+        with self.assertRaisesRegex(TypeError, "binary"):
             await self.pool.copy_in_rows(p.CopyFrom(self.rows, "text"), [[1, "a"]])
-        with self.assertRaisesRegex(p.ConstructionError, "binary"):
+        with self.assertRaisesRegex(TypeError, "binary"):
             await self.pool.copy_out_rows(p.CopyTo(self.rows, "csv"))
         count = await self.pool.one(p.RawSQL("SELECT count(*) AS n FROM python_copy_rows"))
         self.assertEqual(count["n"], 0)

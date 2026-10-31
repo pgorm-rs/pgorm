@@ -29,7 +29,9 @@ pub mod values;
 use pyo3::prelude::*;
 
 pyo3::create_exception!(pgorm, PgormError, pyo3::exceptions::PyException);
-pyo3::create_exception!(pgorm, UnsupportedCapabilityError, PgormError);
+// An operation outside the capability manifest is an argument the build has
+// nothing for, so it is the ConstructionError the shared rules name too.
+pyo3::create_exception!(pgorm, UnsupportedCapabilityError, errors::ConstructionError);
 
 // [spec:pgorm:def:bindings.api]
 // [spec:pgorm:def:python.api+1]
@@ -45,7 +47,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
 /// Install the shared Python API and a concrete application registry into one
 /// native module. Downstream crates disable `standalone-module` and export
 /// their own PyO3 initializer calling this function.
-// [spec:pgorm:req:bindings.entities]
+// [spec:pgorm:req:bindings.entities+2]
 pub fn install(module: &Bound<'_, PyModule>, registry: entities::Registry) -> PyResult<()> {
     if module.hasattr("_registry")? {
         return Err(errors::ConstructionError::new_err(

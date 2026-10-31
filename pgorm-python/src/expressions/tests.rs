@@ -35,7 +35,7 @@ fn parity(
 }
 
 // [spec:pgorm:req:bindings.delegation/test]
-// [spec:pgorm:req:bindings.expressions/test]
+// [spec:pgorm:req:bindings.expressions+2/test]
 #[test]
 fn expression_structure_matches_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -99,7 +99,7 @@ fn expression_structure_matches_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.identifiers/test]
+// [spec:pgorm:req:bindings.identifiers+2/test]
 #[test]
 fn qualified_casts_preserve_source_typed_parameters() -> PyResult<()> {
     Python::initialize();
@@ -129,7 +129,7 @@ fn qualified_casts_preserve_source_typed_parameters() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.expressions/test]
+// [spec:pgorm:req:bindings.expressions+2/test]
 #[test]
 fn substring_and_pattern_paths_use_rust_functions() -> PyResult<()> {
     Python::initialize();
@@ -178,7 +178,7 @@ fn substring_and_pattern_paths_use_rust_functions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.expressions/test]    each comparison, concatenation,
+// [spec:pgorm:req:bindings.expressions+2/test]    each comparison, concatenation,
 // [spec:pgorm:req:bindings.ranges/test]
 // regular-expression, containment, range position and document search method is the BinOper or
 // Rust method of its meaning, its operand bound unless it is an expression, the path bound as text
@@ -257,7 +257,7 @@ fn operator_methods_are_their_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.expressions/test]    at is Rust's Expr::index and slice its
+// [spec:pgorm:req:bindings.expressions+2/test]    at is Rust's Expr::index and slice its
 // Subscript::Slice, each bound unless it is an expression, None leaving a slice's end open
 #[test]
 fn subscripts_are_rust_index_and_slice() -> PyResult<()> {
@@ -292,7 +292,7 @@ fn subscripts_are_rust_index_and_slice() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.expressions/test]
+// [spec:pgorm:req:bindings.expressions+2/test]
 #[test]
 fn function_calls_use_named_rust_constructors() -> PyResult<()> {
     Python::initialize();
@@ -351,7 +351,7 @@ fn function_calls_use_named_rust_constructors() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.expressions/test]
+// [spec:pgorm:req:bindings.expressions+2/test]
 // [spec:pgorm:req:bindings.statements/test]
 #[test]
 fn conditions_keep_rust_empty_and_grouping_semantics() -> PyResult<()> {
@@ -389,7 +389,7 @@ fn conditions_keep_rust_empty_and_grouping_semantics() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.expressions/test]
+// [spec:pgorm:req:bindings.expressions+2/test]
 // [spec:pgorm:req:sql.ast.expr.similar-to+1/test]    both forms through LikePattern, its
 // ESCAPE carried, and a plain string refused as LIKE's is
 #[test]
@@ -413,12 +413,12 @@ fn similar_to_takes_like_patterns() -> PyResult<()> {
         let error = py
             .eval(c"p.col('text').similar_to('a%')", Some(&globals), None)
             .expect_err("a plain string is not a pattern");
-        assert!(error.is_instance_of::<crate::errors::ConstructionError>(py));
+        assert!(error.is_instance_of::<pyo3::exceptions::PyTypeError>(py));
         Ok(())
     })
 }
 
-// [spec:pgorm:req:bindings.expressions/test]
+// [spec:pgorm:req:bindings.expressions+2/test]
 // [spec:pgorm:req:sql.ast.select.table-function+2/test]    `call` reaches the set-returning
 // constructors at their arities, and no other
 #[test]
@@ -498,7 +498,6 @@ fn collations_lower_into_rust_collate() -> PyResult<()> {
         for source in [
             "p.col('name').collate('')",
             "p.col('name').collate('C', schema='')",
-            "p.col('name').collate(1)",
             "p.col('name').collate('雪' * 22)",
         ] {
             let error = py
@@ -509,6 +508,13 @@ fn collations_lower_into_rust_collate() -> PyResult<()> {
                 "{source}: {error}"
             );
         }
+        let error = py
+            .eval(c"p.col('name').collate(1)", Some(&globals), None)
+            .expect_err("a collation's name is a str");
+        assert!(
+            error.is_instance_of::<pyo3::exceptions::PyTypeError>(py),
+            "{error}"
+        );
         Ok(())
     })
 }

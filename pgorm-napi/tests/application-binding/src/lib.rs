@@ -20,7 +20,7 @@ use neon::prelude::*;
 use pgorm_napi::{RegistrationError, Registry};
 
 /// The application's registrations.
-// [spec:pgorm:req:bindings.entities/test]
+// [spec:pgorm:req:bindings.entities+2/test]
 pub fn registry() -> Result<Registry, RegistrationError> {
     let mut registry = Registry::default();
     registry.entity::<account::Entity>("app.Account")?;
@@ -33,7 +33,7 @@ pub fn registry() -> Result<Registry, RegistrationError> {
     Ok(registry)
 }
 
-// [spec:pgorm:req:napi.application+1/test]
+// [spec:pgorm:req:napi.application+2/test]
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     let registry = match registry() {
@@ -47,7 +47,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
 mod tests {
     use super::*;
 
-    // [spec:pgorm:req:bindings.entities/test]
+    // [spec:pgorm:req:bindings.entities+2/test]
     #[test]
     fn registry_refuses_duplicate_names_and_entities() -> Result<(), RegistrationError> {
         let mut registry = Registry::default();

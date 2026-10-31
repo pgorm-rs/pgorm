@@ -4,6 +4,7 @@ use pgorm::pgorm_query::{
     CopyBinary, CopyCsv, CopySource, CopyText, CopyToStatement, IntoCopySource, Values,
 };
 use pyo3::{
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyDict, PyTuple},
 };
@@ -97,7 +98,7 @@ impl PyCopyTo {
                 "a MERGE needs a WHEN arm before it can be copied",
             ));
         } else {
-            return Err(ConstructionError::new_err(
+            return Err(PyTypeError::new_err(
                 "COPY TO reads a Table or a Select, Insert, Update, Delete or Merge statement",
             ));
         };

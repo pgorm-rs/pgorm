@@ -3,7 +3,7 @@
 //! statement's text.
 
 use pgorm::pgorm_query::{Func, JsonValueType};
-use pyo3::{prelude::*, types::PyDict};
+use pyo3::{exceptions::PyTypeError, prelude::*, types::PyDict};
 
 use super::{
     column_type, input,
@@ -89,7 +89,7 @@ pub(crate) fn json_query(
         Some("with_conditional_wrapper") => json.with_conditional_wrapper(),
         Some("omit_quotes") => json.omit_quotes(),
         Some(_) => {
-            return Err(ConstructionError::new_err(
+            return Err(PyTypeError::new_err(
                 "shaping requires 'with_wrapper', 'with_conditional_wrapper' or 'omit_quotes'",
             ));
         }

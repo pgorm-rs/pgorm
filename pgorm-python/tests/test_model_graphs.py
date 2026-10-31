@@ -146,7 +146,7 @@ class ModelGraphs(unittest.IsolatedAsyncioTestCase):
             Post.belongs_to(Account, from_=["author_id", "id"], to="id")
         with self.assertRaisesRegex(p.ConstructionError, "no field 'author'"):
             Post.belongs_to(Account, from_="author", to="id")
-        with self.assertRaises(ValueError):
+        with self.assertRaises(p.ConstructionError):
             Post.belongs_to(Account, from_=[], to=[])
         with self.assertRaises(TypeError):
             Post.belongs_to(object(), from_="author_id", to="id")
@@ -240,7 +240,7 @@ class ModelGraphs(unittest.IsolatedAsyncioTestCase):
             cursor.after("Ann")
         with self.assertRaises(p.ConstructionError):
             cursor.after("Ann", "x")
-        with self.assertRaises(ValueError):
+        with self.assertRaises(p.ConstructionError):
             cursor.first(-1)
         with self.assertRaises(TypeError):
             cursor.first("2")
@@ -278,13 +278,13 @@ class ModelGraphs(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([row["title"] for _, row in await graph_pages.fetch_page(self.pool, 1)], ["b1"])
         self.assertEqual(await Account.graph().join_one(posts).count(self.pool), 3)
         self.assertEqual(await Account.find().limit(1).count(self.pool), 3)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(p.ConstructionError):
             Account.find().paginate(0)
         with self.assertRaises(TypeError):
             Account.find().paginate(2.0)
-        with self.assertRaisesRegex(ValueError, "past the offsets"):
+        with self.assertRaisesRegex(p.ConstructionError, "past the offsets"):
             paginator.inspect(2**62)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(p.ConstructionError):
             paginator.inspect(-1)
 
     # [spec:pgorm:req:bindings.model-reads/test]
@@ -303,7 +303,7 @@ class ModelGraphs(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([dict(row) for row in tagged], [{"title": "a1"}])
         with self.assertRaisesRegex(p.ConstructionError, "starts at post_tag, which the query does not read"):
             Account.find().join(tag_of)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             Post.find().join(author, kind=p.Join.Full)
         async with await Account.find().order_by(by_account).stream(self.pool) as rows:
             self.assertEqual([row["name"] async for row in rows], ["Ann", "Bob", "Cy"])
@@ -349,7 +349,7 @@ class ModelGraphs(unittest.IsolatedAsyncioTestCase):
             Account.update({"name": "x"}).all_rows().on_conflict(p.Conflict.do_nothing())
         with self.assertRaises(TypeError):
             Account.insert({"name": "x"}).on_conflict("nothing")
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             Account.insert({"name": "x"}).inspect(terminal="returning")
 
 

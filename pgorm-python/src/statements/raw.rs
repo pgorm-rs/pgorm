@@ -1,5 +1,6 @@
 use pgorm::pgorm_query::{Values, inject_parameters};
 use pyo3::{
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyList, PyTuple},
 };
@@ -31,7 +32,7 @@ impl RawSQL {
                 if !values.is_exact_instance_of::<PyList>()
                     && !values.is_exact_instance_of::<PyTuple>()
                 {
-                    return Err(ConstructionError::new_err(
+                    return Err(PyTypeError::new_err(
                         "raw parameters require a list or tuple",
                     ));
                 }

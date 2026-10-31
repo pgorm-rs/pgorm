@@ -27,7 +27,7 @@ def _rows(value: object, what: str) -> int:
     if type(value) is not int:
         raise TypeError(f"{what} is an int")
     if not 0 <= value <= ROWS_MAX:
-        raise ValueError(f"{what} is a non-negative int within bigint")
+        raise p.ConstructionError(f"{what} is a non-negative int within bigint")
     return value
 
 
@@ -182,12 +182,12 @@ class Paginator:
 
     def __post_init__(self) -> None:
         if _rows(self.page_size, "a page size") < 1:
-            raise ValueError("a page size is at least 1")
+            raise p.ConstructionError("a page size is at least 1")
 
     def _page(self, page: int) -> p.Select:
         offset = self.page_size * _rows(page, "a page number")
         if offset > ROWS_MAX:
-            raise ValueError(f"page {page} of {self.page_size} rows is past the offsets bigint holds")
+            raise p.ConstructionError(f"page {page} of {self.page_size} rows is past the offsets bigint holds")
         return self.pageable.page(self.page_size, offset)
 
     def inspect(self, page: int | str) -> p.Compiled:
@@ -196,7 +196,7 @@ class Paginator:
         if page == "count":
             return self.pageable.counted.inspect()
         if isinstance(page, str):
-            raise ValueError('a paginator inspects a page, or its "count"')
+            raise TypeError('a paginator inspects a page, or its "count"')
         return self._page(page).inspect()
 
     async def fetch_page(self, db: Database, page: int) -> list[Row]:

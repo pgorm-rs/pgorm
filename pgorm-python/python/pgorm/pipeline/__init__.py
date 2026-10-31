@@ -1,7 +1,8 @@
 """Compose pgorm's native PRQL-shaped pipeline stages without HTTP.
 
-Plain scalar operands are SQL literals. Use a ``*_with`` callback and its
-Binder for parameters. A callback's bound expressions cannot escape it.
+A plain operand is bound as a parameter by the stage that takes it; only
+``literal(value)`` writes a value into the SQL. A ``*_with`` callback's Binder
+mints placeholders to reuse within its stage, which cannot escape it.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from .._native import (
     pipeline_col as col,
     pipeline_case as case,
     pipeline_sources as sources,
+    pipeline_source_tuples as source_tuples,
 )
 from ..models import Model
 
@@ -40,6 +42,7 @@ def from_(value: SourceInput | Model) -> Pipeline:
     return Pipeline(value.table if isinstance(value, Model) else value)
 
 
+# [spec:pgorm:req:python.pipeline]
 def null() -> PipelineExpr:
     return literal(None)
 
@@ -126,6 +129,7 @@ __all__ = [
     "SourceSelection",
     "SelectedSources",
     "sources",
+    "source_tuples",
     "source",
     "from_",
     "literal",

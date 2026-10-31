@@ -134,8 +134,8 @@ pub(crate) fn check(file: &str, built: Vec<(&str, (String, Values))>) {
     }
 }
 
-// [spec:pgorm:req:bindings.select/test]
-// [spec:pgorm:req:bindings.expressions/test]
+// [spec:pgorm:req:bindings.select+2/test]
+// [spec:pgorm:req:bindings.expressions+2/test]
 #[test]
 fn select_family_matches_its_golden_file() {
     check(
@@ -187,9 +187,9 @@ fn window_and_range_family_matches_its_golden_file() {
 // [spec:pgorm:req:bindings.schema-indexes/test]
 // [spec:pgorm:req:bindings.schema-types/test]
 // [spec:pgorm:req:bindings.schema-sequences/test]
-// [spec:pgorm:req:bindings.schema-views/test]
+// [spec:pgorm:req:bindings.schema-views+2/test]
 // [spec:pgorm:req:bindings.schema-schemas/test]
-// [spec:pgorm:req:bindings.schema-domains/test]
+// [spec:pgorm:req:bindings.schema-domains+2/test]
 #[test]
 fn schema_family_matches_its_golden_file() {
     let mut cases = schema::cases();
@@ -198,7 +198,7 @@ fn schema_family_matches_its_golden_file() {
 }
 
 // [spec:pgorm:req:bindings.pipeline/test]
-// [spec:pgorm:req:bindings.pipeline-expressions/test]
+// [spec:pgorm:req:bindings.pipeline-expressions+2/test]
 // [spec:pgorm:req:bindings.pipeline-binder/test]
 #[test]
 fn pipeline_family_matches_its_golden_file() {

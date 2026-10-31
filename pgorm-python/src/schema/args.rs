@@ -3,10 +3,11 @@
 //! an option carries, a collation, a sequence's options and the text a label
 //! or comment is.
 //!
-//! An argument of the wrong Python type is a `TypeError`; a value of the
-//! right type that cannot become what pgorm writes — an empty list, a choice
-//! outside its set, an aliased `Table`, a label PostgreSQL cannot store — is
-//! a `ConstructionError`; and an integer outside `bigint` is a `ValueError`.
+//! An argument of the wrong Python type is a `TypeError`, a string outside
+//! a closed choice among them, since Python's typing spells the choice as a
+//! `Literal` of its strings; a value of the right type that cannot become what
+//! pgorm writes — an empty list, an aliased `Table`, a label PostgreSQL cannot
+//! store, an integer outside `bigint` — is a `ConstructionError`.
 
 use crate::{
     errors::ConstructionError, identifiers::PyIdentifier, statements::PyTable, values::PyTypeName,
@@ -16,7 +17,7 @@ use pgorm::pgorm_query::{
     SequenceOption, SequenceOptions, TableName, extension::TypeRef,
 };
 use pyo3::{
-    exceptions::{PyTypeError, PyValueError},
+    exceptions::PyTypeError,
     prelude::*,
     types::{PyBool, PyDict, PyInt, PyString},
 };
@@ -132,6 +133,7 @@ pub(super) fn type_refs(value: &Bound<'_, PyAny>) -> PyResult<(TypeRef, Vec<Type
 }
 
 /// `value`, a string that is one of `choices`, given as `(spelling, meaning)`.
+// [spec:pgorm:req:bindings.argument-errors]
 pub(super) fn pick<T: Clone>(value: &str, what: &str, choices: &[(&str, T)]) -> PyResult<T> {
     match choices.iter().find(|(spelling, _)| *spelling == value) {
         Some((_, meaning)) => Ok(meaning.clone()),
@@ -140,7 +142,7 @@ pub(super) fn pick<T: Clone>(value: &str, what: &str, choices: &[(&str, T)]) -> 
                 .iter()
                 .map(|(spelling, _)| format!("{spelling:?}"))
                 .collect();
-            Err(ConstructionError::new_err(format!(
+            Err(PyTypeError::new_err(format!(
                 "{what} is one of {}",
                 quoted.join(", ")
             )))
@@ -229,7 +231,7 @@ pub(super) fn integer(value: &Bound<'_, PyAny>, what: &str) -> PyResult<i64> {
     }
     value
         .extract::<i64>()
-        .map_err(|_| PyValueError::new_err(format!("{what} is outside PostgreSQL's bigint")))
+        .map_err(|_| ConstructionError::new_err(format!("{what} is outside PostgreSQL's bigint")))
 }
 
 const SEQUENCE_OPTIONS: &[&str] = &[

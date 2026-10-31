@@ -99,7 +99,7 @@ fn python_interval_is_the_rust_interval() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:python.values+6/test]
+// [spec:pgorm:req:python.values+7/test]
 #[test]
 fn rust_output_rejects_lost_temporal_precision() -> PyResult<()> {
     Python::initialize();

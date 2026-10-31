@@ -100,7 +100,7 @@ def versions(
     list, the old under ``o_`` and the new under ``n_``, and their sources."""
     kind = TERMINALS.get(terminal)
     if kind is None:
-        raise ValueError(f"a model write has no terminal {terminal!r}")
+        raise TypeError(f"a model write has no terminal {terminal!r}")
     statement = write.statement
     # An insert of no rows has no statement, and is still an insert.
     if (p.Insert if statement is None else type(statement)) is not kind:

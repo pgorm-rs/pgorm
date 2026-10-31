@@ -313,7 +313,7 @@ fn frame_clause(frame: &Bound<'_, PyAny>) -> PyResult<FrameClause> {
     } else if let Ok(start) = frame.extract::<PyRef<'_, PyFrameCurrentRow>>() {
         Ok(start.inner.clone().into())
     } else {
-        Err(ConstructionError::new_err(
+        Err(pyo3::exceptions::PyTypeError::new_err(
             "a window's frame requires a Frame, or a preceding or current-row start; \
              a following start needs an end",
         ))

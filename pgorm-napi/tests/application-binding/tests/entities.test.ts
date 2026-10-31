@@ -2,7 +2,7 @@
 // against a live server in either runtime: reads through `Select<E>`, writes
 // through `ActiveModelTrait` with the application's hooks, the terminals
 // that return a row's two versions, and registered graphs and their cursors.
-// [spec:pgorm:req:napi.application+1/test]
+// [spec:pgorm:req:napi.application+2/test]
 
 import assert from "node:assert/strict";
 import { after, before, beforeEach, test } from "node:test";
@@ -99,7 +99,7 @@ function refused(pattern: RegExp): (error: unknown) => true {
   };
 }
 
-// [spec:pgorm:req:bindings.entities/test]
+// [spec:pgorm:req:bindings.entities+2/test]
 // [spec:pgorm:req:bindings.relation-conditions/test]
 test("the module names its registrations and describes each, and refuses a name it does not register", () => {
   assert.deepStrictEqual(entities(), ["app.Account", "app.Membership", "app.Note", "app.Parcel", "app.Temper"]);
@@ -216,10 +216,10 @@ test("an ActiveModel holds each column's state, and its writes run the applicati
   assert.throws(() => Account.active().set("mood", "wild"), ConstructionError);
 });
 
-// [spec:pgorm:req:bindings.entities/test]    a registered entity whose columns are domains, over an
+// [spec:pgorm:req:bindings.entities+2/test]    a registered entity whose columns are domains, over an
 // integer, over an enum and an array of one over text, describes, reads, writes and compares
 // through them as through their base types
-// [spec:pgorm:req:bindings.schema-domains/test]    a domain column reports, binds and reads as the
+// [spec:pgorm:req:bindings.schema-domains+2/test]    a domain column reports, binds and reads as the
 // kind it is over, and a check refuses a value written to it as a CheckViolationError naming the
 // domain
 // [spec:pgorm:req:bindings.entity-reads+2/test]    a column whose domain is over an enum compares as
@@ -336,8 +336,8 @@ test("a record's model converts and copies as Rust's does, and belongs to its en
   assert.throws(() => Account.update(Note.active()), refused(/app.Note's, not app.Account's/));
 });
 
-// [spec:pgorm:req:bindings.entity-versions/test]
-// [spec:pgorm:req:napi.update-many-guard/test]
+// [spec:pgorm:req:bindings.entity-versions+2/test]
+// [spec:pgorm:req:bindings.entity-versions+2/test]
 test("the version terminals return each written row before and after, no hook running", async () => {
   await seed();
   const ann = await Account.find().where(Account.col("id").eq(1)).one(pool());
@@ -424,7 +424,7 @@ test("a registered graph's cursor pages by keyset, resuming inside a root's slot
   assert.throws(() => cursor.after("x"), ConstructionError);
 });
 
-// [spec:pgorm:req:bindings.entities/test]
+// [spec:pgorm:req:bindings.entities+2/test]
 // [spec:pgorm:req:bindings.registered-pools/test]
 test("an entity's operations run on a connection or a transaction, with a statement's refusals and aborts", async () => {
   await seed();

@@ -154,8 +154,9 @@ async def main():
 asyncio.run(main())
 ```
 
-TLS verifies certificates and hostnames against the PEM CA file passed as
-`cafile` when one is given, and otherwise against the roots the platform's
+TLS verifies certificates and hostnames against the PEM certificates passed as
+`ca` (a `str` or `bytes`), or read from the file `cafile` names, when one is
+given — never both — and otherwise against the roots the platform's
 certificate store trusts: on macOS the system roots and any certificate the
 user or an administrator has marked trusted in Keychain, on Windows the root
 certificate store, and on Linux and other Unix systems the CA bundle and
@@ -167,7 +168,7 @@ constructed, and a store holding no usable root certificate (a minimal
 container image without a CA bundle, or `SSL_CERT_FILE` naming a missing or
 empty file) raises `ConstructionError` there, naming what was wrong; it never
 yields a pool that trusts nothing, or one that skips verification. Pass
-`cafile` or install the host's CA bundle. Set `tls="disable"` or include
+`ca` or `cafile`, or install the host's CA bundle. Set `tls="disable"` or include
 `sslmode=disable` in the DSN for an explicitly plaintext connection. TLS
 verification never falls back to plaintext. Pool sizing, connect/acquisition
 deadlines, statement-cache bounds and verified/fast recycling are keyword

@@ -1,10 +1,10 @@
 use pgorm::pgorm_query::{ColumnRef, Expr, FromItem};
-use pyo3::prelude::*;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use super::table::PyTable;
 use crate::{errors::ConstructionError, expressions::PyExpr, identifiers::PyIdentifier};
 
-// [spec:pgorm:req:bindings.select]
+// [spec:pgorm:req:bindings.select+2]
 /// A FROM item that is not a plain named table, owned by Rust's `FromItem`.
 /// A value-producing item is always aliased, as PostgreSQL requires, so its
 /// columns are qualified by a name the caller chose; a sampled table is
@@ -58,7 +58,7 @@ pub(super) fn from_item(value: &Bound<'_, PyAny>) -> PyResult<FromItem> {
     } else if let Ok(item) = value.extract::<PyRef<'_, PyFromItem>>() {
         Ok(item.inner.clone())
     } else {
-        Err(ConstructionError::new_err(
+        Err(PyTypeError::new_err(
             "a FROM item requires a Table or FromItem",
         ))
     }

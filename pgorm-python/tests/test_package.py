@@ -6,6 +6,7 @@ import json
 import unittest
 
 import pgorm
+import pgorm.pipeline
 from pgorm import _native
 
 
@@ -25,7 +26,7 @@ class PackageTests(unittest.TestCase):
         self.assertEqual(manifest["transport"], "in-process")
         self.assertEqual(json.loads(json.dumps(manifest)), manifest)
 
-    # [spec:pgorm:req:python.capabilities+1/test]
+    # [spec:pgorm:req:python.capabilities+2/test]
     def test_capability_queries_are_isolated_and_fail_closed(self):
         manifest = pgorm.capabilities()
         manifest["operations"]["invented-operation"] = {"rust_api": "fake"}
@@ -42,10 +43,13 @@ class PackageTests(unittest.TestCase):
             self.assertNotIn("security/", str(path))
             self.assertNotIn("fixtures/", str(path))
 
-    # [spec:pgorm:req:bindings.entities/test]
+    # [spec:pgorm:req:bindings.entities+2/test]
     # [spec:pgorm:req:bindings.entity-graphs+2/test]
     def test_standalone_registry_has_no_application_entities(self):
         self.assertEqual(pgorm.capabilities()["registrations"]["entities"], [])
+        self.assertEqual(
+            (pgorm.entities(), pgorm.graphs(), pgorm.pipeline.source_tuples()), ([], [], [])
+        )
         with self.assertRaises(pgorm.UnsupportedCapabilityError):
             pgorm.entity("app.Account")
         self.assertEqual(pgorm.capabilities()["registrations"]["graphs"], [])

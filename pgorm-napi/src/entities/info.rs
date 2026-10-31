@@ -51,8 +51,8 @@ fn scalar(ty: &ColumnType) -> Option<ArrayType> {
 /// binding has no kind for, whose values a caller declares with `Value`. A
 /// domain's values travel as its base type's do, so a domain column is the
 /// kind of the type it is over.
-// [spec:pgorm:req:bindings.entities]
-// [spec:pgorm:req:bindings.schema-domains]
+// [spec:pgorm:req:bindings.entities+2]
+// [spec:pgorm:req:bindings.schema-domains+2]
 pub(crate) fn column_tag(ty: &ColumnType) -> Option<Tag> {
     let name =
         |name: &pgorm::pgorm_query::Name, schema: &Option<pgorm::pgorm_query::Name>| TypeName {
@@ -101,7 +101,7 @@ pub(crate) struct ColumnInfo {
 /// An enum column's labels, in declaration order, an array of one's and a
 /// domain over one included: what a generated declaration types its values
 /// as.
-// [spec:pgorm:req:bindings.schema-domains]
+// [spec:pgorm:req:bindings.schema-domains+2]
 fn labels(ty: &ColumnType) -> Option<Vec<String>> {
     use pgorm::pgorm_query::SqlName;
     match ty {
@@ -216,7 +216,7 @@ impl EntityInfo {
     }
 
     /// The registration as `describe()` gives it.
-    // [spec:pgorm:req:bindings.entities]
+    // [spec:pgorm:req:bindings.entities+2]
     pub(crate) fn describe(&self) -> Result<Json, Failure> {
         Ok(json!({
             "name": self.name,
@@ -241,7 +241,7 @@ impl EntityInfo {
 /// holds its foreign key's rows to. `onCondition` is present or absent only:
 /// it is a Rust closure over the two tables' aliases, which has no rendering
 /// of its own until a join supplies them.
-// [spec:pgorm:req:bindings.entities]
+// [spec:pgorm:req:bindings.entities+2]
 // [spec:pgorm:req:bindings.relation-conditions]
 fn relation_json(name: &str, def: &RelationDef) -> Json {
     json!({
@@ -316,7 +316,7 @@ mod tests {
         }
     }
 
-    // [spec:pgorm:req:bindings.entities/test]
+    // [spec:pgorm:req:bindings.entities+2/test]
     // [spec:pgorm:req:bindings.relation-conditions/test]
     #[test]
     fn join_condition_shape_is_reported() {
@@ -338,7 +338,7 @@ mod tests {
             .map(|tag| kind_key(tag).unwrap_or_else(|failure| panic!("{failure}")))
     }
 
-    // [spec:pgorm:req:bindings.entities/test]    each column type maps to the kind
+    // [spec:pgorm:req:bindings.entities+2/test]    each column type maps to the kind
     // a decoded column of it carries, so a registered column's values bind and
     // read as the binding's own; a type it has no kind for takes a `Value`
     #[test]
@@ -383,7 +383,7 @@ mod tests {
         );
     }
 
-    // [spec:pgorm:req:bindings.schema-domains/test]    a domain column is the kind
+    // [spec:pgorm:req:bindings.schema-domains+2/test]    a domain column is the kind
     // of the type it is over, through a domain over a domain, an array of one
     // and a domain over an enum, whose labels it carries
     #[test]

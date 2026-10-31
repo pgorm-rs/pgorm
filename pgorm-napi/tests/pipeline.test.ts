@@ -87,8 +87,8 @@ test("a pipeline's stages run as any statement does, through each terminal", asy
   assert.equal(await pool().transaction((tx) => tx.execute(base.select(id))), 6);
 });
 
-// [spec:pgorm:req:bindings.pipeline-expressions/test]
-// [spec:pgorm:req:napi.pipeline-operands+2/test]
+// [spec:pgorm:req:bindings.pipeline-expressions+2/test]
+// [spec:pgorm:req:bindings.operands/test]
 test("a value an operand is given is bound; only literal() writes one into the SQL", async () => {
   const awkward = "O'Brien; -- \\";
   const bound = base.filter(category.eq(awkward)).select(id);
@@ -109,7 +109,7 @@ test("a value an operand is given is bound; only literal() writes one into the S
   assert.deepStrictEqual(await pool().query(cast), [{ spelled: "5", negated: -5 }]);
 });
 
-// [spec:pgorm:req:bindings.pipeline-expressions/test]    a column whose domain is over an enum,
+// [spec:pgorm:req:bindings.pipeline-expressions+2/test]    a column whose domain is over an enum,
 // read with no registration, compares as the schema-qualified enum comparesAs names, bound, listed,
 // coalesced, through an alias and in max, where each left bare is refused with 42883
 test("a column whose domain is over an enum compares as the enum it is named as", async () => {
@@ -143,7 +143,7 @@ test("a column whose domain is over an enum compares as the enum it is named as"
   assert.throws(() => mood.comparesAs(5 as unknown as string), mistyped(/a TypeName/));
 });
 
-// [spec:pgorm:req:bindings.pipeline-expressions/test]
+// [spec:pgorm:req:bindings.pipeline-expressions+2/test]
 test("an interval binds in a pipeline as any value does", async () => {
   const span = new Interval({ months: 1, days: -2, microseconds: 3_000_004n });
   const selected = base.filter(id.eq(1)).selectWith((binder) => [
@@ -271,7 +271,7 @@ test("a placeholder used outside the stage its binder's function returns it to i
 });
 
 // [spec:pgorm:req:bindings.pipeline-binder/test]
-// [spec:pgorm:req:napi.argument-errors+2/test]
+// [spec:pgorm:req:bindings.argument-errors/test]
 test("shapes a pipeline cannot take are refused as they are built", () => {
   assert.throws(() => base.filterWith((async () => id.gt(1)) as never), TypeError);
   assert.throws(() => base.deriveWith((() => "column") as never), TypeError);

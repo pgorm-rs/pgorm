@@ -117,7 +117,7 @@ class ModelQuery:
             return self.statement.inspect()
         if terminal == "count":
             return p._model_count(self.statement).inspect()
-        raise ValueError('a model query inspects itself, or its "count"')
+        raise TypeError('a model query inspects itself, or its "count"')
 
     def where(self, predicate: p.Expr | p.Condition) -> ModelQuery:
         recipe = self.recipe
@@ -147,7 +147,7 @@ class ModelQuery:
         if not isinstance(relation, Relation):
             raise TypeError("a model query joins a Relation")
         if kind != p.Join.Inner and kind != p.Join.Left:
-            raise ValueError("a model join is Join.Inner or Join.Left")
+            raise TypeError("a model join is Join.Inner or Join.Left")
         recipe = self.recipe
         tables = [(recipe.model, recipe.model.qualifier)]
         tables += [(join.model, join.qualifier) for join in recipe.joins]

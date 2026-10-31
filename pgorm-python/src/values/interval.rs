@@ -12,7 +12,7 @@ use crate::errors::ConstructionError;
 
 /// Months, days and microseconds, each independently signed.
 // [spec:pgorm:req:bindings.values]
-// [spec:pgorm:req:python.values+6]
+// [spec:pgorm:req:python.values+7]
 #[pyclass(name = "Interval", module = "pgorm", frozen, eq, hash, from_py_object)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct PyInterval(pub(crate) Interval);

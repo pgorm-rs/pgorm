@@ -65,7 +65,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(await query.optional(connection))
 
     # [spec:pgorm:req:bindings.codegen/test]
-    # [spec:pgorm:req:bindings.entity-versions/test]
+    # [spec:pgorm:req:bindings.entity-versions+2/test]
     async def test_generated_views_return_typed_versions(self):
         def active(identity, name):
             return app.Account.active().set_id(identity).set_display_name(name).set_note(None)
@@ -326,9 +326,12 @@ class GeneratedDomains(unittest.IsolatedAsyncioTestCase):
                 return sorted(row["id"] for row in rows)
 
             typed = pl.col("stock_line", mood)
-            glad = pl.from_(stock).filter(typed == "glad")
+            glad = pl.from_(stock).filter(typed == pl.literal("glad"))
             self.assertIn('CAST(mood AS mood) = \'glad\'', glad.inspect().sql)
             self.assertEqual(await ids(glad), [1, 3])
+            plain = pl.from_(stock).filter(typed == "glad")
+            self.assertIn("CAST(mood AS mood) = $1", plain.inspect().sql)
+            self.assertEqual(await ids(plain), [1, 3])
             bound = pl.from_(stock).filter_with(lambda binder: typed < binder.bind("glad"))
             self.assertEqual(await ids(bound), [2])
             peer = pl.source(stock).named("peer")
@@ -338,9 +341,10 @@ class GeneratedDomains(unittest.IsolatedAsyncioTestCase):
                 .filter(pl.col("peer", "id") == 3)
             )
             self.assertEqual(await ids(joined), [1, 3])
-            with self.assertRaises(p.DatabaseError) as refused:
-                await ids(pl.from_(stock).filter(pl.col("stock_line", "mood") == "glad"))
-            self.assertEqual(refused.exception.sqlstate, "42883")
+            for value in ("glad", pl.literal("glad")):
+                with self.assertRaises(p.DatabaseError) as refused:
+                    await ids(pl.from_(stock).filter(pl.col("stock_line", "mood") == value))
+                self.assertEqual(refused.exception.sqlstate, "42883")
 
 class GeneratedContract(unittest.TestCase):
     # [spec:pgorm:req:bindings.codegen/test]
