@@ -14551,6 +14551,14 @@ children (
                 kind @note
                 text "binding-spec-consolidation gave this node bindings.case (docs/spec/bindings.md), which requires CASE of both bindings: case_when(condition, result) and case_of(operand).when(..), each CASE taking further when arms and one else, an expression only once it has an arm. JavaScript has it (caseWhen, caseOf, SearchedCase, SimpleCase, CaseOperand); the Python names are listed under python.gaps in docs/spec/bindings-surface.json with this node, to remove as they land."
             }
+
+            {
+                at 2026-10-31T23:54:15.504269Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Done 2026-11-01 (0eda1e2e). SearchedCase and SimpleCase are native subclasses of Expr (extends = PyExpr, the CASE held in the base's SimpleExpr), not constructor functions returning a plain Expr: the shared surface gives each every Expr method plus when and else, so a CASE keeps taking arms after it is already an expression. else_ returns a plain Expr, as JavaScript's else does; CaseOperand is no Expr. A CASE whose results are all bound values is typed text by the server, so a non-text one needs a typed result (documented in EXPRESSIONS.md)."
+                after_done true
+            }
         )
     }
 
@@ -14656,6 +14664,14 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Reads done after binding-coverage-per-impl (2026-10-30): bindings.quantifiers still states today's behaviour, which both bindings cover. The work starts spec-first: bump bindings.quantifiers to the operators PostgreSQL reads a quantifier after (established against the server and pgorm-query's renderer), which leaves both bindings' annotations stale and the node open until both land."
+                after_done true
+            }
+
+            {
+                at 2026-10-31T23:54:15.23845Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Done 2026-11-01 (46c24ea8 spec, a05fddac feat). Established on PostgreSQL 18 (pgorm-test): ANY/ALL follow = <> < <= > >=, LIKE / NOT LIKE / ILIKE / NOT ILIKE (no ESCAPE after the quantifier: 42601), ~ !~ ~* !~*, @> <@ &&, << >> &< &> -|-, @@ and @? (whose array the server types jsonpath[], so a bound text array is a ConstructionError as it runs and one cast to jsonpath[] is sent); SIMILAR TO, IS [NOT] DISTINCT FROM, BETWEEN and IN are 42601; + - * / % and || are 42809. pgorm-query renders binary(op, Func::any/Expr::any) bare for each, so it needed no change. bindings.argument-errors' example \"any(..) and all(..) outside a comparison\" now reads \"where no operator takes one (bindings.quantifiers)\" without a bump: no argument-errors site changes behaviour, and a bump would re-pin about 28 sites the sibling branches also touch. Left for a follow-up: pgorm-query's Func::any / some / all docs and sql-ast.md's eq-any paragraph still say a quantifier renders only after a comparison."
                 after_done true
             }
         )
