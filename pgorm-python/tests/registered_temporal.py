@@ -53,7 +53,8 @@ class RegisteredTemporal(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(room["primary_key_without_overlaps"])
         self.assertEqual(room["relations"], [])
         self.assertFalse(self.account.describe()["primary_key_without_overlaps"])
-        self.assertEqual(self.room.col("valid_at").describe()["input_hint"], {"kind": "daterange"})
+        hints = {column["name"]: column["input_hint"] for column in room["columns"]}
+        self.assertEqual(hints["valid_at"], {"kind": "daterange"})
         relations = {relation["name"]: relation for relation in self.stay.describe()["relations"]}
         self.assertEqual(relations["Room"], {
             "name": "Room", "type": "has_one",

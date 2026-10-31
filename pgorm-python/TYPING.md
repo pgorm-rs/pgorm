@@ -47,6 +47,9 @@ security harness. See [schema](SCHEMA.md), [statements](STATEMENTS.md),
 | `pool.transaction()`, `connection.transaction()`, `transaction.transaction()` | `AbstractAsyncContextManager[Transaction]`; the `Transaction` is open for its `async with` block only |
 | `Model.find().all(executor)` | `list[ModelRecord]` |
 | `Model.find().optional(executor)` | `ModelRecord \| None` |
+| `Model.insert(values)`, `Model.insert_many(rows)` | `ModelInsert`: `on_conflict`, `returning_upsert(s)`, `returning`, `execute`, `inspect` |
+| `Model.update(values)` | `ModelUpdate`: `where`, `all_rows`, `returning_change(s)`, `returning`, `execute`, `inspect` |
+| `Model.delete()` | `ModelDelete`: `where`, `all_rows`, `returning`, `execute`, `inspect` |
 | `Entity.find().all(connection_or_transaction)` | `list[EntityModel]` |
 | `Pipeline.all(connection_or_transaction)` | `list[Record]` |
 | `Pipeline.optional(connection_or_transaction)` | `Record \| None` |
@@ -59,6 +62,9 @@ immutable until an execution method is called. Native methods returning an
 The stream must be closed or used with `async with` when iteration can stop
 early. A transaction reserves its connection; a savepoint reserves its parent
 transaction until it finishes. Transaction row streaming is not exposed.
+
+A model write has only its own kind's methods, so mypy reports an insert's
+`where` or an update's `on_conflict` as an `attr-defined` error.
 
 The stubs mark positional-only parameters and keyword-only options. An opaque
 native result such as `Record`, `Compiled` or `Expr` is obtained from its

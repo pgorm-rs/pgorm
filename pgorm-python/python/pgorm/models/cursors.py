@@ -77,7 +77,7 @@ class Cursor:
                 f"a cursor boundary of {len(values)} values does not match {expected} key column(s)"
             )
         return tuple(
-            model.columns[field].value(value)
+            model.columns[field]._value(value)
             for (model, _, field), value in zip(keyset, values)
         )
 

@@ -397,8 +397,8 @@ class GeneratedContract(unittest.TestCase):
         self.assertIn("def codes(self) -> list[str]:", stub)
         self.assertIn("def labels(self) -> list[str] | None:", stub)
         self.assertIn("def amount(self) -> Decimal:", stub)
-        self.assertEqual(app.Account.col("id").describe()["rust_decode_type"], "i32")
-        self.assertEqual(
-            app.Account.col("display name").describe()["json_key"], "displayName"
-        )
-        self.assertEqual(app.Account.describe()["schema"], "python_entities")
+        described = app.Account.describe()
+        columns = {column["name"]: column for column in described["columns"]}
+        self.assertEqual(columns["id"]["rust_decode_type"], "i32")
+        self.assertEqual(columns["display name"]["json_key"], "displayName")
+        self.assertEqual(described["schema"], "python_entities")

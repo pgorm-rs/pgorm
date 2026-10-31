@@ -69,3 +69,18 @@ async def invalid(connection: p.Connection) -> None:
     accounts.find().join(accounts.col("id"))  # expected-error: arg-type
     accounts.col("id").between(1, 2, symmetric="yes")  # expected-error: arg-type
     rows: list[p.ModelRecord] = await accounts.graph().all_grouped(connection)  # expected-error: assignment
+    insert, update, delete = accounts.insert({"id": 1}), accounts.update({"id": 2}), accounts.delete()
+    insert.where(accounts.col("id") == 1)  # expected-error: attr-defined
+    insert.all_rows()  # expected-error: attr-defined
+    await insert.returning_change(connection)  # expected-error: attr-defined
+    insert.inspect(terminal="returning_changes")  # expected-error: arg-type
+    update.on_conflict(p.Conflict.do_nothing())  # expected-error: attr-defined
+    await update.all_rows().returning_upsert(connection)  # expected-error: attr-defined
+    update.inspect(terminal="returning_upserts")  # expected-error: arg-type
+    delete.on_conflict(p.Conflict.do_nothing())  # expected-error: attr-defined
+    await delete.all_rows().returning_changes(connection)  # expected-error: attr-defined
+    delete.inspect(terminal="returning_change")  # expected-error: call-arg
+    accounts.columns["id"].value(1)  # expected-error: attr-defined
+    accounts.columns["id"].validate(p.Value(1, "i64"))  # expected-error: attr-defined
+    accounts.columns["id"].describe()  # expected-error: attr-defined
+    p.entity("app.Account").col("id").describe()  # expected-error: attr-defined

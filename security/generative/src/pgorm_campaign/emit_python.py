@@ -161,7 +161,7 @@ async def _fetch(query, mode, connection):
 async def _execute(query, connection):
     value = (
         await query.execute(connection)
-        if isinstance(query, p.ModelWrite)
+        if isinstance(query, (p.ModelInsert, p.ModelUpdate, p.ModelDelete))
         else await connection.execute(query)
     )
     paths = ["pgorm::ConnectionTrait::execute_raw"]
@@ -769,6 +769,9 @@ class Emitter:
                     query = call(query, "order_by", self.variables(i["order"]))
                 return query
             case "model.write":
+                if d["method"] == "insert" and "predicate" in i:
+                    message = literal("insert cannot carry a predicate")
+                    return f"_construction_error({message})"
                 if d["method"] == "delete":
                     if d["columns"]:
                         message = literal("delete cannot carry assignments")

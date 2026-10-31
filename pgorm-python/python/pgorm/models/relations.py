@@ -131,7 +131,7 @@ class Relation:
         if len(columns) == 1:
             return columns[0].is_in([key[0] for key in keys])
         rows = [
-            p.tuple_expr(*(column.declaration.value(value) for column, value in zip(columns, key)))
+            p.tuple_expr(*(column.declaration._value(value) for column, value in zip(columns, key)))
             for key in keys
         ]
         return p.tuple_expr(*columns).is_in(rows)

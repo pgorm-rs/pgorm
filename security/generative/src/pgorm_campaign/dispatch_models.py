@@ -62,6 +62,8 @@ def dispatch(name, i, d, p, fixture):
             values = dict(zip(d["columns"], i["values"], strict=True))
             if method == "delete" and values:
                 raise p.ConstructionError("delete cannot carry assignments")
+            if method == "insert" and "predicate" in i:
+                raise p.ConstructionError("insert cannot carry a predicate")
             query = (
                 i["model"].delete()
                 if method == "delete"

@@ -4,9 +4,10 @@ from .columns import Column, ModelColumn
 from .cursors import Cursor, Paginator
 from .graphs import Graph
 from .model import Model
-from .queries import ModelQuery, ModelRows, ModelWrite
+from .queries import ModelQuery, ModelRows
 from .record import ModelRecord
 from .relations import Relation
+from .writes import ModelDelete, ModelInsert, ModelUpdate
 
 __all__ = [
     "Column",
@@ -14,7 +15,9 @@ __all__ = [
     "Model",
     "ModelQuery",
     "ModelRows",
-    "ModelWrite",
+    "ModelInsert",
+    "ModelUpdate",
+    "ModelDelete",
     "ModelRecord",
     "Relation",
     "Graph",

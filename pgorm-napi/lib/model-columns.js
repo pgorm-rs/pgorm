@@ -204,7 +204,7 @@ export function columnValue(column, field, input) {
  * `all(..)`, are compared as written. A value any other operator takes
  * converts the same way.
  */
-// [spec:pgorm:req:bindings.column-operators]
+// [spec:pgorm:req:bindings.column-operators+1]
 export class ModelColumn extends Expr {
   /** @type {Column} */
   #column;
