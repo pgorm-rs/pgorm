@@ -15411,6 +15411,7 @@ children (
         id python-model-shapes
         title "Python's model writes are ModelInsert, ModelUpdate and ModelDelete, and a column's conversion and description are no public methods of its own, as JavaScript's are"
         kind @refactor
+        sealed true
         log (
             {
                 at 2026-10-31T20:00:20.040537Z
@@ -15425,6 +15426,13 @@ children (
                 kind @note
                 text "Built (A) and (B). pgorm-python/python/pgorm/models/writes.py holds ModelInsert (statement Insert | None, an insert of no rows having none), ModelUpdate and ModelDelete over two private bases: _Write (model, statement, returning, execute, the refusing __bool__) and _Guarded (where, all_rows, inspect) for update and delete, so mypy types each write's statement exactly and reports another kind's method as attr-defined; an insert's inspect(terminal=) takes the upsert terminals and an update's the change terminals, any other a TypeError (a closed choice), where a wrong-kind terminal was UnsupportedCapabilityError. Column.validate/value became _validate/_value; Column.describe and the native EntityColumn.describe are gone, Model.describe() reporting the same per-column keys as before and Entity.describe()[\"columns\"] what EntityColumn.describe gave. Rules: bindings.models+3 (a Column has no method, Value(data, kind) the public conversion, what Model.describe() reports), bindings.model-writes+1 (the three kinds, each only its own methods), bindings.column-operators+1 (neither column describes itself); both bindings' annotations re-pinned, JavaScript's code unchanged. bindings-surface.json lists ModelInsert/ModelUpdate/ModelDelete as shared and drops the five undecided Python names and three JavaScript ones, the shapes question no longer naming model writes or column helpers. test_truth_testing.py lists the two bases in BASES (never built; each sampled through a write). Campaign: effects.py and the emitted reproducer's _execute test the three classes; dispatch_models.py and emit_python.py refuse an insert carrying a predicate as a ConstructionError, as they refuse a delete carrying assignments, since an insert no longer has where (the grammar never builds one)."
             }
+
+            {
+                at 2026-10-31T22:52:13.637711Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -15432,12 +15440,20 @@ children (
         id python-ddl-factories
         title "Python's DDL builders are made only by their factory functions, as JavaScript's are"
         kind @refactor
+        sealed true
         log (
             {
                 at 2026-10-31T20:00:25.282718Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Decision (C) of the operator's 2026-10-31 answer (binding-spec-consolidation). pgorm-python's DDL builder classes (CreateTable, CreateIndex, CreateType, CreateDomain, CreateSequence, CreateView, CreateRecursiveView, CreateMaterializedView, CreateTableAs and the rest) are constructible through #[new], and each factory is the class under a second name (create_table = CreateTable in pgorm-python/python/pgorm/schema/__init__.py). Make the factories real functions and the only way to build, and the classes non-constructible from Python, as pgorm-napi's are and as Python's Expr is (col() / bind()); the classes stay exported for annotations and isinstance. The stubs say so (a class's __init__ taking a Never, as Expr's does), the signature test and typing rejection cases cover it, and the shared schema rule states it for both bindings."
+            }
+
+            {
+                at 2026-10-31T22:52:13.77853Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
