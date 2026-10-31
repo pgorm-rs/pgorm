@@ -15231,6 +15231,7 @@ children (
                 title "Restore trustworthy generative and sqlmap security evidence"
                 kind @test
                 deps (security-remediation-2026-10-31.advisories)
+                sealed true
                 log (
                     {
                         at 2026-10-31T18:30:18.938233Z
@@ -15251,6 +15252,20 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Smoke validation found a second stale campaign path after the constraint-subclass comparator was fixed: ModelQuery values fell through to Connection.query and were refused as non-statements. Added ModelQuery beside ModelRows in the live and emitted terminal dispatchers. Run smoke-a843ef923f08 passed all 209 scheduled items: 150 construction, 30 live, six expected invalid-input rejections and 23 controls; the preceding smoke-2d95a8b24bb4 retains the two incomplete ModelQuery findings."
+                    }
+
+                    {
+                        at 2026-10-31T19:58:27.518679Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Full generative profile passed 25,524/25,524 items at 58eb5cc2 (20,000 construction, 5,000 live, 500 expected rejection, 23 controls, 80 compile cases, 472/472 matrix obligations). Full sqlmap passed 234/234 invocations and 117/117 scheduled pairs with 93 documented inapplicable pairs; identifier profile passed 56/56 invocations and 28/28 pairs with 38 documented inapplicable pairs; protected findings, infrastructure failures, cleanup errors and falsified exemptions were all zero. Direct SQL regressions passed 17/17; harness tests passed 32/32; nplan reports no covered-but-untested sqlmap rule."
+                    }
+
+                    {
+                        at 2026-10-31T19:58:29.008215Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Doing → Done (nplan complete)"
                     }
                 )
             }

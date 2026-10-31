@@ -19,4 +19,12 @@ sites (
     {path security/sqlmap/acceptance/2026-09-14.md, spec (
         [spec:pgorm:req:security.sqlmap.acceptance+1]
     )}
+    {path security/sqlmap/acceptance/2026-10-31.md, spec (
+        [spec:pgorm:def:security.sqlmap/test]
+        [spec:pgorm:req:security.sqlmap.acceptance+1/test]
+        [spec:pgorm:req:security.sqlmap.adapter/test]
+        [spec:pgorm:req:security.sqlmap.fixtures/test]
+        [spec:pgorm:req:security.sqlmap.isolation/test]
+        [spec:pgorm:req:security.sqlmap.observability/test]
+    )}
 )
