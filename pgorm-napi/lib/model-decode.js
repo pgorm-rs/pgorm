@@ -7,13 +7,19 @@
 // value to its nullability and listed values, a mismatch being a
 // DecodeError rather than a value of the wrong type; and each row becomes a
 // record keyed by field, a tuple of a graph's records, or null for an
-// optional source its row does not carry.
-// [spec:pgorm:req:bindings.model-records]
+// optional source its row does not carry. A field read from its text, a
+// created multirange's, is held to the text its projection casts it to and
+// read as the value that text spells.
+// [spec:pgorm:req:bindings.model-records+1]
 
 import { runStatement } from "./connections.js";
 import { DecodeError } from "./errors.js";
-import { columnKey } from "./model-columns.js";
+import { columnKey, readsText } from "./model-columns.js";
+import { native } from "./operations.js";
 import { decodedWith } from "./streams.js";
+
+/** The kind a field read from its text is projected as. */
+const TEXT = "text";
 
 /**
  * A source of a result: the fields it decodes, the result column each is
@@ -44,7 +50,7 @@ function plan(names, kinds, sources) {
       if (index === undefined) {
         throw new DecodeError(`the result has no column ${JSON.stringify(name)} for ${field.field}`);
       }
-      const key = columnKey(field.column);
+      const key = readsText(field.column) ? TEXT : columnKey(field.column);
       if (kinds[index] !== key) {
         throw new DecodeError(`column ${JSON.stringify(name)} is ${kinds[index]}, and ${field.field} declares ${key}`);
       }
@@ -60,7 +66,8 @@ function plan(names, kinds, sources) {
 }
 
 /**
- * One field's value, held to its declaration's nullability and values.
+ * One field's value, held to its declaration's nullability and values, and
+ * read from its text where the field is.
  *
  * @param {import("./model-shape.js").Field} field
  * @param {unknown} value
@@ -71,6 +78,7 @@ function checked(field, value) {
     if (!column.nullable) throw new DecodeError(`${field.field} is not nullable, and the row holds NULL`);
     return value;
   }
+  if (readsText(column)) return native.modelReadText(column.kind, value);
   if (column.values !== null) {
     const labels = column.values;
     const items = column.array ? /** @type {unknown[]} */ (value) : [value];

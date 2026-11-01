@@ -251,7 +251,7 @@ fn pipeline_at<'cx>(cx: &mut FunctionContext<'cx>, index: usize) -> NeonResult<p
 /// name, a `Pipeline` embedded whole, a `Source`, or a registered entity's
 /// table, its schema from the registration.
 // [spec:pgorm:req:bindings.pipeline]
-// [spec:pgorm:req:bindings.pipeline-sources+2]
+// [spec:pgorm:req:bindings.pipeline-sources+3]
 fn relation<'cx>(cx: &mut Cx<'cx>, value: Handle<'cx, JsValue>) -> NeonResult<Source> {
     if let Some(entity) = crate::entities::entity_source(cx, value) {
         return Ok(Source {

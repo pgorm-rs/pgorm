@@ -51,7 +51,7 @@ struct EntityGraphQuery<E: EntityTrait, S> {
     aliases: Vec<String>,
 }
 
-// [spec:pgorm:req:bindings.entity-graphs+2]
+// [spec:pgorm:req:bindings.entity-graphs+3]
 impl<E, S> QueryBackend for EntityGraphQuery<E, S>
 where
     E: EntityTrait + Send + Sync + 'static,

@@ -13,7 +13,7 @@ import { cursorOver, paginatorOver } from "./cursors.js";
 import { ConstructionError } from "./errors.js";
 import { decodeAll, decodeCount, decodeOne, decodeOptional, decodeStream } from "./model-decode.js";
 import { countOf, orderingsOf, predicateOf } from "./model-queries.js";
-import { fieldOf, qualified, sameTable } from "./model-shape.js";
+import { fieldOf, projected, qualified, sameTable } from "./model-shape.js";
 import { native } from "./operations.js";
 import { keyText, relationOn, shapesOf } from "./relations.js";
 import { select } from "./select.js";
@@ -76,7 +76,7 @@ function selectOf(state, orders = state.orders, wheres = state.wheres, limit = s
   const sources = sourcesOf(state);
   const projection = decoded(state).flatMap((table, index) =>
     table.shape.fields.map((field, position) =>
-      qualified(field, table.qualifier).as(/** @type {string} */ (sources[index]?.names[position]))
+      projected(field, qualified(field, table.qualifier), /** @type {string} */ (sources[index]?.names[position]))
     )
   );
   const root = /** @type {Joined} */ (state.tables[0]);

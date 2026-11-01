@@ -200,7 +200,7 @@ class ModelGraphs(unittest.IsolatedAsyncioTestCase):
             bool(Post.graph())
 
     # [spec:pgorm:req:bindings.graphs/test]
-    # [spec:pgorm:req:bindings.model-records/test]
+    # [spec:pgorm:req:bindings.model-records+1/test]
     async def test_undecodable_present_slot_is_decode_error(self):
         await self.pool.execute(p.RawSQL(f"UPDATE {SCHEMA}.account SET mood = 'wild' WHERE id = 1"))
         with self.assertRaisesRegex(p.DecodeError, "'wild' is not one of the column's values"):

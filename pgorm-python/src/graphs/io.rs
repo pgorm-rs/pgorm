@@ -17,7 +17,7 @@ pub(crate) enum Read {
     Cursor(CursorPlan),
 }
 
-// [spec:pgorm:req:bindings.entity-graphs+2]
+// [spec:pgorm:req:bindings.entity-graphs+3]
 pub(crate) fn read<'py>(
     py: Python<'py>,
     connection: &Bound<'_, PyAny>,

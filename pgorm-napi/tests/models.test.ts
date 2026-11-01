@@ -12,9 +12,11 @@ import {
   column,
   Conflict,
   ConstructionError,
+  CreatedMultirange,
   CreatedRange,
   DecodeError,
   model,
+  Multirange,
   type Pool,
   Range,
   TypeName,
@@ -125,7 +127,7 @@ test("a declaration that cannot be used is refused as it is made", () => {
 });
 
 // [spec:pgorm:req:bindings.model-writes+1/test]
-// [spec:pgorm:req:bindings.model-records/test]
+// [spec:pgorm:req:bindings.model-records+1/test]
 test("an insert writes the fields it sets, the rest taking the table's defaults", async () => {
   const ann = await Account.insert({ mood: "calm", name: "Ann", span: new Range(1.5, 2.5) }).returning().one(pool());
   assert.deepStrictEqual(Object.keys(ann), ["id", "name", "displayName", "mood", "tags", "visits", "created", "span", "seq"]);
@@ -266,7 +268,7 @@ test("a key names every key field and no other, a composite one included", async
   assert.throws(() => keyless.key({} as never), refused(/declares no primary key/));
 });
 
-// [spec:pgorm:req:bindings.model-records/test]
+// [spec:pgorm:req:bindings.model-records+1/test]
 test("a result that breaks the declaration is a DecodeError, never a value", async () => {
   await seed();
   await pool().execute("INSERT INTO app.account (name, mood) VALUES ('Dee', 'wild')");
@@ -287,7 +289,42 @@ test("a result that breaks the declaration is a DecodeError, never a value", asy
   assert.equal((await partial.find().all(pool())).length, 4);
 });
 
-// [spec:pgorm:req:bindings.model-records/test]
+// [spec:pgorm:req:bindings.models+4/test]
+// [spec:pgorm:req:bindings.model-records+1/test]
+// [spec:pgorm:req:bindings.created-ranges/test]
+test("a created multirange field is projected as its text and read as the multirange of its declared subtype", async () => {
+  await pool().execute("CREATE TABLE app.slot (id int4 PRIMARY KEY, open app.floatmultirange)");
+  const kind = new CreatedMultirange("floatmultirange", "f64", { schema: "app" });
+  const Slot = model("slot", {
+    schema: "app",
+    columns: { id: column("i32", { primaryKey: true }), open: column(kind, { nullable: true }) },
+  });
+  assert.equal(Slot.find().inspect().sql, 'SELECT "slot"."id", CAST("slot"."open" AS text) AS "open" FROM "app"."slot"');
+  const hours = new Multirange([new Range(9, 12.5), new Range(13.5, 17)]);
+  assert.deepStrictEqual(await Slot.insert({ id: 1, open: hours }).returning().one(pool()), { id: 1, open: hours });
+  assert.deepStrictEqual(await Slot.insert({ id: 2, open: null }).returning("open").one(pool()), { open: null });
+  assert.equal((await Slot.findByKey({ id: 2 }).one(pool())).open, null);
+  assert.deepStrictEqual(await Slot.findByKey({ id: 1 }).one(pool()), { id: 1, open: hours });
+  const filtered = Slot.find().where(Slot.col("open").eq(new Value(hours, kind)));
+  assert.deepStrictEqual(await filtered.all(pool()), [{ id: 1, open: hours }]);
+  // The text is read through the declared subtype, so text that subtype does
+  // not read is a DecodeError, never a value of another type.
+  const wrong = model("slot", {
+    schema: "app",
+    columns: {
+      id: column("i32", { primaryKey: true }),
+      open: column(new CreatedMultirange("floatmultirange", "i64", { schema: "app" }), { nullable: true }),
+    },
+  });
+  await assert.rejects(wrong.findByKey({ id: 1 }).one(pool()), undecodable(/is no value of floatmultirange/));
+  const later = new Multirange([new Range(18, null)]);
+  const change = await Slot.update({ open: later }).where(Slot.key({ id: 1 })).returningChange(pool());
+  assert.deepStrictEqual([change.old.open, change.new.open], [hours, later]);
+  assert.deepStrictEqual(await Slot.graph().where(Slot.col("id").eq(1)).all(pool()), [{ id: 1, open: later }]);
+  assert.throws(() => column(kind, { array: true }), refused(/arrays of a created range/));
+});
+
+// [spec:pgorm:req:bindings.model-records+1/test]
 test("records stream from a pool or a connection, and a transaction has no stream", async () => {
   await seed();
   const streamed = [];

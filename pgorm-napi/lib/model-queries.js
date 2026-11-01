@@ -11,7 +11,7 @@ import { ConstructionError } from "./errors.js";
 import { Expr, OrderBy } from "./expressions.js";
 import { cursorOver, paginatorOver } from "./cursors.js";
 import { decodeAll, decodeCount, decodeOne, decodeOptional, decodeStream } from "./model-decode.js";
-import { fieldOf, qualified, sameTable } from "./model-shape.js";
+import { fieldOf, projected, qualified, sameTable } from "./model-shape.js";
 import { native } from "./operations.js";
 import { relationOn, shapesOf } from "./relations.js";
 import { Select, select } from "./select.js";
@@ -66,7 +66,8 @@ export function orderingsOf(orderings) {
  */
 export function selectOf(recipe, orders = recipe.orders, wheres = recipe.wheres, limit = recipe.limit) {
   const { shape } = recipe;
-  let query = select(...recipe.fields.map((field) => qualified(field, shape.qualifier))).from(shape.table);
+  const projection = recipe.fields.map((field) => projected(field, qualified(field, shape.qualifier), field.sql));
+  let query = select(...projection).from(shape.table);
   for (const join of recipe.joins) query = query.join(join.table, join.on, { kind: join.kind });
   for (const where of wheres) query = query.where(where);
   if (orders.length > 0) query = query.orderBy(...orders);

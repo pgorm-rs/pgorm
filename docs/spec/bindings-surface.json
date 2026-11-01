@@ -277,6 +277,16 @@
         }
       ],
       "rust": {"entity": null, "model": null, "active_model": null, "column": null}
+    },
+    "pgorm.EntityGraph": {
+      "name": null,
+      "rust_shape": null,
+      "sources": [{"index": null, "entity": null, "slot": null}]
+    },
+    "pipeline.SourceSelection": {
+      "name": null,
+      "rust_shape": null,
+      "entities": null
     }
   },
   "questions": {

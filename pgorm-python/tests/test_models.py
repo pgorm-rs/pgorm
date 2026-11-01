@@ -333,7 +333,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         await self.pool.close()
 
     # [spec:pgorm:req:bindings.model-writes+1/test]
-    # [spec:pgorm:req:bindings.model-records/test]
+    # [spec:pgorm:req:bindings.model-records+1/test]
     async def test_crud_returns_declared_field_records(self):
         with patch(
             "subprocess.run",
@@ -426,7 +426,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
             1,
         )
 
-    # [spec:pgorm:req:bindings.model-records/test]
+    # [spec:pgorm:req:bindings.model-records+1/test]
     async def test_declared_types_validate_decoded_columns(self):
         await self.model.insert({}).execute(self.pool)
         for columns in (
@@ -476,7 +476,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(dict(row), {"a": 1, "b": "second"})
 
-    # [spec:pgorm:req:bindings.model-records/test]
+    # [spec:pgorm:req:bindings.model-records+1/test]
     async def test_declared_wire_kinds_keep_exact_tags(self):
         cases = [
             ("bool", "boolean", True),
@@ -542,7 +542,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
                 {"moods": p.Value.array(p.TypeName("Mood", schema="wrong"), labels)}
             )
 
-    # [spec:pgorm:req:bindings.model-records/test]
+    # [spec:pgorm:req:bindings.model-records+1/test]
     # [spec:pgorm:req:bindings.created-ranges/test]
     async def test_created_range_columns_keep_their_type(self):
         await self.pool.execute(
@@ -563,7 +563,7 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
             p.Column(floatrange, array=True)
 
     # [spec:pgorm:req:bindings.models+4/test]
-    # [spec:pgorm:req:bindings.model-records/test]
+    # [spec:pgorm:req:bindings.model-records+1/test]
     # [spec:pgorm:req:bindings.created-ranges/test]
     async def test_created_multirange_columns_read_and_write(self):
         await self.pool.execute(

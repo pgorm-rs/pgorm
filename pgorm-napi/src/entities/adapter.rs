@@ -94,7 +94,7 @@ impl<E: EntityTrait> Debug for RegisteredColumn<E> {
     }
 }
 
-// [spec:pgorm:req:bindings.pipeline-sources+2]
+// [spec:pgorm:req:bindings.pipeline-sources+3]
 impl<E: EntityTrait + Send + Sync> PipelineColumn for RegisteredColumn<E> {
     fn lower<'brand>(&self, qualifier: Name) -> pgorm::pipeline::Expr<'brand> {
         pgorm::pipeline::named_runtime(E::default(), qualifier).col(self.0)

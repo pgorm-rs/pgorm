@@ -265,4 +265,4 @@ use checked Rust-value-to-Python conversion. Their custom Rust decoders retain
 their own behavior. The additional PostgreSQL wire exactness policies for
 dynamic `Record` results are scoped to that result form; they do not replace an
 application's typed decoder. `capabilities()` records this distinction and
-lists each registration's types and supported terminals.
+lists each registration as its `describe()` reports it.

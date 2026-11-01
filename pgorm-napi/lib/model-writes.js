@@ -12,7 +12,7 @@ import { ConstructionError, DecodeError } from "./errors.js";
 import { col } from "./expressions.js";
 import { columnValue } from "./model-columns.js";
 import { decodeAll, decodeOne, decodeOptional } from "./model-decode.js";
-import { fieldOf } from "./model-shape.js";
+import { fieldOf, projected } from "./model-shape.js";
 import { native } from "./operations.js";
 import { predicateOf } from "./model-queries.js";
 import { Conflict, ConflictUpdate } from "./conflicts.js";
@@ -69,7 +69,7 @@ function assignments(shape, values, write) {
  * @param {readonly import("./model-shape.js").Field[]} fields
  */
 function returned(fields) {
-  return fields.map((field) => col(field.sql));
+  return fields.map((field) => projected(field, col(field.sql), field.sql));
 }
 
 /**
@@ -84,7 +84,7 @@ function versions(shape) {
   const items = [[OLD, "o_"], [NEW, "n_"]].flatMap(([row, prefix]) => {
     const names = shape.fields.map((field) => native.modelResultName(prefix, field.sql));
     sources.push({ fields: shape.fields, names, optional: row === OLD });
-    return shape.fields.map((field, index) => col(field.sql, { table: row }).as(/** @type {string} */ (names[index])));
+    return shape.fields.map((field, index) => projected(field, col(field.sql, { table: row }), /** @type {string} */ (names[index])));
   });
   return { items, sources };
 }

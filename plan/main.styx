@@ -15656,6 +15656,13 @@ children (
                 kind @note
                 text "Found by binding-describe-shapes (merged 61f70c15), which settled a model's and an entity's describe() keys: a registered graph's describe() and a source tuple's still differ between the bindings, Python's carrying keys JavaScript's lack (terminals, aliases, cursor, result). Settle one key set each under decision (6), change the side that differs, state them in bindings.entity-graphs and bindings.pipeline-sources, and declare them under bindings-surface.json's descriptions so each surface test holds them, run against the application modules as the entity descriptions are."
             }
+
+            {
+                at 2026-11-01T10:48:43.544049Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Settled under decision (6), JavaScript's sets, spelled by each binding's naming rule. Registered graph: {name, rust_shape, sources: [{index, entity, slot}]}, slot root, Req or Opt. Source tuple: {name, rust_shape, entities}. Python dropped its constants: a graph's terminals [\"all\", \"optional\", \"cursor.all\"], aliases (a fixed sentence) and cursor (a fixed object), and a source tuple's terminals [\"all\", \"one\", \"optional\"] and result (a fixed sentence); JavaScript unchanged. Neither the generative campaign nor Python's codegen read those keys (codegen embeds the described registrations in _COMPATIBILITY and compares them at load, so a module generated before this change refuses to load until regenerated). bindings.entity-graphs+3 and bindings.pipeline-sources+3 state the shapes; bindings.surface+2 extends descriptions to both; bindings-surface.json declares pgorm.EntityGraph and pipeline.SourceSelection; each surface test compares every registered graph's and source tuple's describe() with them, skipped in the standalone modules and run against the application modules by checks/entities.py and checks/entities.js. Bite proof: renaming EntityGraph's rust_shape to rust_type made Python's test fail ('rust_shape: undeclared', 'rust_type: missing') and JavaScript's fail in Node and Deno ('rustShape: undeclared', 'rust_type: missing'); restored, both pass."
+            }
         )
     }
 
@@ -15669,6 +15676,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-model-created-multirange (scalar-kinds-shared branch): the filing note was wrong that JavaScript's models decode a created multirange. A probe shows an insert succeeds but returning().one() and find().all() throw DecodeError \"the type is not supported\". Give pgorm-napi's model decode what Python's got: project the column cast to text as ColumnTrait::select_as does, read it back as a Multirange of the declared subtype (DecodeError for text it cannot parse), with live tests of insert-returning, NULL, a filter, find_by_key, a change terminal and a graph read."
+            }
+
+            {
+                at 2026-11-01T03:07:25.737224Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-11-01T09:30:18.336131Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Built: pgorm-napi's model statements project a CreatedMultirange field cast to text (model-shape.js projected(), used by the SELECT, RETURNING, the update/upsert version lists and model graphs), model-decode.js holds that column to text and reads it through a new native modelReadText(kind, text) (src/models/mod.rs), which reads the text as a Multirange of the declared subtype through write::plain, text the subtype does not read a DecodeError. bindings.model-records+1 states the text read for both bindings (Python's python-model-created-multirange did the same without a rule); annotations re-pinned in both. Live test in tests/models.test.ts: insert-returning, NULL, a filter (through a Value: a model column's comparison types take no bare Range or Multirange, a typing gap left as it was), find_by_key, the i64-subtype DecodeError, returningChange and a graph read."
             }
         )
     }
