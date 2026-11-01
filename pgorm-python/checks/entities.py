@@ -58,9 +58,10 @@ def reject_execution_mismatch(project, output, environment):
         )
 
 
-# [spec:pgorm:req:bindings.entities+2/test]
+# [spec:pgorm:req:bindings.entities+3/test]
 # [spec:pgorm:req:bindings.entity-graphs+2/test]
 # [spec:pgorm:req:bindings.pipeline-sources+2/test]
+# [spec:pgorm:req:bindings.surface+1/test]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("target/python-entities"))
@@ -148,6 +149,23 @@ def main():
             ],
             environment,
         )
+        # The surface test's registered-entity descriptions run only against
+        # a module that registers entities.
+        run(
+            [
+                str(python),
+                "-I",
+                "-m",
+                "unittest",
+                "discover",
+                "-s",
+                str(root / "pgorm-python/tests"),
+                "-p",
+                "test_surface.py",
+                "-v",
+            ],
+            environment,
+        )
         run(
             [
                 str(python),
@@ -230,6 +248,15 @@ def main():
             [
                 str(python),
                 "-I",
+                str(root / "pgorm-python/tests/registered_pools.py"),
+                "-v",
+            ],
+            environment,
+        )
+        run(
+            [
+                str(python),
+                "-I",
                 str(root / "pgorm-python/tests/registered_execution.py"),
             ],
             environment,
@@ -268,6 +295,7 @@ def main():
                 "registered_versions": True,
                 "registered_schema": True,
                 "registered_transactions": True,
+                "registered_pools": True,
                 "rust_execution_parity": True,
                 "execution_mismatch_rejected": True,
                 "wheel": wheel.name,

@@ -1,7 +1,7 @@
 use super::Database;
 use crate::{
     errors::{LifecycleError, database_error},
-    runtime::{ConnectionState, NativeConnection, Operation},
+    runtime::{ConnectionState, NativeConnection, NativePool, Operation, PoolState},
     transactions::{
         NativeTransaction, State,
         work::{Output, Work},
@@ -15,20 +15,29 @@ pub(crate) enum Target {
     Transaction(Arc<State>),
 }
 
+/// The native handle behind a Python `Pool`, `Connection` or `Transaction`.
+fn native<'py>(value: &Bound<'py, PyAny>) -> Bound<'py, PyAny> {
+    value.getattr("_native").unwrap_or_else(|_| value.clone())
+}
+
 impl Target {
     pub(crate) fn extract(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let native = value.getattr("_native").unwrap_or_else(|_| value.clone());
+        Self::held(py, &native(value))?.ok_or_else(|| {
+            PyTypeError::new_err("execution requires an acquired pgorm Connection or Transaction")
+        })
+    }
+
+    /// The connection or transaction `native` is, checked usable from here.
+    fn held(py: Python<'_>, native: &Bound<'_, PyAny>) -> PyResult<Option<Self>> {
         let target = if let Ok(connection) = native.extract::<PyRef<'_, NativeConnection>>() {
             Self::Connection(connection.state.clone())
         } else if let Ok(transaction) = native.extract::<PyRef<'_, NativeTransaction>>() {
             Self::Transaction(transaction.state.clone())
         } else {
-            return Err(PyTypeError::new_err(
-                "execution requires an acquired pgorm Connection or Transaction",
-            ));
+            return Ok(None);
         };
         target.check(py)?;
-        Ok(target)
+        Ok(Some(target))
     }
 
     pub(crate) fn check(&self, py: Python<'_>) -> PyResult<()> {
@@ -54,6 +63,37 @@ impl Target {
                 operation.restore();
                 result.map_err(|error| database_error(error, &state.pool.secrets))
             }
+        }
+    }
+}
+
+/// Where an operation on a registration runs: on a connection a pool lends it
+/// alone, or on the connection or transaction its caller holds.
+pub(crate) enum Executor {
+    Pool(Arc<PoolState>),
+    Held(Target),
+}
+
+impl Executor {
+    // [spec:pgorm:req:bindings.registered-pools]
+    pub(crate) fn extract(py: Python<'_>, value: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let native = native(value);
+        if let Ok(pool) = native.extract::<PyRef<'_, NativePool>>() {
+            pool.state.check_owner(py)?;
+            pool.state.ensure_open()?;
+            return Ok(Self::Pool(pool.state.clone()));
+        }
+        Target::held(py, &native)?.map(Self::Held).ok_or_else(|| {
+            PyTypeError::new_err("a registration runs on a Pool, a Connection or a Transaction")
+        })
+    }
+
+    /// Run `work`. A pool's connection goes back to it once the work has
+    /// finished, and is discarded if the work is cut off, as a statement's is.
+    pub(crate) async fn run(self, work: Work) -> PyResult<Output> {
+        match self {
+            Self::Held(target) => target.run(work).await,
+            Self::Pool(pool) => Target::Connection(pool.lend().await?).run(work).await,
         }
     }
 }

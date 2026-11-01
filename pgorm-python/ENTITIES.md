@@ -122,13 +122,16 @@ list of expressions or `any_(..)` included, is compared as written.
 `col(name).expr()` gives its plain expression, whose comparisons bind as an
 `Expr`'s do rather than through the column's `ColumnTrait`.
 
-Entity terminals currently require an acquired `Connection`. They return
-native asyncio awaitables; calling a terminal schedules its operation. Await
-each operation before reusing the connection. An outstanding operation can be
-cancelled through its future or `asyncio.wait_for`; cancellation discards the
-connection if the operation's completion is uncertain. Closing its connection
-or pool also cancels an outstanding Rust hook. Cancellation does not guarantee
-rollback of a submitted write.
+Every entity terminal, ActiveModel write and version terminal runs on a
+`Pool`, an acquired `Connection` or a `Transaction`. On a pool it runs on a
+connection the pool lends it alone, returned once the operation finishes, as a
+pool's statement does. They return native asyncio awaitables; calling a
+terminal schedules its operation. Await each operation before reusing a
+connection. An outstanding operation can be cancelled through its future or
+`asyncio.wait_for`; cancellation discards the connection if the operation's
+completion is uncertain. Closing its connection or pool also cancels an
+outstanding Rust hook. Cancellation does not guarantee rollback of a submitted
+write.
 
 `all` returns a list of detached models. `one` and `optional` are Rust's `one`
 and `one_opt`, which narrow the query's limit to one row: `LIMIT 1`, including
@@ -198,10 +201,16 @@ raises `ConstructionError` on Python truth testing.
 
 ## Values, state and hooks
 
-Column lookup and model keys use SQL names. `describe()` also reports the
-separate JSON key, SQL type, nullability, primary key and concrete Rust type
-names. Plain Python inputs use the declared SQL column type as a conversion
-hint. Explicit `Value` tags preserve the caller's chosen Rust value variant;
+Column lookup and model keys use SQL names. `describe()` reports the
+registration's `name`, `schema` and `table`; under `columns`, each column's
+SQL `name`, its `json_key`, `sql_type`, the `rust_type` its model reads it as,
+`nullable`, `primary_key`, the `kind` its values bind and read as (`i32`,
+`text[]`, `enum "app"."mood"`, `range "app"."floatrange" of f64`, or `None`
+for a type that takes an explicit `Value`) and an enum's `values`; and under
+`rust` the concrete Rust `entity`, `model`, `active_model` and `column` type
+names. These are the keys JavaScript's `describe()` reports, each spelled in
+snake_case. Plain Python inputs use the declared SQL column type as a
+conversion hint. Explicit `Value` tags preserve the caller's chosen Rust value variant;
 the real Rust model/ActiveModel setter performs the final conversion checks.
 An unusual custom field type may therefore require an explicit tagged value.
 Qualified enum input must match the declared column enum identity. A field of a
@@ -243,9 +252,12 @@ wrappers. `Account.active()` calls the application's `ActiveModelBehavior::new`
 and preserves its defaults. Each write operates on a clone, so the Python
 wrapper is reusable; it is not a mutable object that marks itself saved.
 
-Insert, update and delete run the actual before/after hooks. A before-hook
-failure prevents the subsequent write. An after-hook failure is reported even
-though the write may already have committed. The binding adds no implicit
+Insert, update and delete run the actual before/after hooks. A hook's
+refusal, the `pgorm::Error::Custom` it returns, raises `ConstructionError`
+carrying its message; any other error a hook returns keeps its own class, a
+`DatabaseError` from the server among them. A before-hook failure prevents the
+subsequent write. An after-hook failure is reported even though the write may
+already have committed. The binding adds no implicit
 transaction or retries around these methods.
 
 Registered models decode with their actual `Model::from_query_result` and then

@@ -68,7 +68,7 @@ async function seed(): Promise<void> {
 
 const byId = Account.col("id").asc();
 
-// [spec:pgorm:req:bindings.models+3/test]
+// [spec:pgorm:req:bindings.models+4/test]
 test("a declaration is data: it sends nothing, and describes its table and fields", () => {
   const unconnected = model("nowhere", { schema: "absent", columns: { id: column("i32", { primaryKey: true }) } });
   assert.equal(unconnected.find().inspect().sql, 'SELECT "nowhere"."id" FROM "absent"."nowhere"');
@@ -96,7 +96,7 @@ test("a declaration is data: it sends nothing, and describes its table and field
   assert.equal(Account.alias, null);
 });
 
-// [spec:pgorm:req:bindings.models+3/test]
+// [spec:pgorm:req:bindings.models+4/test]
 // [spec:pgorm:req:bindings.argument-errors+1/test]
 test("a declaration that cannot be used is refused as it is made", () => {
   const unknown = { nullabel: true } as unknown as Record<string, never>;

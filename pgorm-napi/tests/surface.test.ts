@@ -1,6 +1,7 @@
 // The module offers the surface both bindings share, spelled as JavaScript
 // spells it, with JavaScript's own names and its gaps declared beside it in
-// docs/spec/bindings-surface.json, which pgorm-python's suite reads too.
+// docs/spec/bindings-surface.json, which pgorm-python's suite reads too; and
+// each describe() reports the keys the file declares for it.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -17,8 +18,11 @@ type Side = {
   readonly gaps: Readonly<Record<string, string>>;
   readonly undecided: Readonly<Record<string, Entry>>;
 };
+/** A declared description: a value, a list of items of one shape, or an object of exactly these keys. */
+type Shape = null | readonly [Shape] | { readonly [key: string]: Shape };
 type Surface = {
   readonly modules: Readonly<Record<string, Readonly<Record<string, readonly string[] | null>>>>;
+  readonly descriptions: Readonly<Record<string, Shape>>;
   readonly questions: Readonly<Record<string, string>>;
   readonly javascript: Side;
 };
@@ -123,14 +127,14 @@ const all = new Set([...live.names, ...[...live.members].flatMap(([key, found]) 
 const { expected, gaps, classes } = declared();
 const own = ownNames();
 
-// [spec:pgorm:req:bindings.surface/test]
+// [spec:pgorm:req:bindings.surface+1/test]
 // [spec:pgorm:req:napi.naming+3/test]
 test("the module offers every shared name, or the surface lists it as a gap with its plan node", () => {
   const missing = [...expected].filter(([key]) => !all.has(key)).map(([, path]) => path).sort();
   assert.deepStrictEqual(missing, []);
 });
 
-// [spec:pgorm:req:bindings.surface/test]
+// [spec:pgorm:req:bindings.surface+1/test]
 test("the module offers nothing the surface does not declare as shared or as JavaScript's own", () => {
   const extra = [...all].filter((key) => {
     if (expected.has(key) || own.has(key)) return false;
@@ -142,19 +146,19 @@ test("the module offers nothing the surface does not declare as shared or as Jav
   assert.deepStrictEqual(extra.sort(), []);
 });
 
-// [spec:pgorm:req:bindings.surface/test]
+// [spec:pgorm:req:bindings.surface+1/test]
 test("a gap that lands leaves the gap list", () => {
   const closed = [...gaps].filter(([key]) => all.has(key) && !expected.has(key)).map(([, path]) => path);
   assert.deepStrictEqual(closed.sort(), []);
 });
 
-// [spec:pgorm:req:bindings.surface/test]
+// [spec:pgorm:req:bindings.surface+1/test]
 test("every name the surface declares as JavaScript's own is still offered", () => {
   const stale = [...own].filter(([key]) => !all.has(key)).map(([, path]) => path);
   assert.deepStrictEqual(stale.sort(), []);
 });
 
-// [spec:pgorm:req:bindings.surface/test]
+// [spec:pgorm:req:bindings.surface+1/test]
 test("every gap names a plan node and every undecided name a question", () => {
   const shared = new Set(Object.entries(surface.modules).flatMap(([module, entries]) =>
     Object.entries(entries).flatMap(([name, methods]) => [
@@ -168,4 +172,77 @@ test("every gap names a plan node and every undecided name a question", () => {
   }
   for (const entry of Object.values(side.undecided)) assert.ok(entry.question in surface.questions);
   for (const reason of [...Object.values(side.only), ...Object.values(side.protocols)]) assert.ok(reason.trim());
+});
+
+const isList = (shape: Shape): shape is readonly [Shape] => Array.isArray(shape);
+
+/** Every key path a declared description holds, nested keys included. */
+function declaredPaths(shape: Shape, path = ""): string[] {
+  if (shape === null) return [];
+  if (isList(shape)) return declaredPaths(shape[0], `${path}[]`);
+  return Object.entries(shape).flatMap(([key, inner]) => [`${path}.${key}`, ...declaredPaths(inner, `${path}.${key}`)]);
+}
+
+/**
+ * How a live description differs from its declared shape, each difference at
+ * its neutral key path; every declared path it reaches joins `seen`.
+ * JavaScript spells a neutral key in camelCase (napi.naming).
+ */
+function differences(live: unknown, shape: Shape, path: string, seen: Set<string>): string[] {
+  if (shape === null) return [];
+  if (isList(shape)) {
+    if (!Array.isArray(live)) return [`${path}: is no array`];
+    return live.flatMap((item) => differences(item, shape[0], `${path}[]`, seen));
+  }
+  if (typeof live !== "object" || live === null || Array.isArray(live)) return [`${path}: is no object`];
+  const object = live as Record<string, unknown>;
+  const keys = Object.keys(shape);
+  if (keys.length === 1 && keys[0] === "*") {
+    return Object.values(object).flatMap((item) => {
+      seen.add(`${path}.*`);
+      return differences(item, shape["*"]!, `${path}.*`, seen);
+    });
+  }
+  const spelled = new Map(keys.map((key) => [camel(key), key]));
+  const found = Object.keys(object).filter((key) => !spelled.has(key)).map((key) => `${path}.${key}: undeclared`);
+  for (const [key, neutral] of spelled) {
+    if (!(key in object)) {
+      found.push(`${path}.${neutral}: missing`);
+      continue;
+    }
+    seen.add(`${path}.${neutral}`);
+    found.push(...differences(object[key], shape[neutral]!, `${path}.${neutral}`, seen));
+  }
+  return found;
+}
+
+/** Each description has exactly the keys declared for `owner`, and together they reach every one. */
+function assertDeclared(owner: string, descriptions: readonly unknown[]) {
+  const shape = surface.descriptions[owner]!;
+  const seen = new Set<string>();
+  const found = [...new Set(descriptions.flatMap((described) => differences(described, shape, owner, seen)))];
+  assert.deepStrictEqual(found.sort(), [], "describe() keys differ from bindings-surface.json's descriptions");
+  const unreached = declaredPaths(shape).map((path) => owner + path).filter((path) => !seen.has(path));
+  assert.deepStrictEqual(unreached.sort(), [], "declared keys no live description reached");
+}
+
+// [spec:pgorm:req:bindings.surface+1/test]
+// [spec:pgorm:req:bindings.models+4/test]
+test("a model's describe() reports exactly the keys the surface declares", () => {
+  const declared = pgorm.model("accounts", {
+    schema: "app",
+    columns: {
+      id: pgorm.column("i64", { primaryKey: true, generated: "always" }),
+      mood: pgorm.column(new pgorm.TypeName("mood", { schema: "app" }), { nullable: true, values: ["calm"] }),
+    },
+  });
+  assertDeclared("pgorm.Model", [declared.describe(), declared.as("a").describe()]);
+});
+
+// [spec:pgorm:req:bindings.surface+1/test]
+// [spec:pgorm:req:bindings.entities+3/test]
+test("a registered entity's describe() reports exactly the keys the surface declares", {
+  skip: pgorm.entities().length === 0 && "the module registers no entity; checks/entities.js runs this against an application's",
+}, () => {
+  assertDeclared("pgorm.Entity", pgorm.entities().map((name) => pgorm.entity(name).describe()));
 });

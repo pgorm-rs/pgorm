@@ -944,6 +944,7 @@ assertions (
     {id between-render-parens, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:14:51.562869Z}
     {id big-unsigned-binding, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:24.191318Z}
     {id binding-coverage-per-impl, kind @complete, author "brendan@necessary.nu", at 2026-10-30T14:18:38.065807Z}
+    {id binding-describe-shapes, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:44.983153Z}
     {id binding-renames, kind @complete, author "brendan@necessary.nu", at 2026-10-30T14:35:54.859252Z}
     {id bindings-array-subquery, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:53:58.290968Z}
     {id bindings-copy-created-multiranges, kind @complete, author "brendan@necessary.nu", at 2026-10-26T10:21:29.151829Z}
@@ -1199,6 +1200,7 @@ assertions (
     {id python-created-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:45:27.273279Z}
     {id python-datatype-export, kind @complete, author "brendan@necessary.nu", at 2026-10-19T12:56:06.241222Z}
     {id python-ddl-factories, kind @complete, author "brendan@necessary.nu", at 2026-10-31T22:52:13.77853Z}
+    {id python-hook-refusal-class, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:44.640722Z}
     {id python-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:34:09.315805Z}
     {id python-listen-header-duplicate, kind @complete, author "brendan@necessary.nu", at 2026-10-26T00:02:49.425118Z}
     {id python-merge-and-row-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:16:36.872555Z}
@@ -2256,18 +2258,11 @@ impl_evidence (
         {impl_name python, rule bindings.models}
         {impl_name python, rule bindings.pagination}
         {impl_name python, rule bindings.relations}
-    ), rule_versions_seen (
-        {id bindings.cursors, version 0}
-        {id bindings.graphs, version 0}
-        {id bindings.model-reads, version 0}
-        {id bindings.model-records, version 0}
-        {id bindings.model-writes, version 1}
-        {id bindings.models, version 3}
-        {id bindings.pagination, version 0}
-        {id bindings.relations, version 0}
     )}
-    {id python-registered-pools, rule_versions_seen (
-        {id bindings.registered-pools, version 0}
+    {id python-registered-pools, covered_rules (
+        bindings.registered-pools
+    ), covered_claims (
+        {impl_name python, rule bindings.registered-pools}
     )}
     {id python-schema-gaps, covered_rules (
         bindings.schema-alter

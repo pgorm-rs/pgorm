@@ -15235,6 +15235,13 @@ children (
                 kind @note
                 text "Found by python-binding-decisions (merged 70cbc894). pgorm's Error::Custom, which an ActiveModelBehavior hook's refusal arrives as, still maps to DatabaseError in pgorm-python/src/errors.rs, while bindings.entity-writes says a hook's refusal is a ConstructionError and JavaScript's entity_failure maps it so. Python's transaction task uses the same Custom variant internally, so mapping every Custom to ConstructionError would misreport those; give the internal uses a variant or a typed error of their own first, then map the hook's refusal, with a live test of each."
             }
+
+            {
+                at 2026-10-31T22:54:44.640722Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
         )
     }
 
@@ -15522,6 +15529,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Operator 2026-10-31: \"make that node\". Found merging python-model-shapes (b48f9869): Python's Model.describe() reports {schema, table, alias, columns: {field: {column, type, nullable, primary_key, default, generated, values}}, primary_key, path} where JavaScript's ModelDescription is {schema, table, alias, primaryKey, fields: {field: {column, kind, nullable, primaryKey, default, generated, values}}}: \"columns\" against \"fields\", \"type\" (a value snapshot's type) against \"kind\" (the string a result spells a column's kind as: i64, text[], enum \"app\".\"mood\"), and a Python-only \"path\". A registered entity's describe() differs the same way (pgorm-python/src/entities/metadata.rs: columns with an input_hint, against pgorm-napi's columns with sqlType, rustType and kind, and the relations' fields). Under decision (6) each key takes one name, spelled by each binding's naming rule; settle the set, change the side that differs (mostly Python, as decision (6) went), and state it in bindings.models and bindings.entities. bindings-surface.json checks callables only, so data shapes drift unseen: declare each describe() key set there and have each binding's surface test compare a live describe() against it, as it compares names."
+            }
+
+            {
+                at 2026-10-31T22:54:44.983153Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-11-01T00:38:32.024406Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Delivered in 21575750. Model: {schema, table, alias, primary_key, fields: {field: {column, kind, nullable, primary_key, default, generated, values}}}. Entity: {name, schema, table, columns: [{name, json_key, sql_type, rust_type, nullable, primary_key, kind, values}], primary_key, primary_key_without_overlaps, relations: [{name, type, from, to, columns, period, condition_type, on_condition, enforcement, deferrability}], rust: {entity, model, active_model, column}}. json_key kept as a shared key (JavaScript gained jsonKey) because Python's code generator falls back to it for a column name that is no identifier; Python's terminals, active_states and hooks dropped as constants JavaScript never reported. Left as they were, outside this node: a registered graph's describe() (Python {name, rust_shape, sources, terminals, aliases, cursor} against JavaScript {name, rustShape, sources}) and a source tuple's (Python {name, rust_shape, entities, terminals, result} against JavaScript {name, rustShape, entities}) still differ, and bindings-surface.json's descriptions do not declare them."
             }
         )
     }

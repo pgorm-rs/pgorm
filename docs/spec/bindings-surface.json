@@ -1,5 +1,5 @@
 {
-  "about": "The shared public surface of pgorm's two bindings (bindings.surface). Names are neutral: snake_case functions and methods, PascalCase classes and constants; each binding spells them by its naming rule (python.naming, napi.naming). A null entry is a function or a value; a list is a class's methods and constants. Each binding's suite reads its live module and compares it with this file.",
+  "about": "The shared public surface of pgorm's two bindings (bindings.surface). Names are neutral: snake_case functions and methods, PascalCase classes and constants; each binding spells them by its naming rule (python.naming, napi.naming). A null entry is a function or a value; a list is a class's methods and constants. Under descriptions, the keys of the data each describe() reports, neutral and spelled by each binding as its names are: a key mapped to null holds any value, to an object an object of exactly those keys, and to a one-item list a list whose items have that item's shape; an object whose one key is \"*\" maps names the program chose, each to that shape. Each binding's suite reads its live module and its live descriptions and compares them with this file.",
   "modules": {
     "pgorm": {
       "ActiveModel": ["delete", "get", "insert", "not_set", "reset", "set", "update"],
@@ -224,6 +224,59 @@
       "sum": null,
       "that": null,
       "this": null
+    }
+  },
+  "descriptions": {
+    "pgorm.Model": {
+      "schema": null,
+      "table": null,
+      "alias": null,
+      "primary_key": null,
+      "fields": {
+        "*": {
+          "column": null,
+          "kind": null,
+          "nullable": null,
+          "primary_key": null,
+          "default": null,
+          "generated": null,
+          "values": null
+        }
+      }
+    },
+    "pgorm.Entity": {
+      "name": null,
+      "schema": null,
+      "table": null,
+      "columns": [
+        {
+          "name": null,
+          "json_key": null,
+          "sql_type": null,
+          "rust_type": null,
+          "nullable": null,
+          "primary_key": null,
+          "kind": null,
+          "values": null
+        }
+      ],
+      "primary_key": null,
+      "primary_key_without_overlaps": null,
+      "relations": [
+        {
+          "name": null,
+          "type": null,
+          "from": {"schema": null, "table": null},
+          "to": {"schema": null, "table": null},
+          "columns": null,
+          "period": null,
+          "condition_type": null,
+          "on_condition": null,
+          "enforcement": null,
+          "deferrability": null
+        }
+      ],
+      "rust": {"entity": null, "model": null, "active_model": null, "column": null}
     }
   },
   "questions": {

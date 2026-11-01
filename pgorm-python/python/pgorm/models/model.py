@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from .writes import ModelDelete, ModelInsert, ModelUpdate
 
 
-# [spec:pgorm:req:bindings.models+3]
+# [spec:pgorm:req:bindings.models+4]
 @dataclass(frozen=True, eq=False, slots=True, init=False)
 class Model:
     table: p.Table
@@ -185,15 +185,18 @@ class Model:
 
     def describe(self) -> dict[str, Any]:
         """The declaration as data: the table, its primary key, and each
-        field's column with every option it was declared with."""
+        field's column with every option it was declared with, its kind
+        spelled as a decoded column's is compared: ``i64``, ``text[]``,
+        ``enum "app"."mood"``."""
         return {
             "schema": self.table.schema,
             "table": self.table.name,
             "alias": self.table.alias,
-            "columns": {
+            "primary_key": list(self.primary_key),
+            "fields": {
                 name: {
                     "column": column.name,
-                    "type": column._null.snapshot()["type"],
+                    "kind": column._null._kind_key(),
                     "nullable": column.nullable,
                     "primary_key": column.primary_key,
                     "default": column.default,
@@ -202,6 +205,4 @@ class Model:
                 }
                 for name, column in self.columns.items()
             },
-            "primary_key": list(self.primary_key),
-            "path": "runtime statements",
         }

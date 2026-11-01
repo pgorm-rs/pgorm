@@ -399,6 +399,6 @@ class GeneratedContract(unittest.TestCase):
         self.assertIn("def amount(self) -> Decimal:", stub)
         described = app.Account.describe()
         columns = {column["name"]: column for column in described["columns"]}
-        self.assertEqual(columns["id"]["rust_decode_type"], "i32")
+        self.assertEqual(columns["id"]["rust_type"], "i32")
         self.assertEqual(columns["display name"]["json_key"], "displayName")
         self.assertEqual(described["schema"], "python_entities")

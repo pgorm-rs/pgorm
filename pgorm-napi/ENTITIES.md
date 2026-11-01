@@ -111,11 +111,15 @@ const first = await query.optional(pool);    // Select::one_opt, LIMIT 1
   `IntoActiveModel`, `Account.withValue(record, column, value)` is
   `ModelTrait::set` on a copy, and `Account.tagged(record, column)` gives a
   column as a `Value` of its declared kind.
-- `describe()` reports the table, each column's SQL name, type, nullability,
-  key membership and kind, the primary key and whether it ends `WITHOUT
-  OVERLAPS`, every relation with its columns, period, condition type (`all`
-  or `any`), whether an `on_condition` adds a condition of its own,
-  enforcement and deferrability, and the Rust types behind it. A column whose type is a
+- `describe()` reports the registration's `name`, `schema` and `table`; its
+  `columns`, each one's SQL `name`, the `jsonKey` its Rust field serializes
+  under, `sqlType`, `rustType`, `nullable`, `primaryKey`, `kind` and an enum's
+  `values`; the `primaryKey` and whether it ends `WITHOUT OVERLAPS`
+  (`primaryKeyWithoutOverlaps`); every relation with its columns, period,
+  condition type (`all` or `any`), whether an `on_condition` adds a condition
+  of its own, enforcement and deferrability; and under `rust` the Rust types
+  behind it. These are the keys Python's `describe()` reports, each spelled in
+  camelCase. A column whose type is a
   domain has the kind of the type the domain is over, its values travelling
   as that type's do.
 

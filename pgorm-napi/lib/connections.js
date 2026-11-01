@@ -160,7 +160,7 @@ export async function runStatement(db, terminal, statement, options) {
  * addon — on a pool's connection, a connection or a transaction, with the
  * operation a statement gets around it: the busy refusal, the abort, the
  * discard of a connection an abort left in an unknown state.
- * [spec:pgorm:req:bindings.entities+2]
+ * [spec:pgorm:req:bindings.entities+3]
  * [spec:pgorm:req:bindings.registered-pools]
  *
  * @param {unknown} db

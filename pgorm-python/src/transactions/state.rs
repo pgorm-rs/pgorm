@@ -3,7 +3,7 @@ use super::{
     work::{Output, Work},
 };
 use crate::{
-    errors::{InternalError, LifecycleError, database_error},
+    errors::{InternalError, LifecycleError},
     runtime::ConnectionState,
 };
 use pyo3::prelude::*;
@@ -108,7 +108,7 @@ impl State {
             .await
             .map_err(|_| LifecycleError::new_err("transaction owner has closed"))?;
         guard.complete();
-        result.map_err(|error| database_error(error, &self.connection.pool.secrets))
+        result.map_err(|failure| failure.raised(&self.connection.pool.secrets))
     }
 
     pub(super) async fn begin(self: &Arc<Self>) -> PyResult<Arc<Self>> {

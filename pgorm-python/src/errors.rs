@@ -68,13 +68,15 @@ pub(crate) fn database_error(error: pgorm::Error, secrets: &Redactions) -> PyErr
         | pgorm::Error::RecordNotInserted
         | pgorm::Error::UnpackInsertId
         | pgorm::Error::Verify(_) => DecodeError::new_err(secrets.apply(&error.to_string())),
-        // A write pgorm refuses to build from what it was given.
+        // A write pgorm refuses to build from what it was given, and the
+        // refusal an application's ActiveModelBehavior hook returns:
+        // pgorm-python makes no `Error::Custom` of its own.
+        // [spec:pgorm:req:bindings.entity-writes]
         pgorm::Error::NothingToSet
         | pgorm::Error::PrimaryKeyNotSet
         | pgorm::Error::AttrNotSet(_)
-        | pgorm::Error::QueryBuilder(_) => {
-            ConstructionError::new_err(secrets.apply(&error.to_string()))
-        }
+        | pgorm::Error::QueryBuilder(_)
+        | pgorm::Error::Custom(_) => ConstructionError::new_err(secrets.apply(&error.to_string())),
         _ => DatabaseError::new_err(secrets.apply(&error.to_string())),
     }
 }

@@ -1,7 +1,7 @@
 use super::selected_backend::{Query, Terminal};
 use crate::{
     errors::InternalError,
-    execution::Target,
+    execution::Executor,
     transactions::work::{Output, Work},
 };
 use pyo3::{
@@ -17,7 +17,7 @@ pub(super) fn read<'py>(
     query: Query,
     terminal: Terminal,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let target = Target::extract(py, connection)?;
+    let target = Executor::extract(py, connection)?;
     query.compile(terminal)?;
     future_into_py(py, async move {
         let Output::Graph(rows) = target.run(Work::Sources(query, terminal)).await? else {

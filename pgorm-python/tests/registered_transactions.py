@@ -57,8 +57,10 @@ class RegisteredTransactions(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await self.account.find().all(tx), [])
 
     # [spec:pgorm:req:bindings.transactions/test]
+    # [spec:pgorm:req:bindings.entity-writes/test]    the hook's refusal, a ConstructionError,
+    # rolls back the write it refused inside the transaction
     async def test_after_hook_exception_rolls_back_database_write(self):
-        with self.assertRaises(p.DatabaseError):
+        with self.assertRaisesRegex(p.ConstructionError, "after_save refused"):
             async with self.pool.transaction() as tx:
                 active = self.account.active().set("id", 1).set("display name", "reject_after").set("note", None)
                 await active.insert(tx)
@@ -78,6 +80,25 @@ class RegisteredTransactions(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(connection.close(), 2)
             self.assertTrue(tx.closed)
             self.assertTrue(await self.pool.ping())
+
+    # [spec:pgorm:req:bindings.cancellation/test]
+    # [spec:pgorm:req:bindings.errors+3/test]    a transaction whose connection was given up
+    # refuses its next operation and its commit as closed, a LifecycleError, never the
+    # ConstructionError an application's refusal is
+    async def test_a_discarded_transaction_refuses_with_lifecycle_error(self):
+        async with self.pool.connection() as connection:
+            with self.assertRaises(p.LifecycleError):
+                async with connection.transaction() as tx:
+                    active = self.account.active().set("id", 1).set("display name", "wait_before").set("note", None)
+                    task = asyncio.ensure_future(active.insert(tx))
+                    await asyncio.sleep(0.05)
+                    task.cancel()
+                    with self.assertRaises(asyncio.CancelledError):
+                        await task
+                    with self.assertRaises(p.LifecycleError):
+                        await self.account.find().all(tx)
+            self.assertTrue(tx.closed)
+        self.assertEqual(await self.account.find().all(self.pool), [])
 
 
 if __name__ == "__main__":

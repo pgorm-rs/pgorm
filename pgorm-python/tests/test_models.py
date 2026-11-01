@@ -31,7 +31,7 @@ def accounts():
 
 
 class ModelConstruction(unittest.TestCase):
-    # [spec:pgorm:req:bindings.models+3/test]
+    # [spec:pgorm:req:bindings.models+4/test]
     def test_descriptor_names_and_values_are_owned(self):
         from pgorm.models.columns import MODEL_KINDS
 
@@ -70,7 +70,7 @@ class ModelConstruction(unittest.TestCase):
         self.assertEqual(write.inspect().params[-1].value, ["a"])
         self.assertEqual(write.inspect().params[0].kind, "i32")
 
-    # [spec:pgorm:req:bindings.models+3/test]
+    # [spec:pgorm:req:bindings.models+4/test]
     def test_describe_reports_each_fields_declaration(self):
         model = p.Model(
             "accounts",
@@ -79,6 +79,7 @@ class ModelConstruction(unittest.TestCase):
                 "display_name": p.Column("text", name="display name", default=True),
                 "mood": p.Column(p.TypeName("Mood", schema="app"), nullable=True, values=["calm"]),
                 "tags": p.Column("text", array=True, nullable=True),
+                "span": p.Column(p.CreatedRange("floatrange", "f64", schema="app")),
             },
             schema="app",
         ).as_("a")
@@ -87,24 +88,28 @@ class ModelConstruction(unittest.TestCase):
             {key: described[key] for key in ("schema", "table", "alias", "primary_key")},
             {"schema": "app", "table": "accounts", "alias": "a", "primary_key": ["id"]},
         )
-        self.assertEqual(described["columns"], {
-            "id": {"column": "id", "type": {"kind": "i64"}, "nullable": False, "primary_key": True,
+        self.assertEqual(described["fields"], {
+            "id": {"column": "id", "kind": "i64", "nullable": False, "primary_key": True,
                    "default": False, "generated": "always", "values": None},
-            "display_name": {"column": "display name", "type": {"kind": "text"}, "nullable": False,
+            "display_name": {"column": "display name", "kind": "text", "nullable": False,
                              "primary_key": False, "default": True, "generated": None, "values": None},
-            "mood": {"column": "mood", "type": {"kind": "enum", "name": "Mood", "schema": "app"},
+            "mood": {"column": "mood", "kind": 'enum "app"."Mood"',
                      "nullable": True, "primary_key": False, "default": False, "generated": None,
                      "values": ["calm"]},
-            "tags": {"column": "tags", "type": {"kind": "array", "element": {"kind": "text"}},
+            "tags": {"column": "tags", "kind": "text[]",
                      "nullable": True, "primary_key": False, "default": False, "generated": None,
                      "values": None},
+            "span": {"column": "span", "kind": 'range "app"."floatrange" of f64',
+                     "nullable": False, "primary_key": False, "default": False, "generated": None,
+                     "values": None},
         })
+        self.assertEqual(set(described), {"schema", "table", "alias", "primary_key", "fields"})
         for name in ("describe", "validate", "value"):
             with self.subTest(method=name):
                 self.assertFalse(hasattr(model.columns["id"], name))
         self.assertFalse(hasattr(model.col("id"), "describe"))
 
-    # [spec:pgorm:req:bindings.models+3/test]
+    # [spec:pgorm:req:bindings.models+4/test]
     def test_unknown_fields_and_collisions_fail_early(self):
         model = accounts()
         for operation in (

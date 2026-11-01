@@ -153,7 +153,7 @@ from .transactions import Transaction, TransactionMode, IsolationLevel
 from .copy import CopyOutStream, CopyRows, CopyRowStream, CopySource
 from .listen import Listener
 
-# [spec:pgorm:req:bindings.surface]
+# [spec:pgorm:req:bindings.surface+1]
 # [spec:pgorm:req:python.naming+2]
 select = Select
 insert = Insert
