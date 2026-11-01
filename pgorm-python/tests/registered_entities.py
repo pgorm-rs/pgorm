@@ -302,21 +302,23 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
             model.with_value(self.note.col("id"), 2)
         self.assertEqual(changed.into_active().get("display name").state, p.ActiveState.Unchanged)
 
-    # [spec:pgorm:req:bindings.entity-writes/test]
+    # [spec:pgorm:req:bindings.entity-writes/test]    a hook's refusal is a ConstructionError,
+    # never a DatabaseError, and the write it refused after the fact stands
     async def test_before_and_after_hooks_keep_write_outcomes(self):
         async with self.pool.connection() as connection:
-            with self.assertRaises(p.DatabaseError):
+            with self.assertRaisesRegex(p.ConstructionError, "before_save refused"):
                 await self.active(1, "reject_before").insert(connection)
             self.assertIsNone(await self.account.find().optional(connection))
-            with self.assertRaises(p.DatabaseError):
+            with self.assertRaisesRegex(p.ConstructionError, "after_save refused") as refused:
                 await self.active(2, "reject_after").insert(connection)
+            self.assertNotIsInstance(refused.exception, p.DatabaseError)
             self.assertEqual((await self.account.find().one(connection))["id"], 2)
             protected = await self.active(99).insert(connection)
-            with self.assertRaises(p.DatabaseError):
+            with self.assertRaisesRegex(p.ConstructionError, "before_delete refused"):
                 await protected.into_active().delete(connection)
             self.assertIsNotNone(await self.account.find().where(self.account.col("id") == 99).optional(connection))
             after = await self.active(98).insert(connection)
-            with self.assertRaises(p.DatabaseError):
+            with self.assertRaisesRegex(p.ConstructionError, "after_delete refused"):
                 await after.into_active().delete(connection)
             self.assertIsNone(await self.account.find().where(self.account.col("id") == 98).optional(connection))
 

@@ -15484,6 +15484,13 @@ children (
                 kind @status
                 text "Todo → Doing (nplan start)"
             }
+
+            {
+                at 2026-11-01T00:38:32.024406Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Delivered in 21575750. Model: {schema, table, alias, primary_key, fields: {field: {column, kind, nullable, primary_key, default, generated, values}}}. Entity: {name, schema, table, columns: [{name, json_key, sql_type, rust_type, nullable, primary_key, kind, values}], primary_key, primary_key_without_overlaps, relations: [{name, type, from, to, columns, period, condition_type, on_condition, enforcement, deferrability}], rust: {entity, model, active_model, column}}. json_key kept as a shared key (JavaScript gained jsonKey) because Python's code generator falls back to it for a column name that is no identifier; Python's terminals, active_states and hooks dropped as constants JavaScript never reported. Left as they were, outside this node: a registered graph's describe() (Python {name, rust_shape, sources, terminals, aliases, cursor} against JavaScript {name, rustShape, sources}) and a source tuple's (Python {name, rust_shape, entities, terminals, result} against JavaScript {name, rustShape, entities}) still differ, and bindings-surface.json's descriptions do not declare them."
+            }
         )
     }
 )

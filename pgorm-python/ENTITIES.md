@@ -252,9 +252,12 @@ wrappers. `Account.active()` calls the application's `ActiveModelBehavior::new`
 and preserves its defaults. Each write operates on a clone, so the Python
 wrapper is reusable; it is not a mutable object that marks itself saved.
 
-Insert, update and delete run the actual before/after hooks. A before-hook
-failure prevents the subsequent write. An after-hook failure is reported even
-though the write may already have committed. The binding adds no implicit
+Insert, update and delete run the actual before/after hooks. A hook's
+refusal, the `pgorm::Error::Custom` it returns, raises `ConstructionError`
+carrying its message; any other error a hook returns keeps its own class, a
+`DatabaseError` from the server among them. A before-hook failure prevents the
+subsequent write. An after-hook failure is reported even though the write may
+already have committed. The binding adds no implicit
 transaction or retries around these methods.
 
 Registered models decode with their actual `Model::from_query_result` and then

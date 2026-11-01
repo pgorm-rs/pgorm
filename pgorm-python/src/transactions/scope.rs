@@ -7,17 +7,36 @@ use super::{
 };
 use crate::{
     copy::{Columns, CopyFrom, CopyTo, Message, Piece, Unopened},
-    errors::database_error,
+    errors::{InternalError, Redactions, database_error},
     execution::Database,
 };
 use futures_util::future::BoxFuture;
 use pgorm::{DatabaseTransaction, Error, TransactionError, TransactionTrait};
-use pyo3::PyResult;
+use pyo3::{PyErr, PyResult};
 use std::{future::Future, sync::Arc, time::Duration};
 use tokio::sync::{OwnedMutexGuard, mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
-type Reply = oneshot::Sender<Result<Output, Error>>;
+/// What a frame's command failed with: pgorm's error, or the frame's
+/// transaction ending in a way this binding has no arm for. The binding makes
+/// no `Error` of its own, so an `Error::Custom` is the application's refusal.
+pub(super) enum Failure {
+    Pgorm(Error),
+    Unrepresented,
+}
+
+impl Failure {
+    pub(super) fn raised(self, secrets: &Redactions) -> PyErr {
+        match self {
+            Self::Pgorm(error) => database_error(error, secrets),
+            Self::Unrepresented => InternalError::new_err(
+                "the transaction failed in a way pgorm-python does not represent",
+            ),
+        }
+    }
+}
+
+type Reply = oneshot::Sender<Result<Output, Failure>>;
 
 /// The wait for a frame to open, answered with the error Python raises.
 pub(super) type Opened = oneshot::Sender<PyResult<()>>;
@@ -54,30 +73,39 @@ pub(super) enum Command {
 
 pub(super) struct Completion {
     pub(super) healthy: bool,
-    reply: Option<Reply>,
-    result: Result<Output, Error>,
+    /// The reply waiting on the frame's end, and what answers it.
+    answer: Option<(Reply, Result<Output, Failure>)>,
 }
 
 impl Completion {
+    /// A frame given up with its connection. A reply still waiting on it is
+    /// dropped unanswered, which Python reads as the transaction's owner
+    /// having closed.
     fn discarded() -> Self {
         Self {
             healthy: false,
-            reply: None,
-            result: Err(Error::Custom("transaction connection discarded".into())),
+            answer: None,
         }
     }
 
     fn finished(reply: Option<Reply>) -> Self {
         Self {
             healthy: true,
-            reply,
-            result: Ok(Output::Finished),
+            answer: reply.map(|reply| (reply, Ok(Output::Finished))),
+        }
+    }
+
+    /// A frame whose end left its connection in a state nobody knows.
+    fn failed(reply: Option<Reply>, failure: Failure) -> Self {
+        Self {
+            healthy: false,
+            answer: reply.map(|reply| (reply, Err(failure))),
         }
     }
 
     pub(super) fn respond(self) {
-        if let Some(reply) = self.reply {
-            let _ = reply.send(self.result);
+        if let Some((reply, result)) = self.answer {
+            let _ = reply.send(result);
         }
     }
 }
@@ -195,7 +223,7 @@ impl Frame {
                             _ = self.state.abandoned.cancelled() => return self.halt.discard().await,
                             result = work.run(Database::Transaction(&*tx)) => result,
                         };
-                        if reply.send(result).is_err() {
+                        if reply.send(result.map_err(Failure::Pgorm)).is_err() {
                             return self.halt.discard().await;
                         }
                     }
@@ -295,33 +323,51 @@ impl Frame {
                 if let Some(opened) = self.opened.take() {
                     return Ended::Refused(opened, error);
                 }
-                Completion {
-                    healthy: false,
-                    reply: self.committed.take(),
-                    result: Err(error),
-                }
+                Completion::failed(self.committed.take(), Failure::Pgorm(error))
             }
             Err(TransactionError::Transaction(Exit::RolledBack(reply))) => {
                 Completion::finished(Some(reply))
             }
             Err(TransactionError::Transaction(Exit::Abandoned)) => Completion::finished(None),
-            Err(TransactionError::RollbackFailed { cause, rollback }) => Completion {
-                healthy: false,
-                reply: match cause {
+            Err(TransactionError::RollbackFailed { cause, rollback }) => Completion::failed(
+                match cause {
                     Exit::RolledBack(reply) => Some(reply),
                     Exit::Abandoned => None,
                 },
-                result: Err(rollback),
-            },
+                Failure::Pgorm(rollback),
+            ),
             // A failure with no arm here leaves the connection in a state
             // nobody knows, as a failed ROLLBACK does.
-            Err(_) => Completion {
-                healthy: false,
-                reply: self.committed.take(),
-                result: Err(Error::Custom(
-                    "the transaction failed in a way pgorm-python does not represent".to_owned(),
-                )),
-            },
+            Err(_) => Completion::failed(self.committed.take(), Failure::Unrepresented),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::errors::ConstructionError;
+    use pyo3::Python;
+
+    // [spec:pgorm:req:bindings.errors+3/test]    a transaction ending this binding has no arm
+    // for is its own failure, an InternalError, while pgorm's `Error::Custom`, which only an
+    // application's hook returns, is the ConstructionError a hook's refusal is
+    #[test]
+    fn frame_failures_keep_their_own_class() {
+        Python::initialize();
+        Python::attach(|py| {
+            let secrets = Redactions::default();
+            assert!(
+                Failure::Unrepresented
+                    .raised(&secrets)
+                    .is_instance_of::<InternalError>(py)
+            );
+            let refusal = Failure::Pgorm(Error::Custom("before_save refused".into()));
+            assert!(
+                refusal
+                    .raised(&secrets)
+                    .is_instance_of::<ConstructionError>(py)
+            );
+        });
     }
 }
