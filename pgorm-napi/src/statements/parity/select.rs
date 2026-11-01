@@ -226,6 +226,24 @@ fn matches_and_quantifiers() -> SelectStatement {
         .to_owned()
 }
 
+fn quantifiers_beyond_comparisons() -> SelectStatement {
+    let patterns = || Query::select().expr(col!("p")).from(table!("u")).to_owned();
+    let bound = Func::any(Expr::val(vec!["x%".to_owned(), "y%".to_owned()]));
+    star!()
+        .from(table!("t"))
+        .cond_where(
+            Condition::all()
+                .add(col!("a").binary(BinOper::Like, bound))
+                .add(col!("a").binary(BinOper::NotILike, Expr::all(patterns())))
+                .add(col!("a").binary(BinOper::RegexCaseInsensitive, Func::any(col!("b"))))
+                .add(col!("span").binary(BinOper::Contained, Func::any(col!("spans"))))
+                .add(col!("span").binary(BinOper::AdjacentTo, Expr::all(patterns())))
+                .add(col!("doc").binary(BinOper::JsonPathExists, Func::any(col!("paths"))))
+                .add(col!("body").binary(BinOper::Matches, Func::all(col!("queries")))),
+        )
+        .to_owned()
+}
+
 fn casts() -> SelectStatement {
     let mood = TypeName::new(n("Mood")).schema(n("app")).array();
     let twice: SimpleExpr = Expr::expr(col!("f")).index(1i64).into();
@@ -631,6 +649,10 @@ pub(super) fn cases() -> Vec<(&'static str, (String, Values))> {
         ("patterns", patterns().build()),
         ("regex-and-json-path", regex_and_json_path().build()),
         ("matches-and-quantifiers", matches_and_quantifiers().build()),
+        (
+            "quantifiers-beyond-comparisons",
+            quantifiers_beyond_comparisons().build(),
+        ),
         ("casts-collations-subscripts", casts().build()),
         ("case", case().build()),
         ("values", values().build()),

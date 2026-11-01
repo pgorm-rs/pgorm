@@ -131,7 +131,7 @@ pub enum Tag {
 }
 
 impl Tag {
-    // [spec:pgorm:req:bindings.argument-errors]
+    // [spec:pgorm:req:bindings.argument-errors+1]
     pub fn parse(value: &Bound<'_, PyAny>) -> PyResult<Self> {
         if let Ok(name) = value.extract::<PyRef<'_, PyTypeName>>() {
             Ok(Self::Enum(name.clone()))

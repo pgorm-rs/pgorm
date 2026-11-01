@@ -84,7 +84,7 @@ function withoutSslmode(text: string, host?: string): string {
 }
 
 // [spec:pgorm:req:bindings.connections+2/test]
-// [spec:pgorm:req:bindings.argument-errors/test]
+// [spec:pgorm:req:bindings.argument-errors+1/test]
 test("a pool sends nothing until used, and refuses an unusable option at construction", async () => {
   await using unreachable = new Pool("postgres://pgorm@127.0.0.1:1/postgres?sslmode=disable");
   assert.equal(unreachable.closed, false);

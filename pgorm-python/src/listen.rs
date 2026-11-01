@@ -115,7 +115,7 @@ enum Request {
     UnlistenAll,
 }
 
-// [spec:pgorm:req:bindings.argument-errors]
+// [spec:pgorm:req:bindings.argument-errors+1]
 fn channel(value: &Bound<'_, PyAny>) -> PyResult<String> {
     value
         .extract::<String>()

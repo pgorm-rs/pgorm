@@ -134,7 +134,7 @@ option.
 > an operation pending, and MUST NOT be classified as an expected rejection of
 > input.
 
-> [spec:pgorm:req:bindings.argument-errors]
+> [spec:pgorm:req:bindings.argument-errors+1]
 > An argument of a type the call does not take MUST be refused with the
 > language's `TypeError`, before anything is sent; a `ConstructionError`
 > (`bindings.errors`) is left to an argument whose value cannot become what
@@ -185,7 +185,8 @@ option.
 > COPY row's field and a JSON document may each be any value of the
 > language, and one that cannot become what pgorm sends is a
 > `ConstructionError`: a builder that is no expression given as an operand,
-> and `any(..)` and `all(..)` outside a comparison, among them. So is a name
+> and `any(..)` and `all(..)` where no operator takes one
+> (`bindings.quantifiers`), among them. So is a name
 > pgorm has nothing for — a function, a value kind, a built-in type, a
 > pipeline cast, a registration, a field or a column — an identifier outside
 > 1–63 bytes, a count or size out of range, an integer outside `bigint`, an
@@ -817,13 +818,34 @@ the same terminals that run raw SQL.
 > CHECK tests. `asc()` and `desc()` give an ordering, with NULLS FIRST or
 > LAST, and `as(alias)` an aliased projection item.
 
-> [spec:pgorm:req:bindings.quantifiers]
+> [spec:pgorm:req:bindings.quantifiers+1]
 > `any(source)` and `all(source)` MUST be `ANY (..)` and `ALL (..)`:
 > pgorm-query's `Expr::any` / `Expr::all` over a `Select`'s rows, and
 > `Func::any` / `Func::all` over an array, an expression or a value bound as
-> one array parameter. Each is a `Quantified`, no expression: the right
-> operand of `eq`, `ne`, `lt`, `lte`, `gt` and `gte` alone, as PostgreSQL's
-> grammar reads it. Any other operator, operand position, membership list and
+> one array parameter. Each is a `Quantified`, no expression, and MUST be
+> taken as the right operand of each operator PostgreSQL reads one after:
+> every operator its grammar takes before `ANY` or `ALL` whose result is a
+> boolean, which the server requires of one:
+>
+> - the comparisons `eq`, `ne`, `lt`, `lte`, `gt` and `gte`;
+> - `like`, `not_like`, `ilike` and `not_ilike`, the quantifier ranging over
+>   patterns with no escape, since the grammar reads no `ESCAPE` after one;
+> - `regex`, `not_regex`, `iregex` and `not_iregex`;
+> - `contains`, `contained_by` and `overlaps`;
+> - `strictly_left_of`, `strictly_right_of`, `not_extend_right_of`,
+>   `not_extend_left_of` and `adjacent_to`;
+> - `matches` and `path_exists`, the latter's quantifier ranging over
+>   `jsonpath` values: PostgreSQL reads a bound array there as `jsonpath[]`,
+>   which pgorm sends no text as, so an array of text is a
+>   `ConstructionError` as the statement runs, and one cast to `jsonpath[]`
+>   is sent.
+>
+> Each is the pgorm-query operator of its meaning with the quantifier as its
+> right operand. The grammar reads none after `similar_to`, `not_similar_to`,
+> `is_distinct_from`, `is_not_distinct_from`, `between` or a membership test,
+> and the server refuses one after an operator whose result is no boolean
+> (`42809`), arithmetic and `concat`. Those operators, an escape given with a
+> quantified pattern, every other operand position, a membership list and
 > `bind` MUST refuse it with a `ConstructionError`.
 
 > [spec:pgorm:req:bindings.case]

@@ -241,6 +241,8 @@
       "pgorm.EntityColumn": ["add", "sub", "mul", "div", "mod", "and", "or", "not"],
       "pgorm.ModelColumn": ["add", "sub", "mul", "div", "mod", "and", "or", "not"],
       "pgorm.Condition": ["not"],
+      "pgorm.SearchedCase": ["add", "sub", "mul", "div", "mod", "and", "or", "not"],
+      "pgorm.SimpleCase": ["add", "sub", "mul", "div", "mod", "and", "or", "not"],
       "pipeline.PipelineExpr": ["add", "sub", "mul", "div", "and", "or", "not", "neg"]
     },
     "spellings": {
@@ -294,11 +296,6 @@
       "pipeline.null": "literal(None) under a name of its own, which JavaScript cannot give a function since null is a reserved word there; JavaScript writes literal(null)"
     },
     "gaps": {
-      "pgorm.CaseOperand": "python-case-expressions",
-      "pgorm.SearchedCase": "python-case-expressions",
-      "pgorm.SimpleCase": "python-case-expressions",
-      "pgorm.case_of": "python-case-expressions",
-      "pgorm.case_when": "python-case-expressions",
       "pgorm.Select.as": "python-select-gaps",
       "pgorm.Select.lock": "python-select-gaps",
       "pgorm.Insert.overriding": "python-statement-gaps",

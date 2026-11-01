@@ -2314,13 +2314,11 @@ impl_evidence (
         {impl_name python, rule bindings.argument-errors}
         {impl_name python, rule bindings.operands}
         {impl_name python, rule bindings.row-count}
-    ), rule_versions_seen (
-        {id bindings.argument-errors, version 0}
-        {id bindings.operands, version 0}
-        {id bindings.row-count, version 0}
     )}
-    {id python-case-expressions, rule_versions_seen (
-        {id bindings.case, version 0}
+    {id python-case-expressions, covered_rules (
+        bindings.case
+    ), covered_claims (
+        {impl_name python, rule bindings.case}
     )}
     {id python-model-column-operators, covered_rules (
         bindings.column-operators
@@ -2448,8 +2446,6 @@ impl_evidence (
     ), covered_claims (
         {impl_name javascript, rule bindings.quantifiers}
         {impl_name python, rule bindings.quantifiers}
-    ), rule_versions_seen (
-        {id bindings.quantifiers, version 0}
     )}
     {id query-reexports-curated, covered_rules (
         sql.surface

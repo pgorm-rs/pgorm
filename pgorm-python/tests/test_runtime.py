@@ -108,7 +108,7 @@ class RuntimeTests(unittest.IsolatedAsyncioTestCase):
     # [spec:pgorm:req:bindings.errors+3/test]
     # [spec:pgorm:req:bindings.connections+2/test]    an empty or overlong
     # statement_cache_channel is a ConstructionError, and one of another type a TypeError
-    # [spec:pgorm:req:bindings.argument-errors/test]
+    # [spec:pgorm:req:bindings.argument-errors+1/test]
     async def test_bad_configuration_is_an_explicit_construction_error(self):
         for options in (
             {"max_size": 0}, {"max_size": -1},

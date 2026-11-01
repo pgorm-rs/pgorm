@@ -271,7 +271,7 @@ test("a placeholder used outside the stage its binder's function returns it to i
 });
 
 // [spec:pgorm:req:bindings.pipeline-binder/test]
-// [spec:pgorm:req:bindings.argument-errors/test]
+// [spec:pgorm:req:bindings.argument-errors+1/test]
 test("shapes a pipeline cannot take are refused as they are built", () => {
   assert.throws(() => base.filterWith((async () => id.gt(1)) as never), TypeError);
   assert.throws(() => base.deriveWith((() => "column") as never), TypeError);

@@ -73,7 +73,7 @@ pub(crate) enum Node {
     /// expression yet: PostgreSQL's grammar requires a `WHEN`.
     CaseOperand(SimpleExpr),
     /// `ANY (..)` or `ALL (..)`, which PostgreSQL's grammar reads only as the
-    /// right operand of a comparison, so no other operator takes it.
+    /// right operand of an operator, so no other position takes it.
     Quantified(SimpleExpr),
     Table(NamedTable),
     FromItem(FromItem),

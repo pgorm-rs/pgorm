@@ -119,7 +119,7 @@ test("a MERGE with no WHEN arm has nothing to inspect, and every terminal refuse
 });
 
 // [spec:pgorm:req:bindings.merge/test]
-// [spec:pgorm:req:bindings.argument-errors/test]
+// [spec:pgorm:req:bindings.argument-errors+1/test]
 test("an arm takes only an action its kind of row can take", () => {
   const pending = merge(target, source, on);
   const statement = pending.whenMatched(MergeAction.delete());

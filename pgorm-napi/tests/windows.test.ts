@@ -245,7 +245,7 @@ test("the window-only functions and the JSON aggregates run over a window", asyn
 });
 
 // [spec:pgorm:req:bindings.windows/test]
-// [spec:pgorm:req:bindings.argument-errors/test]
+// [spec:pgorm:req:bindings.argument-errors+1/test]
 test("OVER follows only a call, a frame only ends after its start, and a window-only function needs its window", () => {
   const ordered = new Window().orderBy(byId);
   assert.throws(() => col("x").over(ordered), refused(/OVER follows only a function call/));

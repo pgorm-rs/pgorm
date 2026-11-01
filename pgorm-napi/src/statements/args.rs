@@ -352,7 +352,7 @@ pub(crate) fn choice<'cx>(
 /// meaning)`. A closed choice is a type, a union of string literals as
 /// Python's is a class of constants, so anything outside it is a
 /// `TypeError`.
-// [spec:pgorm:req:bindings.argument-errors]
+// [spec:pgorm:req:bindings.argument-errors+1]
 pub(crate) fn pick<'cx, T: Clone>(
     cx: &mut Cx<'cx>,
     value: Handle<'cx, JsValue>,

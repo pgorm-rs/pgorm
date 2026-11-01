@@ -94,7 +94,7 @@ export function trusted(trusted, name, madeBy) {
 export function statementArgs(statement, params, options) {
   if (statement instanceof Handle) {
     if (Array.isArray(params)) {
-      // [spec:pgorm:req:bindings.argument-errors]
+      // [spec:pgorm:req:bindings.argument-errors+1]
       throw new TypeError("a built statement binds its own values: pass its options second");
     }
     return [handleOf(statement), [], params ?? {}];

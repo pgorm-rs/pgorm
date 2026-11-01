@@ -199,7 +199,7 @@ test("a write that cannot run is refused before anything is sent", async () => {
 });
 
 // [spec:pgorm:req:bindings.writes/test]
-// [spec:pgorm:req:bindings.argument-errors/test]
+// [spec:pgorm:req:bindings.argument-errors+1/test]
 test("shapes an INSERT, an UPDATE or a conflict cannot take are refused as they are built", () => {
   assert.throws(() => insert(account).values(1), refused(/follows columns/));
   assert.throws(() => insert(account).columns("a", "a"), refused(/"a" is named twice/));

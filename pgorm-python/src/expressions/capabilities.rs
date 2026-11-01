@@ -160,6 +160,16 @@ pub(crate) fn operations() -> Map<String, Value> {
             "condition.inspect",
             "pgorm_query::SelectStatement::cond_where, SelectStatement::build",
         ),
+        ("case_when", "pgorm_query::Expr::case"),
+        ("searched_case.when", "pgorm_query::CaseStatement::case"),
+        ("searched_case.else_", "pgorm_query::CaseStatement::finally"),
+        ("case_of", "pgorm_query::Expr::case_of"),
+        ("case_operand.when", "pgorm_query::CaseOperand::when"),
+        ("simple_case.when", "pgorm_query::SimpleCaseStatement::when"),
+        (
+            "simple_case.else_",
+            "pgorm_query::SimpleCaseStatement::finally",
+        ),
         ("order_by", "pgorm_query::Order, pgorm_query::NullOrdering"),
         ("expr.as_", "pgorm_query::SimpleExpr, pgorm_query::Name"),
     ]

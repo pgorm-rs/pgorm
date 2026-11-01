@@ -57,6 +57,13 @@ async def invalid(connection: p.Connection) -> None:
     p.GroupingElement.sets()  # expected-error: call-arg
     p.Table("t").tablesample("bernoulli", 10)  # expected-error: arg-type
     p.TableFunction(p.Table("t"))  # expected-error: arg-type
+    p.case_when("x > 0", 1)  # expected-error: arg-type
+    p.case_of(p.col("x")).else_(0)  # expected-error: attr-defined
+    p.case_when(p.col("x") > 0, 1).else_(0).when(p.col("x") < 0, 2)  # expected-error: attr-defined
+    p.select(p.case_of(p.col("x")))  # expected-error: arg-type
+    p.col("x").like(p.any_(["a%"])) & p.col("doc").path_exists(p.all_(p.col("paths")))
+    p.col("x").similar_to(p.any_(["a%"]))  # expected-error: arg-type
+    p.col("doc").path_exists(p.col("path"))  # expected-error: arg-type
     pl.from_(p.Table("t")).filter_with(42)  # expected-error: arg-type
     optional: p.Record | None = await connection.query(  # expected-error: assignment
         p.select(p.literal(1))

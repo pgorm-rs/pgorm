@@ -133,7 +133,7 @@ pub(super) fn type_refs(value: &Bound<'_, PyAny>) -> PyResult<(TypeRef, Vec<Type
 }
 
 /// `value`, a string that is one of `choices`, given as `(spelling, meaning)`.
-// [spec:pgorm:req:bindings.argument-errors]
+// [spec:pgorm:req:bindings.argument-errors+1]
 pub(super) fn pick<T: Clone>(value: &str, what: &str, choices: &[(&str, T)]) -> PyResult<T> {
     match choices.iter().find(|(spelling, _)| *spelling == value) {
         Some((_, meaning)) => Ok(meaning.clone()),

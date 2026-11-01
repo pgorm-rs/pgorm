@@ -1268,10 +1268,10 @@ fn array_subquery_matches_rust_expr_array() -> PyResult<()> {
 }
 
 // [spec:pgorm:req:bindings.expressions+2/test]    exists, scalar, IN a Select and any_ / all_
-// [spec:pgorm:req:bindings.quantifiers/test]
+// [spec:pgorm:req:bindings.quantifiers+1/test]
 // are Rust's Expr::exists, the scalar SubQuery, in_subquery / not_in_subquery and Expr::any /
 // Expr::all over a subquery or Func::any / Func::all over an array, a quantifier taken by each
-// comparison and refused by every other operator
+// comparison and refused by arithmetic, IS DISTINCT FROM, a membership list and bind
 #[test]
 fn subquery_expressions_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -1331,6 +1331,112 @@ fn subquery_expressions_match_rust_builders() -> PyResult<()> {
                 ),
                 "{refused} is refused"
             );
+        }
+        Ok(())
+    })
+}
+
+// [spec:pgorm:req:bindings.quantifiers+1/test]    any_ and all_ are the right operand of LIKE's
+// and ILIKE's family, the regular-expression matches, containment, the range positions, @@ and
+// @?, each Rust's operator over Func::any / Func::all or Expr::any / Expr::all, and every other
+// operator and operand position refuses one
+#[test]
+fn quantifiers_follow_each_operator_postgres_reads() -> PyResult<()> {
+    Python::initialize();
+    Python::attach(|py| {
+        let globals = module(py)?;
+        let a = || Expr::col(Name::runtime("a"));
+        let rows = Query::select()
+            .expr(Expr::col(Name::runtime("p")))
+            .from(Name::runtime("u"))
+            .to_owned();
+        let filtered = |predicate: SimpleExpr| {
+            Query::select()
+                .column(Asterisk)
+                .from(Name::runtime("t"))
+                .cond_where(predicate)
+                .build()
+        };
+        for (method, operator) in [
+            ("like", BinOper::Like),
+            ("not_like", BinOper::NotLike),
+            ("ilike", BinOper::ILike),
+            ("not_ilike", BinOper::NotILike),
+            ("regex", BinOper::Regex),
+            ("not_regex", BinOper::NotRegex),
+            ("iregex", BinOper::RegexCaseInsensitive),
+            ("not_iregex", BinOper::NotRegexCaseInsensitive),
+            ("contains", BinOper::Contains),
+            ("contained_by", BinOper::Contained),
+            ("overlaps", BinOper::Overlap),
+            ("strictly_left_of", BinOper::LShift),
+            ("strictly_right_of", BinOper::RShift),
+            ("not_extend_right_of", BinOper::NotExtendRightOf),
+            ("not_extend_left_of", BinOper::NotExtendLeftOf),
+            ("adjacent_to", BinOper::AdjacentTo),
+            ("matches", BinOper::Matches),
+            ("path_exists", BinOper::JsonPathExists),
+        ] {
+            let quantified = Func::any(Expr::col(Name::runtime("b")));
+            parity(
+                py,
+                &globals,
+                &format!(
+                    "p.Select().from_(p.Table('t')).where(p.col('a').{method}(p.any_(p.col('b'))))"
+                ),
+                filtered(a().binary(operator, quantified)),
+            )?;
+            parity(
+                py,
+                &globals,
+                &format!(
+                    "p.Select().from_(p.Table('t')).where(p.col('a').{method}(p.all_(p.Select(p.col('p')).from_(p.Table('u')))))"
+                ),
+                filtered(a().binary(operator, Expr::all(rows.clone()))),
+            )?;
+        }
+        let patterns = Value::Array(
+            ArrayType::String,
+            Some(Box::new(vec!["a%".into(), "b%".into()])),
+        );
+        parity(
+            py,
+            &globals,
+            "p.Select().from_(p.Table('t')).where(p.col('a').like(p.any_(['a%', 'b%'])))",
+            filtered(a().binary(BinOper::Like, Func::any(Expr::val(patterns)))),
+        )?;
+        for (source, class) in [
+            (
+                "p.col('a').similar_to(p.any_(p.col('b')))",
+                "ConstructionError",
+            ),
+            (
+                "p.col('a').not_similar_to(p.all_(p.col('b')))",
+                "ConstructionError",
+            ),
+            (
+                "p.col('a').is_not_distinct_from(p.any_(p.col('b')))",
+                "ConstructionError",
+            ),
+            (
+                "p.col('a').between(p.any_(p.col('b')), 1)",
+                "ConstructionError",
+            ),
+            ("p.col('a').concat(p.any_(p.col('b')))", "ConstructionError"),
+            ("p.col('a') % p.all_(p.col('b'))", "ConstructionError"),
+            (
+                "p.col('a').starts_with(p.any_(p.col('b')))",
+                "ConstructionError",
+            ),
+            ("p.col('a').at(p.any_(p.col('b')))", "ConstructionError"),
+            ("p.col('a').like('a%')", "TypeError"),
+            ("p.col('a').path_exists(1)", "TypeError"),
+        ] {
+            let error = py
+                .eval(&CString::new(source)?, Some(&globals), None)
+                .expect_err(source);
+            let name = error.get_type(py).name()?;
+            assert_eq!(name.to_string(), class, "{source}: {error}");
         }
         Ok(())
     })

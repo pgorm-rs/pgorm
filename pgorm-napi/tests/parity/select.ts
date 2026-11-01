@@ -4,6 +4,7 @@
 // with pgorm-query's own builders.
 // [spec:pgorm:req:bindings.select+2/test]
 // [spec:pgorm:req:bindings.expressions+2/test]
+// [spec:pgorm:req:bindings.quantifiers+1/test]
 
 import {
   all,
@@ -129,6 +130,20 @@ export const cases: Record<string, () => Builder> = {
         col("score").gt(all(ids("v"))),
         col("id").lte(any(ids("w"))),
         col("a").gte(any(col("b"))),
+      ),
+    );
+  },
+  "quantifiers-beyond-comparisons": () => {
+    const patterns = select(col("p")).from(new Table("u"));
+    return select().from(t).where(
+      Condition.all(
+        col("a").like(any(["x%", "y%"])),
+        col("a").notIlike(all(patterns)),
+        col("a").iregex(any(col("b"))),
+        col("span").containedBy(any(col("spans"))),
+        col("span").adjacentTo(all(patterns)),
+        col("doc").pathExists(any(col("paths"))),
+        col("body").matches(all(col("queries"))),
       ),
     );
   },
