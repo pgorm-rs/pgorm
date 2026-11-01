@@ -70,7 +70,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
         def active(identity, name):
             return app.Account.active().set_id(identity).set_display_name(name).set_note(None)
 
-        renamed = p.ConflictTarget("id").update("display name")
+        renamed = p.Conflict.on("id").update("display name")
         async with self.pool.connection() as connection:
             first = await app.Account.insert(active(1, "One")).returning_upsert(connection)
             self.assertIsInstance(first, Inserted)

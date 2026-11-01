@@ -30,6 +30,24 @@ impl PyConflict {
         }
     }
 
+    // [spec:pgorm:req:bindings.writes+2]
+    // [spec:pgorm:req:bindings.conflict-arbiters]
+    /// An inference target: at least one column name or index expression.
+    #[staticmethod]
+    #[pyo3(signature = (*targets))]
+    fn on(targets: &Bound<'_, PyTuple>) -> PyResult<PyConflictTarget> {
+        let mut target = None;
+        for item in targets.iter() {
+            target = Some(element(target, &item)?);
+        }
+        let target = target.ok_or_else(|| {
+            ConstructionError::new_err("a conflict target names at least one column or expression")
+        })?;
+        Ok(PyConflictTarget {
+            inner: Arbiter::Target(target),
+        })
+    }
+
     // [spec:pgorm:req:bindings.conflict-arbiters]
     /// The constraint named outright, `ON CONSTRAINT "name"`, which takes no
     /// partial-index predicate.
@@ -99,10 +117,26 @@ fn element(target: Option<ConflictTarget>, item: &Bound<'_, PyAny>) -> PyResult<
     })
 }
 
-// [spec:pgorm:req:bindings.writes+1]
+/// The columns an update sets from `EXCLUDED`: the first, which makes the
+/// update, and the rest. An update naming none is refused.
+fn excluded(columns: &Bound<'_, PyTuple>) -> PyResult<(Name, Vec<Name>)> {
+    let mut names = columns
+        .iter()
+        .map(|column| Ok(PyIdentifier::new(&column)?.name()))
+        .collect::<PyResult<Vec<_>>>()?;
+    if names.is_empty() {
+        return Err(ConstructionError::new_err(
+            "an update names at least one column",
+        ));
+    }
+    let first = names.remove(0);
+    Ok((first, names))
+}
+
+// [spec:pgorm:req:bindings.writes+2]
 // [spec:pgorm:req:bindings.conflict-arbiters]
-/// A conflict arbiter before choosing its action: a nonempty inference
-/// target of column names and index expressions, or `Conflict.on_constraint`.
+/// A conflict arbiter before choosing its action, made by `Conflict.on` or
+/// `Conflict.on_constraint`.
 #[pyclass(name = "ConflictTarget", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyConflictTarget {
@@ -111,21 +145,6 @@ pub struct PyConflictTarget {
 
 #[pymethods]
 impl PyConflictTarget {
-    #[new]
-    #[pyo3(signature = (*targets))]
-    fn new(targets: &Bound<'_, PyTuple>) -> PyResult<Self> {
-        let mut target = None;
-        for item in targets.iter() {
-            target = Some(element(target, &item)?);
-        }
-        let target = target.ok_or_else(|| {
-            ConstructionError::new_err("conflict target requires at least one column or expression")
-        })?;
-        Ok(Self {
-            inner: Arbiter::Target(target),
-        })
-    }
-
     // [spec:pgorm:req:bindings.conflict-arbiters]
     /// The partial index's predicate; an `ON CONSTRAINT` arbiter takes none.
     fn r#where(&self, predicate: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -135,7 +154,7 @@ impl PyConflictTarget {
                 inner: Arbiter::Target(target.clone().cond_where(predicate)),
             }),
             Arbiter::Constraint(_) => Err(ConstructionError::new_err(
-                "ON CONSTRAINT takes no predicate; a partial index's predicate goes with ConflictTarget(..)",
+                "ON CONSTRAINT takes no predicate; a partial index's predicate goes with Conflict.on(..)",
             )),
         }
     }
@@ -146,20 +165,14 @@ impl PyConflictTarget {
         }
     }
 
+    /// Set columns from the row that failed to insert, `EXCLUDED`'s; at least
+    /// one.
     #[pyo3(signature = (*columns))]
     fn update(&self, columns: &Bound<'_, PyTuple>) -> PyResult<PyConflictUpdate> {
-        let mut columns = columns.iter();
-        let first = columns.next().ok_or_else(|| {
-            ConstructionError::new_err("conflict update requires at least one column")
-        })?;
-        let mut inner = self
-            .inner
-            .clone()
-            .update_column(PyIdentifier::new(&first)?.name());
-        for column in columns {
-            inner = inner.update_column(PyIdentifier::new(&column)?.name());
-        }
-        Ok(PyConflictUpdate { inner })
+        let (first, rest) = excluded(columns)?;
+        Ok(PyConflictUpdate {
+            inner: self.inner.clone().update_column(first).update_columns(rest),
+        })
     }
 
     fn set(
@@ -200,12 +213,11 @@ impl PyConflictUpdate {
         })
     }
 
-    fn update(&self, column: &Bound<'_, PyAny>) -> PyResult<Self> {
+    #[pyo3(signature = (*columns))]
+    fn update(&self, columns: &Bound<'_, PyTuple>) -> PyResult<Self> {
+        let (first, rest) = excluded(columns)?;
         Ok(Self {
-            inner: self
-                .inner
-                .clone()
-                .update_column(PyIdentifier::new(column)?.name()),
+            inner: self.inner.clone().update_column(first).update_columns(rest),
         })
     }
 

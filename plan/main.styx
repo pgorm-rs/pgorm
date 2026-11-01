@@ -15628,6 +15628,13 @@ children (
                 kind @note
                 text "Decisions (D) and (E) of the operator's 2026-11-01 answer (binding-spec-consolidation). (D) In pgorm-python: Conflict.on(*targets) names an inference target of columns and index expressions, as pgorm-napi's Conflict.on does; ConflictTarget stays exported for annotations but is not constructible; ConflictUpdate.update(*columns) takes several, as JavaScript's update(...columns). (E) MergeAction.update(column, value), .insert(column, value), .delete(), .do_nothing() and .insert_defaults() as pgorm-napi's MergeAction factories; MatchedAction and NotMatchedAction deleted; MergeUpdate and MergeInsert not constructible; an action given to the wrong kind of arm is a ConstructionError, as bindings.merge requires (Python raises TypeError today, breaking it); the stubs keep the matched and not-matched arms' types apart so mypy still refuses a wrong pairing. Update python.naming (it still says ConflictTarget(columns)), the shared rules, bindings-surface.json's shapes entries, docs, typing cases and the generative campaign."
             }
+
+            {
+                at 2026-11-01T11:20:16.633915Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Delivered (D): Conflict.on(*targets) makes an inference target of columns and index expressions; ConflictTarget has no constructor (stub __init__ takes Never); ConflictUpdate.update(*columns) takes one or more, none a ConstructionError as on a ConflictTarget. (E): MergeAction.update/insert/delete/do_nothing/insert_defaults make every MERGE action; MatchedAction and NotMatchedAction are deleted; MergeUpdate and MergeInsert have no constructor; an action on the wrong kind of arm is a ConstructionError, a non-action still a TypeError. Choices: MergeUpdate and MergeInsert are not runtime subclasses of MergeAction (JavaScript's are), since a subclass would show the five factories as their members to the surface test; the stubs make MergeAction generic in a contravariant phantom row type, delete() a MergeAction[Literal[\"target\"]], insert_defaults() a MergeAction[Literal[\"source\"]] and do_nothing() a MergeAction[Literal[\"target\", \"source\"]], as CopyFrom's format is, so mypy refuses every wrong pairing (rejection cases added). Rules bumped: bindings.writes+2 (Conflict's factories, the three classes not callable, columns named once, an unrunnable write refused as a WITH clause reads it), bindings.merge+2 (MergeAction's factories, the three classes not callable), python.naming+3 (the exceptions gone; a class a shared rule makes by a factory alone is not called), python.typing+2 (the row type parameter), napi.naming+4 (the exceptions gone); every annotation in both bindings re-pinned. Capability keys conflict.target became conflict.on and merge.update/merge.insert became merge_action.update/insert/delete/do_nothing/insert_defaults. bindings-surface.json shares Conflict.on and MergeAction and the shapes question no longer lists conflict arbiters or MERGE actions. JavaScript gained tests that its conflict and MERGE action classes cannot be called. The campaign's emitters and dispatchers write p.Conflict.on(..)."
+            }
         )
     }
 
@@ -15641,6 +15648,20 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-select-gaps / python-statement-gaps (merged 4896da7e). (1) pgorm-napi's src/statements/with.rs takes an INSERT, UPDATE or DELETE body without that write's built() checks, so a write that could not run (no rows, nothing set, no where / all_rows) sits in a CTE and fails only at the server, against bindings.statements; Python refuses it as the clause reads it. (2) pgorm-query renders a CTE's materialization as `AS  MATERIALIZED` with two spaces; fix the renderer and its goldens. (3) pgorm-python's Insert.columns called twice appends to the Rust column list, where pgorm-napi refuses a second call; refuse it in Python as a ConstructionError, as JavaScript does, with a test in each."
+            }
+
+            {
+                at 2026-11-01T03:07:24.696175Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-11-01T11:14:14.05758Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Fixed all three. (1) pgorm-napi's write.rs gives Insert, Update and Delete each a check() that built() and with.rs's expression() both read, so a WITH clause refuses a write that could not run with the ConstructionError inspecting it gives (test \"a write that could not run is refused as a WITH clause reads it\" in tests/writes.test.ts). (2) pgorm-query writes `MATERIALIZED ` / `NOT MATERIALIZED ` after `AS `; sql.render.cte moved to +5, whose text spelled the leading space, with a golden in tests/postgres/query.rs and the two-space strings in pgorm-napi/tests/parity/select.json and pgorm-python/tests/test_cte_options.py fixed. (3) Python's Insert.columns refuses a second call as JavaScript's does, tested in both. No shared rule's text changed for (1) or (3): bindings.statements already requires a method to refuse an argument it cannot use."
             }
         )
     }

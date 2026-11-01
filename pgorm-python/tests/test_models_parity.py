@@ -90,7 +90,7 @@ CASES = {
     .where(Account.col("id").gte(2))
     .inspect(terminal="returning_changes"),
     "insert-upserts": lambda: Account.insert({"id": 1, "name": "Ann"})
-    .on_conflict(p.ConflictTarget("id").update("name"))
+    .on_conflict(p.Conflict.on("id").update("name"))
     .inspect(terminal="returning_upserts"),
     "relation-find": lambda: posts.find({"id": 3}).inspect(),
     "graph": lambda: Post.graph().join_one(author).inspect(),

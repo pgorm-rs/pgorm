@@ -5,7 +5,7 @@
  */
 
 // [spec:pgorm:req:napi.typing+1]
-// [spec:pgorm:req:bindings.merge+1]
+// [spec:pgorm:req:bindings.merge+2]
 // [spec:pgorm:req:bindings.merge-sources]
 
 import type { Builder, Operand, Predicate } from "./expressions.d.ts";

@@ -2,7 +2,7 @@
 
 // INSERT, UPDATE and DELETE, and the RETURNING list that reads a written
 // row's old and new versions.
-// [spec:pgorm:req:bindings.writes+1]
+// [spec:pgorm:req:bindings.writes+2]
 // [spec:pgorm:req:bindings.write-sources]
 // [spec:pgorm:req:bindings.write-ctes]
 

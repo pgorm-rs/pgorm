@@ -118,12 +118,12 @@ class DirectBuilderTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(await pool.optional(record("select_missing", missing)))
         target, source = e.as_("e"), a.as_("a")
         merge = (p.merge(target, source, target.col("id") == source.col("id") + operand(10))
-                 .when_matched(p.MergeUpdate("points", target.col("points") + operand(1)),
+                 .when_matched(p.MergeAction.update("points", target.col("points") + operand(1)),
                                condition=target.col("kind") == operand(term))
-                 .when_not_matched(p.MergeInsert("id", source.col("id") + operand(10))
+                 .when_not_matched(p.MergeAction.insert("id", source.col("id") + operand(10))
                                    .set("account_id", source.col("id"))
                                    .set("kind", operand("merged")).set("points", operand(0)))
-                 .when_not_matched_by_source(p.MatchedAction.Delete)
+                 .when_not_matched_by_source(p.MergeAction.delete())
                  .returning_action()
                  .returning(target.col("id"), p.ReturningRow.Old.col("points").as_("before"),
                             p.ReturningRow.New.col("points").as_("after")))

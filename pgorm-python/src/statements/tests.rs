@@ -105,7 +105,7 @@ fn select_structure_matches_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 #[test]
 fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -142,7 +142,7 @@ fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 #[test]
 fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     Python::initialize();
@@ -169,13 +169,13 @@ fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "p.Insert(p.Table('account', alias='a')).columns('id', 'name').values(1, 'Alice').on_conflict(p.ConflictTarget('id').where(p.col('id') > 0).update('name').set('visits', p.literal(1)).where(p.col('active') == True))",
+            "p.Insert(p.Table('account', alias='a')).columns('id', 'name').values(1, 'Alice').on_conflict(p.Conflict.on('id').where(p.col('id') > 0).update('name').set('visits', p.literal(1)).where(p.col('active') == True))",
             expected.build(),
         )
     })
 }
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 #[test]
 fn update_and_delete_keep_builder_parameter_order() -> PyResult<()> {
     Python::initialize();
@@ -233,7 +233,7 @@ fn raw_templates_use_the_rust_lexer() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge+2/test]
 #[test]
 fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     Python::initialize();
@@ -286,14 +286,14 @@ fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
             py,
             &globals,
             "p.merge(t, s, t.col('id') == s.col('id'))\
-             .when_matched(p.MergeUpdate('name', s.col('name')))\
-             .when_matched(p.MatchedAction.Delete, condition=s.col('visits') > 10)\
-             .when_matched(p.MatchedAction.DoNothing, condition=s.col('visits') > 1)\
-             .when_not_matched(p.MergeInsert('id', s.col('id')).set('name', p.literal('x'))\
+             .when_matched(p.MergeAction.update('name', s.col('name')))\
+             .when_matched(p.MergeAction.delete(), condition=s.col('visits') > 10)\
+             .when_matched(p.MergeAction.do_nothing(), condition=s.col('visits') > 1)\
+             .when_not_matched(p.MergeAction.insert('id', s.col('id')).set('name', p.literal('x'))\
                  .overriding(p.Overriding.UserValue), condition=s.col('name') == \"O'Brien\")\
-             .when_not_matched(p.NotMatchedAction.InsertDefaultValues)\
-             .when_not_matched_by_source(p.MatchedAction.Delete, condition=t.col('visits') == 0)\
-             .when_not_matched_by_source(p.MergeUpdate('visits', 0).set('name', 'gone'))\
+             .when_not_matched(p.MergeAction.insert_defaults())\
+             .when_not_matched_by_source(p.MergeAction.delete(), condition=t.col('visits') == 0)\
+             .when_not_matched_by_source(p.MergeAction.update('visits', 0).set('name', 'gone'))\
              .returning_action()\
              .returning(p.ReturningRow.Old.col('visits'), p.ReturningRow.New.star(), old_as='before')\
              .only()",
@@ -302,7 +302,7 @@ fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge+2/test]
 // [spec:pgorm:req:bindings.with+1/test]
 #[test]
 fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
@@ -335,7 +335,7 @@ fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
             )))
             .build();
         py.run(
-            c"a = p.Table('account')\nstaged = p.Table('staged')\nm = p.merge(a, staged, a.col('id') == staged.col('id')).when_matched(p.MatchedAction.Delete).with_(p.With('staged', p.Select(p.col('id')).from_(p.Table('source')))).returning()",
+            c"a = p.Table('account')\nstaged = p.Table('staged')\nm = p.merge(a, staged, a.col('id') == staged.col('id')).when_matched(p.MergeAction.delete()).with_(p.With('staged', p.Select(p.col('id')).from_(p.Table('source')))).returning()",
             Some(&globals),
             None,
         )?;
@@ -348,7 +348,7 @@ fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 #[test]
 fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     Python::initialize();
@@ -402,9 +402,10 @@ fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge+2/test]
+// [spec:pgorm:req:bindings.argument-errors+1/test]
 #[test]
-fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
+fn merge_actions_are_checked_against_their_row() -> PyResult<()> {
     Python::initialize();
     Python::attach(|py| {
         let globals = module(py)?;
@@ -413,23 +414,31 @@ fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
             Some(&globals),
             None,
         )?;
-        for source in [
-            "pending.when_matched(p.MergeInsert('id', 1))",
-            "pending.when_matched(p.NotMatchedAction.DoNothing)",
-            "pending.when_not_matched_by_source(p.MergeInsert('id', 1))",
-            "pending.when_not_matched(p.MergeUpdate('id', 1))",
-            "pending.when_not_matched(p.MatchedAction.Delete)",
-            "pending.when_matched(p.MatchedAction.Delete).when_not_matched(p.MatchedAction.Delete)",
-            "p.With('w', a)",
-        ] {
-            let error = py
-                .eval(&CString::new(source)?, Some(&globals), None)
-                .expect_err(source);
-            assert!(
-                error.is_instance_of::<pyo3::exceptions::PyTypeError>(py),
-                "{source}: {error}"
-            );
-        }
+        refused::<crate::errors::ConstructionError>(
+            py,
+            &globals,
+            &[
+                "pending.when_matched(p.MergeAction.insert('id', 1))",
+                "pending.when_matched(p.MergeAction.insert_defaults())",
+                "pending.when_not_matched_by_source(p.MergeAction.insert('id', 1))",
+                "pending.when_not_matched_by_source(p.MergeAction.insert_defaults())",
+                "pending.when_not_matched(p.MergeAction.update('id', 1))",
+                "pending.when_not_matched(p.MergeAction.delete())",
+                "pending.when_matched(p.MergeAction.delete()).when_not_matched(p.MergeAction.delete())",
+            ],
+        )?;
+        refused::<pyo3::exceptions::PyTypeError>(
+            py,
+            &globals,
+            &[
+                "pending.when_matched('delete')",
+                "pending.when_not_matched(None)",
+                "p.MergeAction()",
+                "p.MergeUpdate('id', 1)",
+                "p.MergeInsert('id', 1)",
+                "p.With('w', a)",
+            ],
+        )?;
         let pending = py.eval(c"pending", Some(&globals), None)?;
         let error = super::compile(&pending).expect_err("a pending MERGE has no statement");
         assert!(error.to_string().contains("needs a WHEN arm"));

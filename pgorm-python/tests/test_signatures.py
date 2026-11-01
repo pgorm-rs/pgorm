@@ -114,7 +114,7 @@ def native_calls(root):
 
 
 class Signatures(unittest.TestCase):
-    # [spec:pgorm:req:python.typing+1/test]
+    # [spec:pgorm:req:python.typing+2/test]
     def test_installed_native_signatures_match_shipped_stubs(self):
         root = Path(pgorm.__file__).resolve().parent
         self.assertTrue((root / "py.typed").is_file())
@@ -136,7 +136,7 @@ class Signatures(unittest.TestCase):
             checked += 1
         self.assertGreater(checked, 200)
 
-    # [spec:pgorm:req:python.typing+1/test]    a stub-only mixin is inherited by a native class in
+    # [spec:pgorm:req:python.typing+2/test]    a stub-only mixin is inherited by a native class in
     # the stubs and absent at runtime, where the native class defines each of its methods itself
     # [spec:pgorm:req:python.expressions+7/test]
     def test_stub_only_mixins_belong_to_native_classes(self):

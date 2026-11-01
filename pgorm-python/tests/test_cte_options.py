@@ -51,7 +51,7 @@ class CteOptionTests(unittest.IsolatedAsyncioTestCase):
         clause = p.With("clicks", clicks, columns=["who"], materialized=True).cte("busy", busy, materialized=False)
         query = p.Select().from_(p.Table("busy")).with_(clause)
         sql = query.inspect().sql
-        self.assertRegex(sql, r'"clicks" \("who"\) AS\s+MATERIALIZED \(SELECT')
+        self.assertIn('"clicks" ("who") AS MATERIALIZED (SELECT', sql)
         self.assertIn('"busy" AS NOT MATERIALIZED (SELECT', sql)
         self.assertEqual(await self.rows(query), [(1,)])
 
@@ -79,7 +79,7 @@ class CteOptionTests(unittest.IsolatedAsyncioTestCase):
             clause.cte("s", p.Select())
         target = p.Table(self.edges_name, alias="t")
         merge = p.merge(target, p.Table("r"), target.col("a") == p.col("n", table="r")).when_matched(
-            p.MatchedAction.Delete)
+            p.MergeAction.delete())
         with self.assertRaises(p.ConstructionError):
             merge.with_(clause)
         plain = p.With("r", p.Select(p.col("a").as_("n")).from_(self.edges))

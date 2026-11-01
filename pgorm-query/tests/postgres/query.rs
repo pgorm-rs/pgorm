@@ -1012,7 +1012,7 @@ fn select_57() {
 }
 
 // [spec:pgorm:def:sql.ast.with+5/test]
-// [spec:pgorm:req:sql.render.cte+4/test]
+// [spec:pgorm:req:sql.render.cte+5/test]
 #[test]
 fn select_58() {
     let select = SelectStatement::new()
@@ -2792,7 +2792,7 @@ fn condition_holder_5() {
 
 // [spec:pgorm:def:sql.ast.with+5/test]    a non-recursive clause takes its first CTE at
 // construction and renders every one it was given
-// [spec:pgorm:req:sql.render.cte+4/test]
+// [spec:pgorm:req:sql.render.cte+5/test]
 #[test]
 fn with_clause_renders_each_of_its_ctes() {
     let cte = |name: &str| {
@@ -2812,6 +2812,43 @@ fn with_clause_renders_each_of_its_ctes() {
         [
             r#"WITH "one" AS (SELECT "id" FROM "glyph") ,"#,
             r#""two" AS (SELECT "id" FROM "glyph")"#,
+            r#"SELECT "id" FROM "one""#,
+        ]
+        .join(" ")
+    );
+}
+
+// [spec:pgorm:req:sql.render.cte+5/test]    a materialization hint follows `AS ` with one
+// space on each side, before the parenthesised body
+#[test]
+fn with_clause_renders_each_materialization() {
+    let cte = |name: &str, materialized: Option<bool>| {
+        let mut cte = CommonTableExpression::new(
+            Name::runtime(name),
+            Query::select().column(Glyph::Id).from(Glyph::Table).take(),
+        );
+        if let Some(materialized) = materialized {
+            cte.materialized(materialized);
+        }
+        cte
+    };
+
+    assert_eq!(
+        Query::select()
+            .column(Glyph::Id)
+            .from(Name::runtime("one"))
+            .take()
+            .with(
+                WithClause::new(cte("one", Some(true)))
+                    .cte(cte("two", Some(false)))
+                    .cte(cte("three", None))
+                    .to_owned()
+            )
+            .to_string(),
+        [
+            r#"WITH "one" AS MATERIALIZED (SELECT "id" FROM "glyph") ,"#,
+            r#""two" AS NOT MATERIALIZED (SELECT "id" FROM "glyph") ,"#,
+            r#""three" AS (SELECT "id" FROM "glyph")"#,
             r#"SELECT "id" FROM "one""#,
         ]
         .join(" ")
@@ -2964,7 +3001,7 @@ fn carried_with_clause_leaves_the_select_shapeable() {
 // its own and renders exactly one WITH, with no wrapper type to give a second one a home
 // [spec:pgorm:def:query.build.with+2/test]    and `with` is the same verb on all four statements —
 // same receiver, same return, same last-call-wins slot
-// [spec:pgorm:req:sql.render.cte+4/test]
+// [spec:pgorm:req:sql.render.cte+5/test]
 #[test]
 fn a_with_clause_has_one_place_to_live() {
     let cte = || {

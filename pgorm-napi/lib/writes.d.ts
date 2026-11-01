@@ -6,7 +6,7 @@
  */
 
 // [spec:pgorm:req:napi.typing+1]
-// [spec:pgorm:req:bindings.writes+1]
+// [spec:pgorm:req:bindings.writes+2]
 // [spec:pgorm:req:bindings.write-sources]
 // [spec:pgorm:req:bindings.write-ctes]
 // [spec:pgorm:req:bindings.conflict-arbiters]

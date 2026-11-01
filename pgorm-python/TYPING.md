@@ -66,11 +66,20 @@ transaction until it finishes. Transaction row streaming is not exposed.
 A model write has only its own kind's methods, so mypy reports an insert's
 `where` or an update's `on_conflict` as an `attr-defined` error.
 
+A MERGE action carries the kind of row it takes as a type parameter:
+`MergeAction.delete()` is a `MergeAction[Literal["target"]]`,
+`insert_defaults()` a `MergeAction[Literal["source"]]` and `do_nothing()`
+both. `when_matched` and `when_not_matched_by_source` take a `MergeUpdate` or
+the first, `when_not_matched` a `MergeInsert` or the second, so mypy reports an
+insert given to a matched arm as an `arg-type` error before the runtime's
+`ConstructionError` would.
+
 The stubs mark positional-only parameters and keyword-only options. An opaque
 native result such as `Record`, `Compiled` or `Expr` is obtained from its
-builder/operation, and a DDL statement such as `CreateTable` from its function
-(`create_table`). Its stub constructor takes `Never` to reject direct
-construction, matching the native runtime's `TypeError`.
+builder/operation, a DDL statement such as `CreateTable` from its function
+(`create_table`), a conflict action from `Conflict`'s functions and a MERGE
+action from `MergeAction`'s. Its stub constructor takes `Never` to reject
+direct construction, matching the native runtime's `TypeError`.
 
 ## Dynamic columns and concrete application models
 

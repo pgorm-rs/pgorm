@@ -175,7 +175,7 @@ pub(crate) fn operations() -> Map<String, Value> {
         ("delete.inspect", "pgorm_query::DeleteStatement::build"),
         ("conflict.do_nothing", "pgorm_query::OnConflict::do_nothing"),
         (
-            "conflict.target",
+            "conflict.on",
             "pgorm_query::OnConflict::{column, expr}, ConflictTarget::{and_column, and_expr}",
         ),
         (
@@ -259,12 +259,21 @@ pub(crate) fn operations() -> Map<String, Value> {
             "pgorm_query::MergeStatement::{when_not_matched_by_source, when_not_matched_by_source_and}",
         ),
         (
-            "merge.update",
-            "pgorm_query::MergeUpdate::{value, and_value}, MatchedAction",
+            "merge_action.update",
+            "pgorm_query::MergeUpdate::{value, and_value}, MatchedAction::Update",
         ),
         (
-            "merge.insert",
-            "pgorm_query::MergeInsert::{value, and_value, overriding}, NotMatchedAction",
+            "merge_action.insert",
+            "pgorm_query::MergeInsert::{value, and_value, overriding}, NotMatchedAction::Insert",
+        ),
+        ("merge_action.delete", "pgorm_query::MatchedAction::Delete"),
+        (
+            "merge_action.do_nothing",
+            "pgorm_query::MatchedAction::DoNothing, NotMatchedAction::DoNothing",
+        ),
+        (
+            "merge_action.insert_defaults",
+            "pgorm_query::NotMatchedAction::InsertDefaultValues",
         ),
         ("merge.returning", "pgorm_query::MergeStatement::returning"),
         (
