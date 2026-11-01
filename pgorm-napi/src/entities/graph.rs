@@ -84,7 +84,7 @@ where
 
 /// The slot tuples a graph can register: Rust's own arities, from no slot to
 /// six. pgorm's `Slots` is sealed, so no other shape implements this.
-// [spec:pgorm:req:bindings.entity-graphs+2]
+// [spec:pgorm:req:bindings.entity-graphs+3]
 pub trait GraphSlots<E: EntityTrait>: Slots + fmt::Debug + Send + Sync + Sized + 'static
 where
     GraphRow<E, Self>: SelectorTrait,
@@ -165,6 +165,9 @@ pub(crate) struct GraphInfo {
 }
 
 impl GraphInfo {
+    /// The graph as `describe()` reports it: its name, the Rust shape, and
+    /// each source's entity and slot kind.
+    // [spec:pgorm:req:bindings.entity-graphs+3]
     pub(crate) fn describe(&self) -> serde_json::Value {
         serde_json::json!({
             "name": self.name,
@@ -281,7 +284,7 @@ impl<E: EntityTrait, S> fmt::Debug for GraphQuery<E, S> {
     }
 }
 
-// [spec:pgorm:req:bindings.entity-graphs+2]
+// [spec:pgorm:req:bindings.entity-graphs+3]
 impl<E, S> QueryBackend for GraphQuery<E, S>
 where
     E: EntityTrait + Send + Sync + 'static,

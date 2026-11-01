@@ -64,7 +64,7 @@ option.
 > time MUST NOT invoke rustc, Cargo, a packaging tool or a code-generation
 > build.
 
-> [spec:pgorm:req:bindings.surface+1]
+> [spec:pgorm:req:bindings.surface+2]
 > The two bindings MUST offer the same public operations, each spelled by its
 > binding's naming rule. `docs/spec/bindings-surface.json` declares the shared
 > surface once, in neutral spelling: each module's functions, classes and
@@ -82,13 +82,17 @@ option.
 > listed as a gap, or when a name listed as a gap is present.
 >
 > The file also declares, under `descriptions`, the keys of the data a
-> model's and a registered entity's `describe()` report (`bindings.models`,
-> `bindings.entities`), nested objects and the items of lists included, in
-> the same neutral spelling. Each binding's surface test MUST compare a live
-> `describe()` of each with that declaration, recursively, and fail on a key
-> missing, a key the declaration does not list, or a declared key no live
-> description reached. A class's other data fields are outside this check;
-> the rules that state them are tested by each binding's own suites.
+> model's, a registered entity's, a registered graph's and a source tuple's
+> `describe()` report (`bindings.models`, `bindings.entities`,
+> `bindings.entity-graphs`, `bindings.pipeline-sources`), nested objects and
+> the items of lists included, in the same neutral spelling. Each binding's
+> surface test MUST compare a live `describe()` of each with that
+> declaration, recursively, and fail on a key missing, a key the declaration
+> does not list, or a declared key no live description reached; a module
+> that registers no entity, graph or source tuple is held to it by the
+> application module its checks build. A class's other data fields are
+> outside this check; the rules that state them are tested by each binding's
+> own suites.
 
 ## Runtime and errors
 
@@ -1232,7 +1236,7 @@ Rust generic at run time, only use the ones compiled in.
 > `all_rows()` before it runs, a `ConstructionError` otherwise, as a
 > statement's UPDATE does (`bindings.writes`).
 
-> [spec:pgorm:req:bindings.entity-graphs+2]
+> [spec:pgorm:req:bindings.entity-graphs+3]
 > `graph(name).find(aliases)` MUST build the registered `SelectGraph` with the
 > application's factory, its declared entity tuple, join slot kinds and
 > decoding terminals, each joined slot under the alias given for it, `g1`,
@@ -1253,8 +1257,15 @@ Rust generic at run time, only use the ones compiled in.
 > key — the column, the root's other key columns, then each slot's — each
 > value converted to its column's declared kind and any other count refused.
 > `first`, `last`, `asc` and `desc` are the cursor's own.
+>
+> `describe()` MUST report a registered graph as data, under these keys and
+> no other, each spelled by the binding's naming rule: its `name`;
+> `rust_shape`, the Rust `SelectGraph` type its factory builds; and
+> `sources`, the root and then each slot in order, each with its `index`, the
+> `entity` it decodes as and its `slot`, `root` or the slot's kind, `Req` or
+> `Opt`.
 
-> [spec:pgorm:req:bindings.pipeline-sources+2]
+> [spec:pgorm:req:bindings.pipeline-sources+3]
 > A registered entity MUST be a pipeline source wherever a relation is, read
 > through its own `IntoSource`, so its table and schema are the ones its Rust
 > declaration names, and `pipeline.col(table, entity.col(name))` MUST lower
@@ -1272,6 +1283,11 @@ Rust generic at run time, only use the ones compiled in.
 > witness, a source a row does not carry being null. A pipeline reshaped
 > before the selection is the `ConstructionError` pgorm's refusal names,
 > before anything is sent.
+>
+> A source tuple's `describe()` MUST report it as data, under these keys and
+> no other, each spelled by the binding's naming rule: its `name`;
+> `rust_shape`, the Rust tuple of entity types it registers; and `entities`,
+> the name of each source's entity registration, in order.
 
 > [spec:pgorm:req:bindings.codegen]
 > Each binding MUST offer a documented workflow that generates, from a

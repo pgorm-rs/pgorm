@@ -36,7 +36,7 @@ pub struct SourceModel(pub(crate) Model);
 
 /// A tuple of one to six concrete entity types a pipeline's rows decode as.
 /// pgorm's own `SourceList` fixes the arities; this is sealed the same way.
-// [spec:pgorm:req:bindings.pipeline-sources+2]
+// [spec:pgorm:req:bindings.pipeline-sources+3]
 pub trait SourceTypes: sealed::Sealed + Send + Sync + 'static {
     #[doc(hidden)]
     type Selection: SourceList + Send + Sync + 'static;
@@ -139,6 +139,9 @@ pub(crate) struct SourcesInfo {
 }
 
 impl SourcesInfo {
+    /// The source tuple as `describe()` reports it: its name, the Rust shape,
+    /// and each source's entity.
+    // [spec:pgorm:req:bindings.pipeline-sources+3]
     pub(crate) fn describe(&self) -> serde_json::Value {
         serde_json::json!({
             "name": self.name,
@@ -213,7 +216,7 @@ impl<T> fmt::Debug for Query<T> {
     }
 }
 
-// [spec:pgorm:req:bindings.pipeline-sources+2]
+// [spec:pgorm:req:bindings.pipeline-sources+3]
 impl<T: SourceTypes> SelectedBackend for Query<T>
 where
     <T::Selection as SourceList>::Row: Send,
@@ -261,7 +264,7 @@ where
 impl Registry {
     /// Register a tuple of one to six entity types a pipeline's
     /// `select_sources` decodes rows as, each entity registered first.
-    // [spec:pgorm:req:bindings.pipeline-sources+2]
+    // [spec:pgorm:req:bindings.pipeline-sources+3]
     pub fn sources<T: SourceTypes>(&mut self, name: &str) -> Result<&mut Self, RegistrationError>
     where
         <T::Selection as SourceList>::Row: Send,

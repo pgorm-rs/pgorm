@@ -278,7 +278,7 @@ test("a registered entity's domain columns read, write and compare as the types 
 // [spec:pgorm:req:bindings.entity-reads+2/test]    a column whose domain is over an enum is a
 // member of a list of values and of a subquery's rows as the enum, either way round, where the
 // column's plain expression is refused with 42883
-// [spec:pgorm:req:bindings.pipeline-sources+2/test]    a registered column a pipeline reads
+// [spec:pgorm:req:bindings.pipeline-sources+3/test]    a registered column a pipeline reads
 // compares as the enum, under its table and under a source's name, where the column named by text
 // is refused with 42883
 test("a registered column whose domain is over an enum is a member, and a pipeline's column, as the enum", async () => {
@@ -380,7 +380,7 @@ test("the version terminals return each written row before and after, no hook ru
   assert.deepStrictEqual(await Account.insertMany([]).returningUpserts(pool()), []);
 });
 
-// [spec:pgorm:req:bindings.entity-graphs+2/test]
+// [spec:pgorm:req:bindings.entity-graphs+3/test]
 test("a registered graph decodes its root and slots, an absent optional slot null", async () => {
   await seed();
   type Pair = [Record<string, unknown>, Record<string, unknown> | null];
@@ -408,7 +408,7 @@ test("a registered graph decodes its root and slots, an absent optional slot nul
   assert.throws(() => graph("app.AccountNotes").find({ aliases: ["accounts"] }), refused(/names a source twice/));
 });
 
-// [spec:pgorm:req:bindings.entity-graphs+2/test]
+// [spec:pgorm:req:bindings.entity-graphs+3/test]
 test("a registered graph's cursor pages by keyset, resuming inside a root's slot rows", async () => {
   await seed();
   const cursor = graph("app.AccountNotes").find({ aliases: ["n"] }).cursor("id");
@@ -451,7 +451,7 @@ test("an entity's operations run on a connection or a transaction, with a statem
   await assert.rejects(Account.find().all({} as never), TypeError);
 });
 
-// [spec:pgorm:req:bindings.pipeline-sources+2/test]
+// [spec:pgorm:req:bindings.pipeline-sources+3/test]
 test("a pipeline reads a registered entity's table, and selects registered sources into their models", async () => {
   await seed();
   const ids = await pool().query(pl.from(Account).filter(pl.col("accounts", "id").gt(1)).sort(pl.col("accounts", "id")));
@@ -488,7 +488,7 @@ test("a pipeline reads a registered entity's table, and selects registered sourc
   assert.deepStrictEqual(pl.sourceTuples(), ["app.AccountWithNote", "app.SingleAccount", "app.SixSources"]);
 });
 
-// [spec:pgorm:req:bindings.pipeline-sources+2/test]
+// [spec:pgorm:req:bindings.pipeline-sources+3/test]
 test("a selection refuses a reshaped pipeline, a wrong count of qualifiers and a tuple the module does not register", async () => {
   const reshaped = pl.from(Account).select(pl.col("accounts", "id")).selectSources(pl.sources("app.SingleAccount"));
   assert.throws(() => reshaped.inspect(), refused(/select/));

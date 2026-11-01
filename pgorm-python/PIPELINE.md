@@ -180,8 +180,11 @@ or aggregation. Registered source selections expose `all`, `one`, `optional` and
 `inspect`, the terminals running on a pool, a connection or a transaction; model
 streaming is not exposed.
 
-`p.capabilities()` records the exact pipeline vocabulary, limits and compiled
-source registrations. A stock wheel contains no application entity registrations.
+A source tuple's `describe()` reports its `name`, its `rust_shape`, the Rust
+tuple of entity types, and its `entities` in order, the keys JavaScript's
+reports. `p.capabilities()` records the exact pipeline vocabulary, limits and
+compiled source registrations, each as its `describe()` reports it. A stock
+wheel contains no application entity registrations.
 
 ## Verification
 

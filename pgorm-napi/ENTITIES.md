@@ -204,7 +204,11 @@ otherwise a tuple of every source's, an `Opt` slot `null` where it matched
 nothing. `col(source, column)` qualifies a column as the query names it.
 `cursor(column)` is `SelectGraph::cursor_by` on a root column: `before` and
 `after` bound that column, `beforeWith` and `afterWith` the whole key — the
-column, the root's other key columns, then each slot's.
+column, the root's other key columns, then each slot's. A graph's
+`describe()` reports its `name`, its `rustShape`, the Rust `SelectGraph`
+type, and its `sources`, the root and then each slot, each with its `index`,
+the `entity` it decodes as and its `slot` (`root`, `Req` or `Opt`): the keys
+Python's reports, each spelled in camelCase.
 
 ## Pipelines over registered entities
 
@@ -235,5 +239,7 @@ Each source is projected under the qualifier given for it, or its table's
 name. A row's source that the join left empty is `null`, read through the
 entity's absence witness. A pipeline reshaped before the selection — a
 `select`, an aggregate — is refused with the `ConstructionError` pgorm's
-refusal names, before anything is sent.
+refusal names, before anything is sent. A source tuple's `describe()` reports
+its `name`, its `rustShape`, the Rust tuple of entity types, and its
+`entities` in order, the keys Python's reports.
 

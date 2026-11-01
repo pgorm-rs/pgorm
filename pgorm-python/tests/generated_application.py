@@ -295,7 +295,7 @@ class GeneratedDomains(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(refused.exception.sqlstate, "23514")
 
 
-    # [spec:pgorm:req:bindings.pipeline-sources+2/test]    a registered column a pipeline reads compares
+    # [spec:pgorm:req:bindings.pipeline-sources+3/test]    a registered column a pipeline reads compares
     # as the enum its domain is over, under its table and under a source's name, where the
     # column named by text is refused with 42883
     async def test_pipeline_compares_registered_domain_as_enum(self):
