@@ -5,6 +5,7 @@ mod convert;
 mod created;
 mod interval;
 mod json;
+mod key;
 mod ranges;
 mod snapshot;
 mod temporal;
@@ -23,8 +24,7 @@ pub use created::{PyCreatedMultirange, PyCreatedRange};
 pub use interval::PyInterval;
 pub(crate) use ranges::{column_type as range_column_type, kind_names as range_kind_names};
 pub use types::PyTypeName;
-use types::Tag;
-pub(crate) use types::{SCALAR_NAMES, scalar_name, unrepresented};
+pub(crate) use types::{SCALAR_NAMES, Tag, parse_scalar, scalar_name, unrepresented};
 
 // [spec:pgorm:req:bindings.value-tags]
 /// Immutable owned Rust value plus qualified enum/array identity.

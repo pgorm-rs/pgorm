@@ -64,7 +64,7 @@ option.
 > time MUST NOT invoke rustc, Cargo, a packaging tool or a code-generation
 > build.
 
-> [spec:pgorm:req:bindings.surface]
+> [spec:pgorm:req:bindings.surface+1]
 > The two bindings MUST offer the same public operations, each spelled by its
 > binding's naming rule. `docs/spec/bindings-surface.json` declares the shared
 > surface once, in neutral spelling: each module's functions, classes and
@@ -79,9 +79,16 @@ option.
 > Each binding's own test suite MUST read its live module — its exports, its
 > classes and their methods — and fail when the module offers a name the file
 > does not list for that binding, when it lacks a shared name that is not
-> listed as a gap, or when a name listed as a gap is present. A class's data
-> fields are outside this check; the rules that state them are tested by each
-> binding's own suites.
+> listed as a gap, or when a name listed as a gap is present.
+>
+> The file also declares, under `descriptions`, the keys of the data a
+> model's and a registered entity's `describe()` report (`bindings.models`,
+> `bindings.entities`), nested objects and the items of lists included, in
+> the same neutral spelling. Each binding's surface test MUST compare a live
+> `describe()` of each with that declaration, recursively, and fail on a key
+> missing, a key the declaration does not list, or a declared key no live
+> description reached. A class's other data fields are outside this check;
+> the rules that state them are tested by each binding's own suites.
 
 ## Runtime and errors
 
@@ -879,7 +886,7 @@ decode into records of its fields, and its relations, graphs, cursors and
 pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 `Paginator`.
 
-> [spec:pgorm:req:bindings.models+3]
+> [spec:pgorm:req:bindings.models+4]
 > `model(name, columns, schema)` MUST declare a model of a table,
 > schema-qualified when a schema is given, from a mapping of fields, each a
 > `Column(kind, options)`. The kind is one every result decodes as — any
@@ -903,9 +910,18 @@ pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 > A `Column` is a declaration and has no method: the model converts a value
 > through the field's column where it takes one, and `Value(data, kind)`
 > (`bindings.value-tags`) is the conversion a program calls. `describe()`
-> MUST report the model as data: its table's schema, name and alias, its
-> primary key, and each field's SQL column, kind, nullability, key
-> membership, default, generation and an enum's values.
+> MUST report the model as data, under these keys and no other, each spelled
+> by the binding's naming rule: `schema`, `table` and `alias`, its table's;
+> `primary_key`, its key fields; and `fields`, mapping each field to its SQL
+> `column`, its `kind`, `nullable`, `primary_key`, `default`, `generated`
+> (always or by default, or null) and an enum's `values` (null for any other
+> column). A kind is spelled as a decoded column's is compared
+> (`bindings.model-records`): a scalar kind's name; `enum` and the enum's
+> type; `range` or `multirange`, a created range's type, `of` and its
+> subtype's kind; and an array's element's spelling followed by `[]` — `i64`,
+> `text[]`, `enum "app"."mood"`, `range "app"."floatrange" of f64` — a type
+> written as its schema and name, each double-quoted with its own quotes
+> doubled, joined by a dot, or as its quoted name alone.
 
 > [spec:pgorm:req:bindings.model-columns+1]
 > `col(field)` MUST be a model field's column, qualified as the model's
@@ -1068,7 +1084,7 @@ registrations. The program reaches each registration by name, and every
 operation on one is the entity's own Rust API. A binding cannot instantiate a
 Rust generic at run time, only use the ones compiled in.
 
-> [spec:pgorm:req:bindings.entities+2]
+> [spec:pgorm:req:bindings.entities+3]
 > Each binding MUST let a downstream application crate register its own
 > entities, `SelectGraph` shapes and pipeline source tuples, for any entity
 > whose model converts into its ActiveModel, and build one native module from
@@ -1081,12 +1097,21 @@ Rust generic at run time, only use the ones compiled in.
 > `entity(name)` and `graph(name)` give one registration, and a name the
 > module does not register is a `ConstructionError`; `entities()`, `graphs()`
 > and `pipeline.source_tuples()` list the names the module registers of each
-> kind, in order. `describe()` reports a
-> registration: its table; each column's SQL name, type, nullability, key
-> membership and the kind its values bind and read as; its primary key, and
-> whether that key ends `WITHOUT OVERLAPS`; its relations, with their columns,
-> `PERIOD` pair, enforcement and deferrability (and what decides their joins,
-> `bindings.relation-conditions`); and the Rust types behind it. A
+> kind, in order. `describe()` reports a registration as data, under these
+> keys and no other, each spelled by the binding's naming rule, as is a value
+> naming a choice: its `name`, and its table's `schema` and `table`;
+> `columns`, each column's SQL `name`, the `json_key` its Rust field
+> serializes under, its `sql_type`, the `rust_type` its model reads it as,
+> `nullable`, `primary_key`, the `kind` its values bind and read as, spelled
+> as a model's is (`bindings.models`) and null for a type that takes a
+> `Value`, and an enum's `values` (null for any other column);
+> `primary_key`, and `primary_key_without_overlaps`, whether that key ends
+> `WITHOUT OVERLAPS`; `relations`, each with its `name`, `type` (has one or
+> has many), the `from` and `to` tables, each its `schema` and `table`, its
+> `columns` as pairs, its `PERIOD` pair as `period`, `condition_type` and
+> `on_condition` (`bindings.relation-conditions`), `enforcement` and
+> `deferrability`; and `rust`, the Rust `entity`, `model`, `active_model`
+> and `column` types behind it. A
 > registered entity's records MUST keep the Rust model each was read as.
 > Every operation runs as a statement does (`bindings.registered-pools`) —
 > refused while another holds the connection, cancellable, the connection

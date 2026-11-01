@@ -1340,6 +1340,9 @@ assertions (
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id view-check-dedup, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:16:21.425085Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
+    {id python-registered-pools, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:29.150894Z}
+    {id python-hook-refusal-class, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:44.640722Z}
+    {id binding-describe-shapes, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:44.983153Z}
 )
 
 impl_evidence (
@@ -1582,104 +1585,6 @@ impl_evidence (
         {impl_name python, rule python.typing}
         {impl_name python, rule python.value-tags}
         {impl_name python, rule python.values}
-    ), rule_versions_seen (
-        {id bindings.api, version 0}
-        {id bindings.argument-errors, version 0}
-        {id bindings.cancellation, version 0}
-        {id bindings.case, version 0}
-        {id bindings.codegen, version 0}
-        {id bindings.collations, version 0}
-        {id bindings.column-operators, version 1}
-        {id bindings.connections, version 2}
-        {id bindings.copy, version 0}
-        {id bindings.copy-rows, version 0}
-        {id bindings.created-ranges, version 0}
-        {id bindings.cursors, version 0}
-        {id bindings.delegation, version 0}
-        {id bindings.entities, version 2}
-        {id bindings.entity-graphs, version 2}
-        {id bindings.entity-reads, version 2}
-        {id bindings.entity-versions, version 2}
-        {id bindings.entity-writes, version 0}
-        {id bindings.errors, version 3}
-        {id bindings.expressions, version 2}
-        {id bindings.from-subqueries, version 0}
-        {id bindings.graphs, version 0}
-        {id bindings.identifiers, version 2}
-        {id bindings.listen, version 2}
-        {id bindings.merge, version 0}
-        {id bindings.model-columns, version 1}
-        {id bindings.model-reads, version 0}
-        {id bindings.model-records, version 0}
-        {id bindings.model-writes, version 1}
-        {id bindings.models, version 3}
-        {id bindings.operands, version 0}
-        {id bindings.optional, version 0}
-        {id bindings.pagination, version 0}
-        {id bindings.pipeline, version 0}
-        {id bindings.pipeline-binder, version 0}
-        {id bindings.pipeline-expressions, version 2}
-        {id bindings.pipeline-sources, version 2}
-        {id bindings.ranges, version 0}
-        {id bindings.registered-pools, version 0}
-        {id bindings.relation-conditions, version 0}
-        {id bindings.relations, version 0}
-        {id bindings.results, version 2}
-        {id bindings.row-count, version 0}
-        {id bindings.row-locks, version 0}
-        {id bindings.rows, version 0}
-        {id bindings.runtime, version 0}
-        {id bindings.schema, version 0}
-        {id bindings.schema-alter, version 0}
-        {id bindings.schema-api, version 2}
-        {id bindings.schema-domains, version 2}
-        {id bindings.schema-from-entity, version 0}
-        {id bindings.schema-indexes, version 0}
-        {id bindings.schema-schemas, version 0}
-        {id bindings.schema-sequences, version 0}
-        {id bindings.schema-tables, version 0}
-        {id bindings.schema-types, version 0}
-        {id bindings.schema-views, version 2}
-        {id bindings.select, version 2}
-        {id bindings.sql-json, version 0}
-        {id bindings.statements, version 0}
-        {id bindings.streams, version 0}
-        {id bindings.surface, version 0}
-        {id bindings.transactions, version 0}
-        {id bindings.value-tags, version 0}
-        {id bindings.values, version 0}
-        {id bindings.windows, version 0}
-        {id bindings.with, version 0}
-        {id bindings.writes, version 0}
-        {id napi.application, version 2}
-        {id napi.cancellation, version 1}
-        {id napi.codegen, version 1}
-        {id napi.errors, version 3}
-        {id napi.lifecycle, version 2}
-        {id napi.naming, version 3}
-        {id napi.pipeline-table-names, version 0}
-        {id napi.raw, version 0}
-        {id napi.records, version 0}
-        {id napi.runtime, version 1}
-        {id napi.temporal, version 1}
-        {id napi.transactions, version 3}
-        {id napi.typing, version 1}
-        {id napi.values, version 1}
-        {id python.api, version 1}
-        {id python.cancellation, version 1}
-        {id python.capabilities, version 2}
-        {id python.codegen, version 3}
-        {id python.expressions, version 7}
-        {id python.lifecycle, version 3}
-        {id python.naming, version 2}
-        {id python.pipeline, version 0}
-        {id python.records, version 0}
-        {id python.runtime, version 1}
-        {id python.transactions, version 3}
-        {id python.truth-testing, version 3}
-        {id python.typing, version 1}
-        {id python.value-tags, version 1}
-        {id python.values, version 7}
     )}
     {id codegen.generate, covered_rules (
         codegen.entity

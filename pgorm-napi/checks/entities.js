@@ -11,7 +11,9 @@
 //    with the application's library as lib/pgorm_napi.node: the facade an
 //    application ships with its own native module.
 // 4. Run the application's JavaScript suite against it under node --test and
-//    deno test, and write target/napi-entities/report.json.
+//    deno test, with the binding's surface test, whose registered-entity
+//    descriptions run only against a module that registers entities, and
+//    write target/napi-entities/report.json.
 //
 // The suite reads PGORM_TEST_DSN, or the server DATABASE_URL names, as the
 // binding's own suite does, and makes and drops a database of its own.
@@ -94,12 +96,18 @@ copyFileSync(join(napi, "package.json"), join(facade, "package.json"));
 writeFileSync(join(facade, "deno.json"), `${JSON.stringify({ nodeModulesDir: "none" }, null, 2)}\n`);
 mkdirSync(join(facade, "tests", "parity"), { recursive: true });
 copyFileSync(join(napi, "tests", "support.ts"), join(facade, "tests", "support.ts"));
+copyFileSync(join(napi, "tests", "surface.test.ts"), join(facade, "tests", "surface.test.ts"));
+mkdirSync(join(out, "docs", "spec"), { recursive: true });
+copyFileSync(join(checkout, "docs", "spec", "bindings-surface.json"), join(out, "docs", "spec", "bindings-surface.json"));
 copyFileSync(join(napi, "tests", "parity", "canonical.ts"), join(facade, "tests", "parity", "canonical.ts"));
 cpSync(join(application, "tests"), join(facade, "tests", "application-binding", "tests"), { recursive: true });
 
 const env = { ...process.env, PGORM_TEST_DSN: dsn(), NO_COLOR: "1" };
 const suite = join(facade, "tests", "application-binding", "tests");
-const files = readdirSync(suite).filter((file) => file.endsWith(".test.ts")).map((file) => join(suite, file));
+const files = [
+  ...readdirSync(suite).filter((file) => file.endsWith(".test.ts")).map((file) => join(suite, file)),
+  join(facade, "tests", "surface.test.ts"),
+];
 run(process.execPath, ["--test", ...files], { cwd: facade, env });
 run("deno", ["test", "--allow-ffi", "--allow-read", "--allow-env", "--allow-run", "--config", join(facade, "deno.json"), ...files], {
   cwd: facade,
@@ -108,6 +116,6 @@ run("deno", ["test", "--allow-ffi", "--allow-read", "--allow-env", "--allow-run"
 
 writeFileSync(
   join(out, "report.json"),
-  `${JSON.stringify({ library, facade, suites: files.map((file) => file.slice(suite.length + 1)), runtimes: ["node", "deno"] }, null, 2)}\n`,
+  `${JSON.stringify({ library, facade, suites: files.map((file) => file.slice(facade.length + 1)), runtimes: ["node", "deno"] }, null, 2)}\n`,
 );
 console.error(`the application module passed its suite in both runtimes: ${join(out, "report.json")}`);

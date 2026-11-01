@@ -2,7 +2,10 @@
 
 from dataclasses import dataclass
 from collections.abc import Iterable
+import re
 from typing import Any
+
+from .config import CodegenError
 
 
 @dataclass(frozen=True)
@@ -82,17 +85,40 @@ def wrapped(spelling: str, names: Iterable[str]) -> str | None:
     return None
 
 
+# One double-quoted part of a type's name, its own quotes doubled.
+QUOTED = re.compile(r'"((?:[^"]|"")*)"')
+
+
+def type_name(spelling: str) -> tuple[str, str | None]:
+    """A described kind's type, ``"schema"."name"`` or ``"name"``, as its
+    name and schema."""
+    parts: list[str] = []
+    position = 0
+    while True:
+        match = QUOTED.match(spelling, position)
+        if match is None:
+            raise CodegenError(f"a described kind names its type in quotes: {spelling!r}")
+        parts.append(match[1].replace('""', '"'))
+        position = match.end()
+        if position == len(spelling):
+            break
+        if spelling[position] != "." or len(parts) == 2:
+            raise CodegenError(f"a described kind names its type in quotes: {spelling!r}")
+        position += 1
+    return parts[-1], (parts[0] if len(parts) == 2 else None)
+
+
 def field_type(column: dict[str, Any]) -> FieldType:
-    spelling = column.get("rust_decode_type")
+    spelling = column.get("rust_type")
     if not isinstance(spelling, str):
         return FieldType("Any")
-    return resolve(spelling.replace(" ", ""), column["input_hint"])
+    return resolve(spelling.replace(" ", ""), column.get("kind"))
 
 
-def resolve(spelling: str, hint: dict[str, Any]) -> FieldType:
+def resolve(spelling: str, kind: str | None) -> FieldType:
     inner = wrapped(spelling, ("Option", "std::option::Option", "core::option::Option"))
     if inner is not None:
-        resolved = resolve(inner, hint)
+        resolved = resolve(inner, kind)
         return FieldType(
             resolved.annotation + " | None",
             resolved.kind,
@@ -104,16 +130,15 @@ def resolve(spelling: str, hint: dict[str, Any]) -> FieldType:
         return FieldType("bytes", repr("bytes"))
     inner = wrapped(spelling, ("Vec", "std::vec::Vec", "alloc::vec::Vec"))
     if inner is not None:
-        if hint.get("kind") != "array":
+        if kind is None or not kind.endswith("[]"):
             return FieldType("Any")
-        element = resolve(inner, hint["element"])
+        element = resolve(inner, kind[:-2])
         if element.kind is None or element.array:
             return FieldType("Any")
         return FieldType(f"list[{element.annotation}]", element.kind, array=True)
-    if hint.get("kind") == "enum":
-        return FieldType(
-            "str", f"p.TypeName({hint['name']!r}, schema={hint.get('schema')!r})"
-        )
+    if kind is not None and kind.startswith("enum "):
+        name, schema = type_name(kind[len("enum ") :])
+        return FieldType("str", f"p.TypeName({name!r}, schema={schema!r})")
     if spelling in ("Json", "JsonValue", "serde_json::Value"):
         return FieldType("Any", repr("json"), json=True)
     if spelling in SCALARS:

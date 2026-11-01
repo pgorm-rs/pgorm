@@ -31,7 +31,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
     def active(self, identity, name="Nora"):
         return self.account.active().set("id", identity).set("display name", name)
 
-    # [spec:pgorm:req:bindings.entities+2/test]
+    # [spec:pgorm:req:bindings.entities+3/test]
     async def test_registration_declares_real_types_and_mapping(self):
         registrations = p.capabilities()["registrations"]["entities"]
         self.assertEqual([r["name"] for r in registrations],
@@ -39,27 +39,34 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
                           "app.Stay", "app.Temper"])
         self.assertEqual(p.entities(), [r["name"] for r in registrations])
         info = self.account.describe()
-        self.assertTrue(info["rust_entity"].endswith("account::Entity"))
-        self.assertTrue(info["rust_model"].endswith("account::Model"))
-        self.assertTrue(info["rust_active_model"].endswith("account::ActiveModel"))
-        self.assertEqual((info["schema"], info["table"]), ("python_entities", "accounts"))
+        self.assertTrue(info["rust"]["entity"].endswith("account::Entity"))
+        self.assertTrue(info["rust"]["model"].endswith("account::Model"))
+        self.assertTrue(info["rust"]["active_model"].endswith("account::ActiveModel"))
+        self.assertTrue(info["rust"]["column"].endswith("account::Column"))
+        self.assertEqual((info["name"], info["schema"], info["table"]), ("app.Account", "python_entities", "accounts"))
         columns = {column["name"]: column for column in info["columns"]}
         self.assertEqual(columns["display name"]["json_key"], "displayName")
+        self.assertEqual(columns["display name"]["rust_type"], "String")
         self.assertTrue(columns["id"]["primary_key"])
         self.assertTrue(columns["note"]["nullable"])
+        self.assertEqual([(column["name"], column["kind"], column["values"]) for column in info["columns"]], [
+            ("id", "i32", None), ("display name", "text", None), ("note", "text", None), ("version", "i32", None),
+            ("mood", 'enum "python_entities"."Mood"', ["calm", "busy"]),
+        ])
         with self.assertRaises(p.UnsupportedCapabilityError):
             p.entity("invented.Entity")
         with self.assertRaises(p.ConstructionError):
             self.account.col("missing")
 
-    # [spec:pgorm:req:bindings.entities+2/test]
-    async def test_registration_declares_its_reachable_terminals(self):
-        terminals = self.account.describe()["terminals"]
-        self.assertEqual(terminals, [
+    # [spec:pgorm:req:python.capabilities+2/test]
+    async def test_manifest_declares_its_reachable_terminals(self):
+        terminals = [
             "all", "one", "optional", "active.insert", "active.update", "active.delete",
             "update.returning_change", "update_many.returning_changes",
             "insert.returning_upsert", "insert_many.returning_upserts",
-        ])
+        ]
+        operations = p.capabilities()["operations"]
+        self.assertEqual([t for t in terminals if "entity." + t not in operations], [])
         active = self.active(1)
         owners = {
             "": self.account.find(), "active": active, "update": self.account.update(active),
@@ -116,10 +123,9 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
         booking = p.entity("app.Booking")
         span = p.CreatedRange("floatrange", "f64", schema="python_entities")
         spans = p.CreatedMultirange("floatmultirange", "f64", schema="python_entities")
-        hints = {column["name"]: column["input_hint"] for column in booking.describe()["columns"]}
-        self.assertEqual(hints["span"],
-                         {"kind": "created_range", "name": "floatrange", "schema": "python_entities", "subtype": "f64"})
-        self.assertEqual(hints["spans"]["kind"], "created_multirange")
+        kinds = {column["name"]: column["kind"] for column in booking.describe()["columns"]}
+        self.assertEqual(kinds["span"], 'range "python_entities"."floatrange" of f64')
+        self.assertEqual(kinds["spans"], 'multirange "python_entities"."floatmultirange" of f64')
         async with self.pool.connection() as connection:
             active = (booking.active().set("id", 1).set("span", p.Range(1.5, 2.5))
                       .set("spans", p.Multirange([p.Range(5.0, 8.0), p.Range(1.0, 3.0)])))
@@ -330,7 +336,7 @@ class RegisteredEntities(unittest.IsolatedAsyncioTestCase):
                 await connection.one(p.RawSQL("SELECT $1::integer AS n", [p.Value("text", "text")]))
             self.assertTrue(await connection.ping())
 
-    # [spec:pgorm:req:bindings.entities+2/test]
+    # [spec:pgorm:req:bindings.entities+3/test]
     # [spec:pgorm:req:bindings.cancellation/test]
     async def test_cancellation_interrupts_an_active_rust_hook(self):
         async with self.pool.connection() as connection:

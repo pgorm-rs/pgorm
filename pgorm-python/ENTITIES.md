@@ -198,10 +198,16 @@ raises `ConstructionError` on Python truth testing.
 
 ## Values, state and hooks
 
-Column lookup and model keys use SQL names. `describe()` also reports the
-separate JSON key, SQL type, nullability, primary key and concrete Rust type
-names. Plain Python inputs use the declared SQL column type as a conversion
-hint. Explicit `Value` tags preserve the caller's chosen Rust value variant;
+Column lookup and model keys use SQL names. `describe()` reports the
+registration's `name`, `schema` and `table`; under `columns`, each column's
+SQL `name`, its `json_key`, `sql_type`, the `rust_type` its model reads it as,
+`nullable`, `primary_key`, the `kind` its values bind and read as (`i32`,
+`text[]`, `enum "app"."mood"`, `range "app"."floatrange" of f64`, or `None`
+for a type that takes an explicit `Value`) and an enum's `values`; and under
+`rust` the concrete Rust `entity`, `model`, `active_model` and `column` type
+names. These are the keys JavaScript's `describe()` reports, each spelled in
+snake_case. Plain Python inputs use the declared SQL column type as a
+conversion hint. Explicit `Value` tags preserve the caller's chosen Rust value variant;
 the real Rust model/ActiveModel setter performs the final conversion checks.
 An unusual custom field type may therefore require an explicit tagged value.
 Qualified enum input must match the declared column enum identity. A field of a

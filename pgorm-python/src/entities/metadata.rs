@@ -9,7 +9,7 @@ use serde_json::{Value as Json, json};
 use crate::{
     errors::{ConstructionError, DecodeError},
     identifiers::validate_name,
-    values::{CreatedKind, PyTypeName, PyValue},
+    values::{CreatedKind, PyTypeName, PyValue, Tag, parse_scalar},
 };
 
 #[derive(Clone, Debug)]
@@ -152,17 +152,41 @@ impl InputKind {
         }
     }
 
-    fn describe(&self) -> PyResult<Json> {
-        Ok(match self {
-            Self::Scalar(name) => json!({"kind": name}),
-            Self::Enum(name) => json!({"kind": "enum", "name": name.name, "schema": name.schema}),
-            Self::Created(kind) => json!({
-                "kind": kind.kind_name(), "name": kind.name.name, "schema": kind.name.schema,
-                "subtype": crate::values::scalar_name(&kind.subtype)?,
-            }),
-            Self::Array(member) => json!({"kind": "array", "element": member.describe()?}),
-            Self::Explicit => json!({"kind": "explicit_value_required"}),
-        })
+    /// The kind a value of the column carries, or `None` for a column that
+    /// takes an explicit `Value`, an array of one included.
+    fn tag(&self) -> PyResult<Option<Tag>> {
+        Ok(Some(match self {
+            Self::Scalar(name) => Tag::Scalar(parse_scalar(name)?),
+            Self::Enum(name) => Tag::Enum(name.clone()),
+            Self::Created(kind) => Tag::Created(kind.clone()),
+            Self::Array(member) => match member.tag()? {
+                Some(element) => Tag::Array(Box::new(element)),
+                None => return Ok(None),
+            },
+            Self::Explicit => return Ok(None),
+        }))
+    }
+
+    /// The kind as `describe()` spells it.
+    // [spec:pgorm:req:bindings.entities+3]
+    fn key(&self) -> PyResult<Option<String>> {
+        self.tag()?.map(|tag| tag.key()).transpose()
+    }
+}
+
+/// An enum column's labels, in declaration order, an array of one's and a
+/// domain over one included.
+fn labels(ty: &ColumnType) -> Option<Vec<String>> {
+    use pgorm::pgorm_query::SqlName;
+    match ty {
+        ColumnType::Enum { variants, .. } => Some(
+            variants
+                .iter()
+                .map(|variant| SqlName::to_string(&**variant))
+                .collect(),
+        ),
+        ColumnType::Array(member) | ColumnType::Domain { base: member, .. } => labels(member),
+        _ => None,
     }
 }
 
@@ -171,19 +195,25 @@ pub(crate) struct ColumnInfo {
     pub(crate) name: String,
     pub(crate) json_key: String,
     pub(crate) sql_type: String,
-    pub(crate) rust_decode_type: Option<&'static str>,
+    pub(crate) rust_type: Option<&'static str>,
     pub(crate) nullable: bool,
     pub(crate) primary_key: bool,
     pub(crate) input: InputKind,
+    pub(crate) labels: Option<Vec<String>>,
 }
 
 impl ColumnInfo {
     fn describe(&self) -> PyResult<Json> {
-        Ok(
-            json!({"name": self.name, "json_key": self.json_key, "sql_type": self.sql_type,
-            "rust_decode_type": self.rust_decode_type,
-            "nullable": self.nullable, "primary_key": self.primary_key, "input_hint": self.input.describe()?}),
-        )
+        Ok(json!({
+            "name": self.name,
+            "json_key": self.json_key,
+            "sql_type": self.sql_type,
+            "rust_type": self.rust_type,
+            "nullable": self.nullable,
+            "primary_key": self.primary_key,
+            "kind": self.input.key()?,
+            "values": self.labels,
+        }))
     }
 }
 
@@ -234,7 +264,7 @@ impl EntityInfo {
             }
             let definition = column.def();
             columns.push(ColumnInfo {
-                rust_decode_type: reflected.as_ref().and_then(|fields| {
+                rust_type: reflected.as_ref().and_then(|fields| {
                     fields
                         .iter()
                         .find(|field| field.name() == name)
@@ -246,6 +276,7 @@ impl EntityInfo {
                 nullable: definition.is_null(),
                 sql_type: format!("{:?}", definition.get_column_type()),
                 input: InputKind::from_column(definition.get_column_type()),
+                labels: labels(definition.get_column_type()),
             });
         }
         if columns.is_empty() {
@@ -275,19 +306,24 @@ impl EntityInfo {
             .ok_or_else(|| ConstructionError::new_err("unknown compiled entity column"))
     }
 
+    /// The registration as `describe()` gives it.
+    // [spec:pgorm:req:bindings.entities+3]
     pub(crate) fn describe(&self) -> PyResult<Json> {
-        Ok(
-            json!({"name": self.name, "schema": self.schema, "table": self.table,
-            "rust_entity": self.entity_type, "rust_column": self.column_type, "rust_model": self.model_type, "rust_active_model": self.active_type,
+        Ok(json!({
+            "name": self.name,
+            "schema": self.schema,
+            "table": self.table,
             "columns": self.columns.iter().map(ColumnInfo::describe).collect::<PyResult<Vec<_>>>()?,
             "primary_key": self.primary_key,
             "primary_key_without_overlaps": self.without_overlaps,
             "relations": self.relations,
-            "terminals": ["all", "one", "optional", "active.insert", "active.update", "active.delete",
-                "update.returning_change", "update_many.returning_changes",
-                "insert.returning_upsert", "insert_many.returning_upserts"],
-            "active_states": ["not_set", "set", "unchanged"], "hooks": "Rust ActiveModelBehavior"}),
-        )
+            "rust": {
+                "entity": self.entity_type,
+                "model": self.model_type,
+                "active_model": self.active_type,
+                "column": self.column_type,
+            },
+        }))
     }
 }
 
@@ -298,25 +334,31 @@ mod tests {
     use pgorm::pgorm_query::{ArrayType, Range, RangeType};
     use std::sync::Arc;
 
-    // [spec:pgorm:req:bindings.entities+2/test]    a range column hints its range kind, so a
-    // registered entity's range field takes a `pgorm.Range` as its value
+    fn key(ty: &ColumnType) -> PyResult<Option<String>> {
+        InputKind::from_column(ty).key()
+    }
+
+    // [spec:pgorm:req:bindings.entities+3/test]    a range column is described by its range kind,
+    // and a registered entity's range field takes a `pgorm.Range` as its value
     #[test]
-    fn range_columns_hint_their_range_kind() -> PyResult<()> {
-        let describe = |ty: ColumnType| InputKind::from_column(&ty).describe();
+    fn range_columns_take_their_range_kind() -> PyResult<()> {
         assert_eq!(
-            describe(ColumnType::Range(RangeType::Int4))?,
-            json!({"kind": "int4range"})
+            key(&ColumnType::Range(RangeType::Int4))?.as_deref(),
+            Some("int4range")
         );
         assert_eq!(
-            describe(ColumnType::Multirange(RangeType::TimestampTz))?,
-            json!({"kind": "tstzmultirange"})
+            key(&ColumnType::Multirange(RangeType::TimestampTz))?.as_deref(),
+            Some("tstzmultirange")
         );
         assert_eq!(
-            describe(ColumnType::Array(Arc::new(ColumnType::Range(
+            key(&ColumnType::Array(Arc::new(ColumnType::Range(
                 RangeType::Date
-            ))))?,
-            json!({"kind": "array", "element": {"kind": "daterange"}})
+            ))))?
+            .as_deref(),
+            Some("daterange[]")
         );
+        assert_eq!(key(&ColumnType::Money)?, None);
+        assert_eq!(key(&ColumnType::Array(Arc::new(ColumnType::Money)))?, None);
 
         Python::initialize();
         Python::attach(|py| {
@@ -345,10 +387,11 @@ mod tests {
         })
     }
 
-    // [spec:pgorm:req:bindings.entities+2/test]    a created range column hints its created kind,
-    // so a registered entity's field takes a `pgorm.Range` and reads back tagged with the type
+    // [spec:pgorm:req:bindings.entities+3/test]    a created range column is described by its
+    // created kind, and a registered entity's field takes a `pgorm.Range` and reads back tagged
+    // with the type
     #[test]
-    fn created_range_columns_hint_their_created_kind() -> PyResult<()> {
+    fn created_range_columns_take_their_created_kind() -> PyResult<()> {
         use pgorm::pgorm_query::Name;
 
         let column = ColumnType::CreatedRange {
@@ -358,8 +401,8 @@ mod tests {
         };
         let input = InputKind::from_column(&column);
         assert_eq!(
-            input.describe()?,
-            json!({"kind": "created_range", "name": "floatrange", "schema": "measure", "subtype": "f64"})
+            input.key()?.as_deref(),
+            Some("range \"measure\".\"floatrange\" of f64")
         );
         let multirange = ColumnType::CreatedMultirange {
             name: Name::runtime("slot_multirange"),
@@ -367,8 +410,8 @@ mod tests {
             subtype: Arc::new(ColumnType::Integer),
         };
         assert_eq!(
-            InputKind::from_column(&multirange).describe()?["kind"],
-            "created_multirange"
+            key(&multirange)?.as_deref(),
+            Some("multirange \"slot_multirange\" of i32")
         );
 
         Python::initialize();
@@ -396,11 +439,12 @@ mod tests {
         })
     }
 
-    // [spec:pgorm:req:bindings.schema-domains+2/test]    a domain column hints its base type, through
-    // a domain over a domain, an array of the domain and a domain over an enum, so a registered
-    // entity's field binds and reads back as a column of the base would
+    // [spec:pgorm:req:bindings.schema-domains+2/test]    a domain column takes its base type's kind,
+    // through a domain over a domain, an array of the domain and a domain over an enum, whose
+    // labels it carries, so a registered entity's field binds and reads back as a column of the
+    // base would
     #[test]
-    fn domain_columns_hint_their_base_type() -> PyResult<()> {
+    fn domain_columns_take_their_base_kind() -> PyResult<()> {
         use pgorm::pgorm_query::Name;
 
         let domain = |name: &str, base: ColumnType| ColumnType::Domain {
@@ -408,26 +452,28 @@ mod tests {
             schema: Some(Name::runtime("billing")),
             base: Arc::new(base),
         };
-        let describe = |ty: ColumnType| InputKind::from_column(&ty).describe();
         let quantity = domain("quantity", ColumnType::Integer);
-        assert_eq!(describe(quantity.clone())?, json!({"kind": "i32"}));
+        assert_eq!(key(&quantity)?.as_deref(), Some("i32"));
         assert_eq!(
-            describe(domain("small", quantity.clone()))?,
-            json!({"kind": "i32"})
+            key(&domain("small", quantity.clone()))?.as_deref(),
+            Some("i32")
         );
         assert_eq!(
-            describe(ColumnType::Array(Arc::new(quantity.clone())))?,
-            json!({"kind": "array", "element": {"kind": "i32"}})
+            key(&ColumnType::Array(Arc::new(quantity.clone())))?.as_deref(),
+            Some("i32[]")
         );
         let mood = ColumnType::Enum {
             name: Name::runtime("mood"),
             schema: None,
-            variants: Vec::new(),
+            variants: vec![Name::runtime("calm"), Name::runtime("tense")],
         };
+        let cheerful = domain("cheerful", mood);
+        assert_eq!(key(&cheerful)?.as_deref(), Some("enum \"mood\""));
         assert_eq!(
-            describe(domain("cheerful", mood))?,
-            json!({"kind": "enum", "name": "mood", "schema": null})
+            labels(&ColumnType::Array(Arc::new(cheerful))),
+            Some(vec!["calm".to_owned(), "tense".to_owned()])
         );
+        assert_eq!(labels(&quantity), None);
 
         Python::initialize();
         Python::attach(|py| {

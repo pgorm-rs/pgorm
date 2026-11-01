@@ -44,8 +44,10 @@ A `Column` is a declaration and has no methods: a model converts each value
 through its field's column where it takes one, and `Value(data, kind)` is the
 conversion a program calls. `model.describe()` reports the declaration as data:
 the table's `schema`, `table` and `alias`, the `primary_key` fields, and under
-`columns` each field's SQL `column`, its `type`, `nullable`, `primary_key`,
-`default`, `generated` and an enum's `values`. Neither a `Column` nor
+`fields` each field's SQL `column`, its `kind` (`i64`, `text[]`,
+`enum "app"."mood"`, `range "app"."floatrange" of f64`), `nullable`,
+`primary_key`, `default`, `generated` and an enum's `values`: the keys
+JavaScript's `describe()` reports, spelled in snake_case. Neither a `Column` nor
 `col(field)` describes itself.
 
 ## Query and write
