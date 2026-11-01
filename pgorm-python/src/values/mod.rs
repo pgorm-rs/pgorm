@@ -9,6 +9,8 @@ mod ranges;
 mod snapshot;
 mod temporal;
 mod types;
+#[cfg(test)]
+mod variants;
 
 use pgorm::pgorm_query::{ArrayType, Expr, SimpleExpr, Value};
 use pyo3::{

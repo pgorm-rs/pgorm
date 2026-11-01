@@ -10,6 +10,8 @@ mod model;
 pub(crate) mod query;
 mod registry;
 mod relations;
+#[cfg(test)]
+mod variants;
 mod versions;
 
 pub use active::{ActiveState, PyActiveModel, PyActiveValue};

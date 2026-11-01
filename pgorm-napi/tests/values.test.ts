@@ -24,6 +24,7 @@ import {
   Uuid,
   Value,
 } from "../lib/index.js";
+import { native } from "../lib/operations.js";
 import { same, scratchDatabase } from "./support.ts";
 
 let database: { dsn: string; drop(): Promise<void> } | undefined;
@@ -631,4 +632,54 @@ test("a column named __proto__ is a property of its row, not the row's prototype
 // [spec:pgorm:req:bindings.rows/test]
 test("two columns of one name are a DecodeError, not one key for both", async () => {
   await undecodable("SELECT 1 AS a, 2 AS a", /more than one column named "a"/);
+});
+
+// [spec:pgorm:req:bindings.values/test]
+test("every kind pgorm names converts both ways, and has a NULL", () => {
+  const plain = Temporal.PlainDateTime.from("2024-02-29T12:30:15.25");
+  const instant = Temporal.Instant.from("2024-02-29T12:30:15.25Z");
+  const ranges: Record<string, Range> = {
+    int4: new Range(1, 5),
+    int8: new Range(1n, 5n),
+    num: new Range(new Decimal("1.5"), new Decimal("2.5")),
+    date: new Range(plain.toPlainDate(), null),
+    ts: new Range(plain, null),
+    tstz: new Range(null, instant),
+  };
+  const samples: Record<string, unknown> = {
+    bool: true,
+    i8: -8,
+    i16: -16,
+    i32: 32,
+    i64: -64n,
+    u32: 32,
+    u64: 64n,
+    f32: 1.5,
+    f64: -2.5,
+    text: "text",
+    char: "c",
+    bytes: new Uint8Array([0, 255]),
+    json: { a: [1, null] },
+    decimal: new Decimal("123.45"),
+    uuid: new Uuid("67e55044-10b1-426f-9247-bb680e5fe0c8"),
+    date: plain.toPlainDate(),
+    time: plain.toPlainTime(),
+    datetime: plain,
+    datetime_utc: instant,
+    ipnetwork: "192.0.2.7/32",
+    mac_address: new Uint8Array([0, 1, 2, 3, 4, 5]),
+    vector: new Float32Array([1, -0.5]),
+    interval: new Interval({ months: 1, days: -2, microseconds: 3n }),
+  };
+  for (const [prefix, range] of Object.entries(ranges)) {
+    samples[`${prefix}range`] = range;
+    samples[`${prefix}multirange`] = new Multirange([range]);
+  }
+  const kinds: string[] = native.valueKinds();
+  assert.deepEqual(new Set(kinds), new Set(Object.keys(samples)));
+  for (const kind of kinds) {
+    const value = new Value(samples[kind], kind as never);
+    assert.ok(new Value(value.value, kind as never).equals(value), kind);
+    assert.equal(Value.null(kind as never).value, null, kind);
+  }
 });

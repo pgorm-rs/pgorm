@@ -28,6 +28,8 @@ mod returning;
 mod schema;
 mod select;
 mod table;
+#[cfg(test)]
+mod variants;
 mod window;
 mod with;
 mod write;

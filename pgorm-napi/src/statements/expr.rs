@@ -204,7 +204,7 @@ fn quantified(cx: &mut FunctionContext) -> NeonResult<Node> {
 const COMPARISONS: [&str; 6] = ["eq", "ne", "lt", "lte", "gt", "gte"];
 
 // [spec:pgorm:req:bindings.ranges]
-const BINARY: [(&str, BinOper); 26] = [
+pub(super) const BINARY: [(&str, BinOper); 26] = [
     ("eq", BinOper::Equal),
     ("ne", BinOper::NotEqual),
     ("lt", BinOper::SmallerThan),

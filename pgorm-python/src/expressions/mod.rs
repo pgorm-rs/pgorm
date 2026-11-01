@@ -20,6 +20,8 @@ mod shaping;
 mod subscripts;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod variants;
 
 use pgorm::pgorm_query::{BinOper, SimpleExpr};
 use pyo3::prelude::*;

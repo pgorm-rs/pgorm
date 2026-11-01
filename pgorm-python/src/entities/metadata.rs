@@ -22,7 +22,7 @@ pub(crate) enum InputKind {
 }
 
 impl InputKind {
-    fn from_column(ty: &ColumnType) -> Self {
+    pub(super) fn from_column(ty: &ColumnType) -> Self {
         if let Some(kind) = CreatedKind::from_column(ty) {
             return Self::Created(kind);
         }

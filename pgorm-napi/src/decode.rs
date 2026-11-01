@@ -317,9 +317,11 @@ fn value(ty: &Type, kind: &ArrayType, raw: &[u8]) -> Result<Value, CodecError> {
             )
         }
         ArrayType::Interval => Value::from(Interval::from_sql(ty, raw)?),
-        // `tag` answers neither `BigUnsigned` nor `Char`, nor any kind it does
-        // not name.
-        _ => return Err("no PostgreSQL type decodes as this kind".into()),
+        // `tag` answers neither of these, which no column decodes as.
+        ArrayType::BigUnsigned | ArrayType::Char => {
+            return Err("no PostgreSQL type decodes as this kind".into());
+        }
+        _ => return Err(crate::values::unrepresented().message().into()),
     })
 }
 
@@ -462,6 +464,8 @@ impl Numeric {
 
 #[cfg(test)]
 mod tests {
+    use pgorm::pgorm_query::tests_cfg::Variants;
+
     use super::*;
 
     fn numeric(text: &str) -> Vec<u8> {
@@ -524,5 +528,18 @@ mod tests {
         )?;
         assert_eq!(created_text(&ty, &kind, &raw)?, "[1.5,2.5)");
         Ok(())
+    }
+
+    // [spec:pgorm:req:bindings.values/test]
+    #[test]
+    fn no_value_kind_reaches_the_decoders_wildcard_arm() {
+        let unrepresented = crate::values::unrepresented();
+        // Long enough that no codec indexes past it; most refuse it.
+        let raw = [0; 16];
+        for kind in ArrayType::variants().into_iter().chain(ArrayType::kinds()) {
+            if let Err(error) = value(&Type::TEXT, &kind, &raw) {
+                assert_ne!(error.to_string(), unrepresented.message(), "{kind:?}");
+            }
+        }
     }
 }

@@ -7,7 +7,10 @@ use neon::{prelude::*, types::JsBigInt};
 use pgorm::pgorm_query::{Range, Value};
 
 use super::{Tag, Tagged, created};
-use crate::{codec::Codec, errors::Failure};
+use crate::{
+    codec::Codec,
+    errors::{Failure, throw},
+};
 
 /// Throw a `DecodeError`: a value has no form in the JavaScript type its kind
 /// declares.
@@ -185,6 +188,6 @@ pub(crate) fn value<'cx>(
                 ("interval", interval.months, interval.days, microseconds),
             )?
         }
-        _ => cx.null().upcast(),
+        _ => return throw(cx, super::unrepresented()),
     })
 }

@@ -1460,6 +1460,7 @@ dependencies = [
  "jiff",
  "neon",
  "pgorm",
+ "pgorm-query",
  "postgres-protocol",
  "rust_decimal",
  "rustls",

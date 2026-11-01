@@ -12,8 +12,8 @@ use pgorm::pgorm_query::{
 use super::{
     Node,
     args::{
-        absent, arg, choice, flag, items, name, node, operand, operand_at, orderings_at, predicate,
-        refuse, select_at,
+        absent, arg, choice, flag, items, name, node, operand, operand_at, orderings_at, pick,
+        predicate, refuse, select_at,
     },
     data_type,
 };
@@ -149,6 +149,29 @@ fn is_json(cx: &mut FunctionContext) -> NeonResult<Node> {
     }))
 }
 
+/// `JSON_EXISTS`'s behaviours by the names JavaScript spells them, which a
+/// `JSON_TABLE`'s EXISTS column takes too.
+pub(super) const EXISTS_BEHAVIORS: &[(&str, JsonExistsBehavior)] = &[
+    ("true", JsonExistsBehavior::True),
+    ("false", JsonExistsBehavior::False),
+    ("unknown", JsonExistsBehavior::Unknown),
+    ("error", JsonExistsBehavior::Error),
+];
+
+/// `JSON_VALUE`'s keyword behaviours; a `jsonDefault` is its DEFAULT.
+pub(super) const VALUE_BEHAVIORS: &[(&str, JsonValueBehavior)] = &[
+    ("null", JsonValueBehavior::Null),
+    ("error", JsonValueBehavior::Error),
+];
+
+/// `JSON_QUERY`'s keyword behaviours; a `jsonDefault` is its DEFAULT.
+pub(super) const QUERY_BEHAVIORS: &[(&str, JsonQueryBehavior)] = &[
+    ("null", JsonQueryBehavior::Null),
+    ("error", JsonQueryBehavior::Error),
+    ("emptyArray", JsonQueryBehavior::EmptyArray),
+    ("emptyObject", JsonQueryBehavior::EmptyObject),
+];
+
 /// `JSON_EXISTS`'s `ON ERROR`, which has no DEFAULT.
 fn exists_behavior(
     cx: &mut FunctionContext,
@@ -158,19 +181,7 @@ fn exists_behavior(
     if absent(cx, value) {
         return Ok(None);
     }
-    Ok(Some(
-        match choice(
-            cx,
-            index,
-            "JSON_EXISTS's behaviour",
-            &["true", "false", "unknown", "error"],
-        )? {
-            "true" => JsonExistsBehavior::True,
-            "false" => JsonExistsBehavior::False,
-            "unknown" => JsonExistsBehavior::Unknown,
-            _ => JsonExistsBehavior::Error,
-        },
-    ))
+    pick(cx, value, "JSON_EXISTS's behaviour", EXISTS_BEHAVIORS).map(Some)
 }
 
 /// `JSON_VALUE`'s `ON EMPTY` or `ON ERROR`: a keyword or a `jsonDefault`.
@@ -185,12 +196,7 @@ pub(super) fn value_behavior(
     if let Some(Node::JsonDefault(default)) = node(cx, value) {
         return Ok(Some(JsonValueBehavior::Default(default)));
     }
-    Ok(Some(
-        match choice(cx, index, "JSON_VALUE's behaviour", &["null", "error"])? {
-            "null" => JsonValueBehavior::Null,
-            _ => JsonValueBehavior::Error,
-        },
-    ))
+    pick(cx, value, "JSON_VALUE's behaviour", VALUE_BEHAVIORS).map(Some)
 }
 
 /// `JSON_QUERY`'s `ON EMPTY` or `ON ERROR`: a keyword or a `jsonDefault`.
@@ -205,19 +211,7 @@ pub(super) fn query_behavior(
     if let Some(Node::JsonDefault(default)) = node(cx, value) {
         return Ok(Some(JsonQueryBehavior::Default(default)));
     }
-    Ok(Some(
-        match choice(
-            cx,
-            index,
-            "JSON_QUERY's behaviour",
-            &["null", "error", "emptyArray", "emptyObject"],
-        )? {
-            "null" => JsonQueryBehavior::Null,
-            "error" => JsonQueryBehavior::Error,
-            "emptyArray" => JsonQueryBehavior::EmptyArray,
-            _ => JsonQueryBehavior::EmptyObject,
-        },
-    ))
+    pick(cx, value, "JSON_QUERY's behaviour", QUERY_BEHAVIORS).map(Some)
 }
 
 /// `JSON_QUERY`'s one shaping slot: PostgreSQL refuses `OMIT QUOTES` beside a
