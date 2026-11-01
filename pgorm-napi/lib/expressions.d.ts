@@ -10,6 +10,8 @@
 // [spec:pgorm:req:bindings.case]
 
 import type { Param, TypeName, Value } from "./index.d.ts";
+import type { EntityColumn } from "./entities.d.ts";
+import type { ModelColumn } from "./models.d.ts";
 import type { Select } from "./select.d.ts";
 import type { ExtendedWindow, Window, Windowed } from "./windows.d.ts";
 
@@ -42,6 +44,28 @@ export type BindValue = Exclude<Param, null>;
 /** What an operand may be: an expression, or a value to bind. */
 export type Operand = Expr | BindValue;
 
+/**
+ * What a comparison or a membership test of the expression `S` takes as its
+ * value: a model's column or a registered entity's column takes what its
+ * declared kind converts, a `Range` or `Multirange` for a range or multirange
+ * kind, and any other expression an {@link Operand}.
+ *
+ * `Expr`'s methods find it through their receiver, `this`, rather than each
+ * column redeclaring them: a `Range` is no `Operand`, and a column whose
+ * methods took one in place of an `Operand` would be no `Expr`.
+ */
+export type ComparisonOperand<S> = S extends ModelColumn<any, infer I> ? I
+  : S extends EntityColumn<infer I> ? I
+  : Operand;
+
+/**
+ * What `between`, the distinctness tests, containment, overlap and the range
+ * positions of the expression `S` take as a value: a model's column takes
+ * what its declared kind converts, and any other expression, a registered
+ * entity's column included, an {@link Operand}.
+ */
+export type ModelOperand<S> = S extends ModelColumn<any, infer I> ? I : Operand;
+
 export type Predicate = Expr | Condition;
 
 /** Where NULLs sort. */
@@ -51,12 +75,12 @@ export type Nulls = "first" | "last";
 export declare class Expr extends Builder {
   protected constructor();
   /** `=`; `any(..)` or `all(..)` compares with an array's elements or a subquery's rows. */
-  eq(other: Operand | Quantified): Expr;
-  ne(other: Operand | Quantified): Expr;
-  lt(other: Operand | Quantified): Expr;
-  lte(other: Operand | Quantified): Expr;
-  gt(other: Operand | Quantified): Expr;
-  gte(other: Operand | Quantified): Expr;
+  eq<S>(this: S, other: ComparisonOperand<S> | Quantified): Expr;
+  ne<S>(this: S, other: ComparisonOperand<S> | Quantified): Expr;
+  lt<S>(this: S, other: ComparisonOperand<S> | Quantified): Expr;
+  lte<S>(this: S, other: ComparisonOperand<S> | Quantified): Expr;
+  gt<S>(this: S, other: ComparisonOperand<S> | Quantified): Expr;
+  gte<S>(this: S, other: ComparisonOperand<S> | Quantified): Expr;
   add(other: Operand): Expr;
   sub(other: Operand): Expr;
   mul(other: Operand): Expr;
@@ -65,21 +89,21 @@ export declare class Expr extends Builder {
   /** `a || b`. */
   concat(other: Operand): Expr;
   /** `@>`: a range, multirange or array containing the other. */
-  contains(other: Operand | Quantified): Expr;
+  contains<S>(this: S, other: ModelOperand<S> | Quantified): Expr;
   /** `<@`: contained by the other. */
-  containedBy(other: Operand | Quantified): Expr;
+  containedBy<S>(this: S, other: ModelOperand<S> | Quantified): Expr;
   /** `&&`: sharing a value with the other. */
-  overlaps(other: Operand | Quantified): Expr;
+  overlaps<S>(this: S, other: ModelOperand<S> | Quantified): Expr;
   /** `<<`: a range or multirange lying wholly left of the other. */
-  strictlyLeftOf(other: Operand | Quantified): Expr;
+  strictlyLeftOf<S>(this: S, other: ModelOperand<S> | Quantified): Expr;
   /** `>>`: a range or multirange lying wholly right of the other. */
-  strictlyRightOf(other: Operand | Quantified): Expr;
+  strictlyRightOf<S>(this: S, other: ModelOperand<S> | Quantified): Expr;
   /** `&<`: extending no further right than the other. */
-  notExtendRightOf(other: Operand | Quantified): Expr;
+  notExtendRightOf<S>(this: S, other: ModelOperand<S> | Quantified): Expr;
   /** `&>`: extending no further left than the other. */
-  notExtendLeftOf(other: Operand | Quantified): Expr;
+  notExtendLeftOf<S>(this: S, other: ModelOperand<S> | Quantified): Expr;
   /** `-|-`: adjacent to the other, sharing no value with nothing between. */
-  adjacentTo(other: Operand | Quantified): Expr;
+  adjacentTo<S>(this: S, other: ModelOperand<S> | Quantified): Expr;
   /** `~`: the text matches a POSIX regular expression, case sensitively; the pattern is bound unless it is an expression. */
   regex(pattern: Operand | Quantified): Expr;
   /** `!~`: the text does not match the regular expression. */
@@ -100,8 +124,8 @@ export declare class Expr extends Builder {
    * values, which a bound string array is not.
    */
   pathExists(path: string | Quantified): Expr;
-  isDistinctFrom(other: Operand): Expr;
-  isNotDistinctFrom(other: Operand): Expr;
+  isDistinctFrom<S>(this: S, other: ModelOperand<S>): Expr;
+  isNotDistinctFrom<S>(this: S, other: ModelOperand<S>): Expr;
   and(other: Expr): Expr;
   or(other: Expr): Expr;
   not(): Expr;
@@ -111,10 +135,10 @@ export declare class Expr extends Builder {
    * Membership in a list of operands, or in a subquery's rows. An empty list
    * holds nothing: `isIn([])` is false and `isNotIn([])` true.
    */
-  isIn(source: readonly Operand[] | Select): Expr;
-  isNotIn(source: readonly Operand[] | Select): Expr;
-  between(lower: Operand, upper: Operand, options?: { readonly symmetric?: boolean }): Expr;
-  notBetween(lower: Operand, upper: Operand, options?: { readonly symmetric?: boolean }): Expr;
+  isIn<S>(this: S, source: readonly ComparisonOperand<S>[] | Select): Expr;
+  isNotIn<S>(this: S, source: readonly ComparisonOperand<S>[] | Select): Expr;
+  between<S>(this: S, lower: ModelOperand<S>, upper: ModelOperand<S>, options?: { readonly symmetric?: boolean }): Expr;
+  notBetween<S>(this: S, lower: ModelOperand<S>, upper: ModelOperand<S>, options?: { readonly symmetric?: boolean }): Expr;
   /**
    * A pattern match; the pattern is bound, and `escape` is one character, or
    * `""` to turn escaping off. `any(..)` or `all(..)` over patterns takes no
