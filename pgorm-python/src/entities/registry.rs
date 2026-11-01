@@ -48,7 +48,7 @@ impl Registry {
         Ok(self)
     }
 
-    pub(crate) fn describe(&self) -> PyResult<Vec<serde_json::Value>> {
+    pub(crate) fn describe(&self) -> Vec<serde_json::Value> {
         self.entries.values().map(|e| e.info().describe()).collect()
     }
 

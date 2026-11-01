@@ -155,5 +155,5 @@ pub(crate) fn value(field: Field<'_>) -> PyResult<PyValue> {
             )));
         }
     }?;
-    PyValue::from_rust(inner)
+    Ok(PyValue::from_rust(inner))
 }

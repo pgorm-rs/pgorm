@@ -185,7 +185,7 @@ pub(super) fn value(field: Field<'_>, ty: &Type, array: bool) -> PyResult<Option
         ))),
         _ => Err(crate::values::unrepresented()),
     }?;
-    PyValue::from_rust(value).map(Some)
+    Ok(Some(PyValue::from_rust(value)))
 }
 
 /// A column of a range type a schema created: read in binary as a range of
