@@ -267,7 +267,7 @@ today, including panicking edges and deliberate failsafes.
 >
 > `build()` MUST return the pair `(String, Values)` where
 > ordinary `SimpleExpr::Value` operands are replaced by numbered PostgreSQL
-> placeholders (`$1`, `$2`, ...) per `[spec:pgorm:req:sql.render.placeholders+1]`
+> placeholders (`$1`, `$2`, ...) per `[spec:pgorm:req:sql.render.placeholders]`
 > — and the corresponding values are collected in order into
 > `Values`. `to_string()`, reached through `Display`, MUST render the same
 > statement with all values inlined as SQL literals instead of placeholders.
@@ -285,7 +285,7 @@ today, including panicking edges and deliberate failsafes.
 > carries the note that it inlines rather than binds, and points at `build`.
 > The inlined form escapes what it writes, so the warning is not about
 > injection; it is that the server re-parses the literal and the type pinning
-> a bound value carries (`[spec:pgorm:req:sql.render.cast-param-type+4]`) is
+> a bound value carries (`[spec:pgorm:req:sql.render.cast-param-type]`) is
 > lost.
 
 ## Scope
@@ -516,7 +516,7 @@ today, including panicking edges and deliberate failsafes.
 > a `TableSample` (`sql.ast.select.table-sample`), which `from` takes as it
 > is.
 >
-> `FromItem::Template` (`[spec:pgorm:def:sql.types.table-ref+7]`) gets no
+> `FromItem::Template` (`[spec:pgorm:def:sql.types.table-ref]`) gets no
 > shorthand of its own. Its constructor returns `Result`, and a shorthand
 > would have to either return `Result` — breaking the `&mut Self` chain every
 > other builder method keeps — or swallow the failure; instead it is built
@@ -578,7 +578,7 @@ today, including panicking edges and deliberate failsafes.
 > argument types, so a bound argument, a placeholder the call gives no type,
 > is ambiguous to the server (`42725`) until it is cast to its type, as
 > anywhere a placeholder has no context
-> (`[spec:pgorm:sem:sql.render.placeholder-typing+1]`); the constructors add
+> (`[spec:pgorm:sem:sql.render.placeholder-typing]`); the constructors add
 > no cast of their own. A zero step is the server's refusal (`22023`).
 
 > [spec:pgorm:req:sql.ast.select.column-definitions]
@@ -665,10 +665,15 @@ today, including panicking edges and deliberate failsafes.
 > anything renders —
 > `Error::TiesWithoutOrder` and `Error::TiesWithSkipLocked` — and every
 > pgorm executor and the Python and JavaScript builders call it before they
-> render (`[dec:pgorm:no-panic]`, `exec.tie-limit`). Rendering is infallible
-> and writes what the statement holds (`sql.render.tie-limit`), so a caller of
-> pgorm-query alone who skips the check sends SQL the server refuses with
-> that `42601`. The check reads the statement's own clauses: a SELECT nested
+> render (`[dec:pgorm:no-panic]`, `exec.tie-limit`), as the constructors of a
+> view, a materialized view and a `CREATE TABLE AS` call it on the body they
+> take (`sql.ddl.view`, `sql.ddl.materialized-view`,
+> `sql.ddl.create-table-as`). Rendering is infallible and writes what the
+> statement holds (`sql.render.tie-limit`), so a caller of pgorm-query alone
+> who renders a `SELECT` without the check sends SQL the server refuses with
+> that `42601`; a stored definition's body cannot, since none of those
+> statements constructs over a body the check refuses. The check reads the
+> statement's own clauses: a SELECT nested
 > in it — a subquery, a CTE body, a set operation's arm — carrying a refused
 > shape is the server's refusal.
 >
@@ -1011,7 +1016,7 @@ today, including panicking edges and deliberate failsafes.
 > family does.
 >
 > `json_path_exists` binds its path as `text` cast to `jsonpath`, as
-> `JSON_EXISTS` binds its own (`[spec:pgorm:def:sql.ast.expr.sql-json+2]`):
+> `JSON_EXISTS` binds its own (`[spec:pgorm:def:sql.ast.expr.sql-json]`):
 > the path never becomes statement text, and the driver, which writes a
 > value in the format of the type it is, is never asked to write a
 > `jsonpath`. Its bound is `Into<String>`, a path being text. It is not
@@ -1022,7 +1027,7 @@ today, including panicking edges and deliberate failsafes.
 >
 > PostgreSQL's SQL/JSON functions — `JSON_EXISTS`, `JSON_VALUE`, `JSON_QUERY`
 > and the constructors — are the neighbouring vocabulary,
-> `[spec:pgorm:def:sql.ast.expr.sql-json+2]`, and replace none of these. The
+> `[spec:pgorm:def:sql.ast.expr.sql-json]`, and replace none of these. The
 > replacement was weighed operator by operator on PostgreSQL 18.6 and refused
 > on both counts it needed: a GIN `jsonb_ops` index serves `?`, `?|` and `?&`
 > and no index serves `JSON_EXISTS`; an expression index on `->>` or its cast
@@ -1169,7 +1174,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:def:sql.ast.insert+3]
 > `InsertStatement` is the INSERT AST node: a target table (`into_table`,
-> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+7]` — a name
+> taking the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref]` — a name
 > with an optional alias, which is the whole of what PostgreSQL's insert target
 > admits, so a subquery, values list or function call cannot be inserted into,
 > and an alias renders as `INSERT INTO "t" AS "a"`), a
@@ -1197,7 +1202,7 @@ today, including panicking edges and deliberate failsafes.
 > than a flag, and the last call wins. It belongs to the *statement* and not to
 > the column definition, which is why the exemption can exist at all without
 > weakening what `identity()` declares
-> (`[spec:pgorm:req:sql.ddl.column-def+5]`): the declaration still refuses every
+> (`[spec:pgorm:req:sql.ddl.column-def]`): the declaration still refuses every
 > insert that does not say this word.
 
 > [spec:pgorm:req:sql.ast.insert.arity]
@@ -1243,7 +1248,7 @@ today, including panicking edges and deliberate failsafes.
 >
 > `OnConflict::columns` MUST name a whole key's columns in one call. It takes
 > an `IntoKeyColumns`, the conversion a table key is built from
-> (`[spec:pgorm:req:sql.ddl.create-table+16]`): one column or a tuple of one
+> (`[spec:pgorm:req:sql.ddl.create-table]`): one column or a tuple of one
 > to twelve, in order, so `OnConflict::columns((a, b))` is the target
 > `column(a).and_column(b)` builds, written the way `.primary_key((a, b))`
 > declares the key it arbitrates on. The conversion hands back the first
@@ -1289,7 +1294,7 @@ today, including panicking edges and deliberate failsafes.
 > (`42809`); it is also the one arbiter that only a name reaches, because
 > inference looks for a unique index and finds none (`42P10`). PostgreSQL
 > 18's temporal key, a primary or unique key ending `WITHOUT OVERLAPS`
-> (`[spec:pgorm:req:sql.ddl.create-table+16]`), is enforced as one and
+> (`[spec:pgorm:req:sql.ddl.create-table]`), is enforced as one and
 > arbitrates as one, which the live suite holds: `OnConflict::columns` over
 > its columns, period included, finds nothing to infer (`42P10`), and its
 > name takes `DO NOTHING`, an overlapping row being the conflict, and refuses
@@ -1377,7 +1382,7 @@ today, including panicking edges and deliberate failsafes.
 > pushes one, and any `Into<SimpleExpr>` is accepted on the right-hand side
 > (values, keywords, `Expr::raw` fragments, subqueries). Duplicate columns are
 > not deduplicated — each call appends. The statement also carries the target
-> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+7]`, so
+> `table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref]`, so
 > the target is a name with an optional alias and nothing else, rendering
 > `UPDATE "t" AS "a" SET ..` when one is bound — a FROM relation list, a WHERE
 > `ConditionHolder` (per `sql.ast.condition.holder`), an optional
@@ -1411,7 +1416,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:def:sql.ast.delete+4]
 > `DeleteStatement` is the DELETE AST node: a target table set by
-> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref+7]`,
+> `from_table` — the `NamedTable` of `[spec:pgorm:def:sql.types.table-ref]`,
 > a name with an optional alias, rendering `DELETE FROM "t" AS "a"` when one is
 > bound — a USING relation list, a WHERE `ConditionHolder` shared with the
 > condition rules, and an optional `ReturningClause`. Like the other three
@@ -1435,7 +1440,7 @@ today, including panicking edges and deliberate failsafes.
 
 > [spec:pgorm:req:sql.ast.merge+1]
 > `MergeStatement` is the MERGE AST node. It holds a target `NamedTable`
-> (`[spec:pgorm:def:sql.types.table-ref+7]`: a name, bare or
+> (`[spec:pgorm:def:sql.types.table-ref]`: a name, bare or
 > schema-qualified, with an optional alias), an `only` flag, a source
 > `FromItem`, the join condition, an optional plain `WithClause`, its
 > `WHEN` arms, and an optional RETURNING list. `Query::merge(target, source,
@@ -1782,13 +1787,19 @@ today, including panicking edges and deliberate failsafes.
 > inline one having no name. `check_windows` refuses each before anything
 > renders — `Error::WindowRedefined`, `Error::WindowBaseUndefined`,
 > `Error::WindowFrameCopied`, `Error::WindowOrderOverridden` and
-> `Error::WindowUndefined` — and every pgorm executor and the Python and
-> JavaScript builders call it where they call `check_tie_limit`
-> (`sql.ast.select.tie-limit`, `[dec:pgorm:no-panic]`). Names are compared as
-> PostgreSQL compares the quoted identifiers pgorm writes: by their text,
-> case-exactly, whatever type minted them. Rendering is infallible and writes
-> what the statement holds (`sql.render.window`), so a caller of pgorm-query
-> alone who skips the check sends SQL the server refuses with those codes.
+> `Error::WindowUndefined` — and it runs wherever `check_tie_limit` does,
+> both reached through `check_clauses` (`sql.ast.select.tie-limit`,
+> `[dec:pgorm:no-panic]`): in every pgorm executor, in the Python and
+> JavaScript builders, before a COPY TO over a `SELECT` (`sql.ast.copy`), and
+> in the constructors of a view, a materialized view and a `CREATE TABLE AS`
+> on the body they take (`sql.ddl.view`, `sql.ddl.materialized-view`,
+> `sql.ddl.create-table-as`). Names are compared as PostgreSQL compares the
+> quoted identifiers pgorm writes: by their text, case-exactly, whatever type
+> minted them. Rendering is infallible and writes what the statement holds
+> (`sql.render.window`), so a caller of pgorm-query alone who renders a
+> `SELECT` without the check sends SQL the server refuses with those codes; a
+> stored definition's body cannot, since none of those statements constructs
+> over a body the check refuses.
 > The check reads the statement's own clauses: a SELECT nested in it names
 > its windows for itself, and one carrying a refused clause is the server's
 > refusal.
@@ -1860,7 +1871,7 @@ today, including panicking edges and deliberate failsafes.
 > created-range casts, and the `cast_as_raw` escape hatch — builds
 > that node, and there is no `Function::Cast`. Whether the type renders as a
 > quoted identifier or as the caller's own verbatim text is carried *inside*
-> the `TypeName` (`[spec:pgorm:def:sql.types.type-name+8]`), never by choosing
+> the `TypeName` (`[spec:pgorm:def:sql.types.type-name]`), never by choosing
 > a different node.
 >
 > What this forbids is the second, `FunctionCall`-shaped cast whose type rode
@@ -1913,9 +1924,9 @@ today, including panicking edges and deliberate failsafes.
 > within one millisecond, so a `uuidv7()` column default fills a key that
 > indexes like a sequence. A column takes one as its
 > `DEFAULT` the way it takes any expression, `ColumnDef::default(Func::uuidv7())`
-> (`[spec:pgorm:req:sql.ddl.column-def+12]`), and an entity as
+> (`[spec:pgorm:req:sql.ddl.column-def]`), and an entity as
 > `#[pgorm(default_expr = "Func::uuidv7()")]`, `Func` being a prelude member for
-> that reason (`[spec:pgorm:def:entity.prelude+8]`). `uuidv7_shifted` is
+> that reason (`[spec:pgorm:def:entity.prelude]`). `uuidv7_shifted` is
 > `uuidv7`'s one-argument overload, which moves the embedded time by an
 > `interval` and binds it as any argument is bound; PostgreSQL has no other
 > `uuidv7` arity (`uuidv7(1)` is `42883`). The two readers are immutable, so
@@ -2009,7 +2020,7 @@ today, including panicking edges and deliberate failsafes.
 > `ON ERROR`, `ON NULL`, `WITH UNIQUE KEYS`, `FORMAT JSON`) are grammar between
 > the parentheses, which `Func::named`'s argument list cannot spell. Each form
 > is built by a `Func` constructor returning its own builder, as `Func::grouping`
-> returns a `Grouping` (`[spec:pgorm:def:sql.ast.func+10]`): `json_exists`,
+> returns a `Grouping` (`[spec:pgorm:def:sql.ast.func]`): `json_exists`,
 > `json_value` and `json_query` take a context item and a path; `json_object()`
 > and `json_array()` start empty; `json_array_query(select)`,
 > `json_objectagg(key, value)`, `json_arrayagg(value)`, `json(input)` and

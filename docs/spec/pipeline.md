@@ -48,13 +48,15 @@ of the crate, compiled in every build. Rules are grouped under
 > `impl IntoSource`, and a whole `Pipeline` is an `IntoSource`, so pipelines
 > compose with each other by the same spellings that name tables; any of
 > them may be read under a name of its own, which is how a relation meets
-> itself ([spec:pgorm:sem:pipeline.self-join]).
+> itself ([spec:pgorm:sem:pipeline.self-join]), and an entity read under one
+> writes its columns as `Named::col(column)`, qualified by the name and typed
+> by the entity.
 >
 > Each transform has two forms. The plain one takes its expressions by value
 > — the whole query reads as one chained expression, with constants written
 > as Rust literals. The `_with` one takes a closure and hands it the `Binder`,
 > and exists only where a runtime value has to enter
-> (`[spec:pgorm:req:pipeline.params+3]`). The `_with` closures of the
+> (`[spec:pgorm:req:pipeline.params]`). The `_with` closures of the
 > list-taking transforms return a fixed-size `[Expr; N]`: an array is the one
 > list shape whose element type can be written under the higher-ranked brand.
 >
@@ -76,7 +78,7 @@ of the crate, compiled in every build. Rules are grouped under
 > Every scalar position takes `impl Into<Expr>` and every list position takes
 > `impl ExprList`. `Into<Expr>` is implemented for `Expr` itself, for any
 > `ColumnTrait` column (qualified by its own entity,
-> `[spec:pgorm:sem:pipeline.qualify+3]`), for an `AliasName` token, and for
+> `[spec:pgorm:sem:pipeline.qualify]`), for an `AliasName` token, and for
 > the Rust literals `i32`, `i64`, `f64`, `bool` and `&str`. `ExprList` is
 > implemented for a single expression, for `[T; N]` and `Vec<T>` of one
 > convertible type, and for tuples of up to twelve mixed ones — the mixed
@@ -92,8 +94,11 @@ of the crate, compiled in every build. Rules are grouped under
 > (rendered `IS [NOT] NULL`), `in_array` over any `IntoIterator` (rendered
 > `IN (...)`, members may be literals or bound placeholders), `cast` over the
 > closed `CastType` enum (rendered `CAST(x AS t)`; closed because the type
-> name reaches the SQL text verbatim), `as_(name)`, and `desc()` / `asc()`
-> for sort keys. Free functions supply `case(arms, otherwise)` with a
+> name reaches the SQL text verbatim), `compares_as(enum_type)`, naming the
+> enum a column with no entity behind it compares as
+> (`[spec:pgorm:sem:entity.traits.column.enum-cast]`), `as_(name)`, and
+> `desc()` / `asc()` for sort keys. Free functions supply
+> `case(arms, otherwise)` with a
 > mandatory fallback, `null()`, the aggregates (`sum` — which PRQL wraps as
 > `COALESCE(SUM(x), 0)` —, `min`, `max`, `average`, `stddev`, `count`,
 > `count_rows`, `count_distinct`) and the window functions (`row_number`,
@@ -101,7 +106,7 @@ of the crate, compiled in every build. Rules are grouped under
 > signatures —, `lag`, `lead`, `first`, `last`).
 >
 > `as_(name)` names a projected expression. The name is an `AliasName` token
-> (`[spec:pgorm:def:sql.types+6]`) when anything refers back to it, and a
+> (`[spec:pgorm:def:sql.types]`) when anything refers back to it, and a
 > bare `&'static str` when nothing does — `as_` takes `impl Into<AliasName>`
 > and both spell the same thing. A token declared once by `let rn =
 > alias("rn")` is also its own reference: it converts to an unqualified
@@ -109,7 +114,7 @@ of the crate, compiled in every build. Rules are grouped under
 > introduced, and the name exists in the program exactly once. The token
 > carries no evidence that it was ever attached: a reference to a name no
 > stage introduced compiles, and the server answers for it
-> (`[spec:pgorm:req:pipeline.errors+4]`).
+> (`[spec:pgorm:req:pipeline.errors]`).
 >
 > `ExprOps`'s comparison names are also `ColumnTrait`'s. Both traits can be
 > in scope: the pipeline's methods take `self` by value and `ColumnTrait`'s
@@ -141,7 +146,7 @@ of the crate, compiled in every build. Rules are grouped under
 > the compiler as pass-through source, so nothing escapes it a second time.
 > Every `'` in the value is doubled, and a value carrying a backslash is
 > written as an `E''` literal with its backslashes doubled — the same trigger
-> `pgorm-query` renders on (`[spec:pgorm:req:sql.render.string-escape+1]`) —
+> `pgorm-query` renders on (`[spec:pgorm:req:sql.render.string-escape]`) —
 > so the literal denotes the value whichever way `standard_conforming_strings`
 > is set. prqlc's own string rendering MUST NOT be used: it delegates to a
 > dialect-agnostic formatter that reads a quote following a backslash, or one
@@ -169,7 +174,7 @@ of the crate, compiled in every build. Rules are grouped under
 > is thus enforced at the boundary rather than assumed of the optimizer. The
 > lexer census is complete here where it has to be argued for in `prql!`
 > ([spec:pgorm:sem:macros.prql.census]): the pipeline offers no raw-SQL hole
-> (s-strings are cut from the surface, `[spec:pgorm:req:pipeline.surface+3]`),
+> (s-strings are cut from the surface, `[spec:pgorm:req:pipeline.surface]`),
 > and the one text it hands the compiler to pass through untouched is a string
 > literal it rendered itself, which the lexer reads as a single constant token
 > — so every placeholder in the emitted text is a
@@ -178,7 +183,7 @@ of the crate, compiled in every build. Rules are grouped under
 > census that cannot be trusted (unscannable text, an out-of-range number;
 > neither reachable from the builder's own output) passes the statement
 > through unchanged for the server to judge, keeping `into_sql` panic-free
-> (`[spec:pgorm:req:pipeline.errors+4]`).
+> (`[spec:pgorm:req:pipeline.errors]`).
 >
 > The binder and the expressions it returns are branded with a
 > higher-ranked, invariant closure lifetime; an expression containing a
@@ -226,7 +231,7 @@ of the crate, compiled in every build. Rules are grouped under
 > and shifts its own binding references past the bindings the consumer
 > already holds. Values and placeholders therefore cross together and stay
 > aligned; an unattached `Expr` still cannot cross
-> (`[spec:pgorm:req:pipeline.params+3]`). Nesting is unbounded: an embedded
+> (`[spec:pgorm:req:pipeline.params]`). Nesting is unbounded: an embedded
 > pipeline's own embeddings ride along, renumbered the same way.
 >
 > The binding names are minted by the module — `table_N`, by position — and
@@ -304,7 +309,7 @@ of the crate, compiled in every build. Rules are grouped under
 > is how the far side's columns are written. The `Named` an entity's
 > `named` returns keeps the entity's type, so `Named::col(column)` writes
 > its column under the name and compared as the entity types it
-> (`[spec:pgorm:sem:entity.traits.column.enum-cast+12]`), where `col` only
+> (`[spec:pgorm:sem:entity.traits.column.enum-cast]`), where `col` only
 > qualifies. It lowers to PRQL's own operand
 > alias (`join m=employee`) and renders as SQL's, `employee AS manager`,
 > with no CTE: the employee-manager query is one join stage, selecting
@@ -313,7 +318,7 @@ of the crate, compiled in every build. Rules are grouped under
 > Naming a relation replaces the name it had, exactly as SQL's `AS` does:
 > after `employee::Entity.named(manager)` the reference `employee.name` no
 > longer resolves, and prqlc refuses it by name
-> ([spec:pgorm:req:pipeline.errors+4]). The ordinary shape therefore names
+> ([spec:pgorm:req:pipeline.errors]). The ordinary shape therefore names
 > only the second occurrence and leaves the reading pipeline
 > entity-qualified. The name then reaches every stage after the join —
 > `filter`, `sort`, `select` — which is what distinguishes it from `this` /
@@ -439,7 +444,7 @@ of the crate, compiled in every build. Rules are grouped under
 >   `$$` or `$tag$` as a dollar-quote delimiter, so two such names would
 >   swallow everything between them, a filter included, as one string
 >   constant. The refusal is also what keeps the parameter census sound
->   (`[spec:pgorm:req:pipeline.params+4]`): with no name able to lex as
+>   (`[spec:pgorm:req:pipeline.params]`): with no name able to lex as
 >   `PARAM`, every `$N` in the emitted text is one the binder minted. A `$`
 >   after the first character is not refused: `a$b` is one identifier to
 >   PostgreSQL, bare or quoted;
@@ -541,7 +546,7 @@ of the crate, compiled in every build. Rules are grouped under
 > (`[spec:pgorm:sem:pipeline.self-join]`), so two occurrences of one table
 > are told apart exactly as the join told them apart. Before compilation
 > the terminal appends one final projection stage through the same writer
-> as the graph's (`[spec:pgorm:sem:query.graph.writer+4]`): for the i-th
+> as the graph's (`[spec:pgorm:sem:query.graph.writer]`): for the i-th
 > listed source (zero-based), every column of its entity in iteration
 > order, projected under the read cast derived from the column's own
 > `select_as` answer — the enum default's `text` / `text[]` and a
@@ -556,7 +561,7 @@ of the crate, compiled in every build. Rules are grouped under
 > writer quotes it, and only a `TypeName::raw` type expression — program
 > text — is written as it stands. Each column is qualified by the source's
 > name — the `named` token, or the entity's own qualification
-> (`[spec:pgorm:sem:pipeline.qualify+3]`) — and aliased `s{i}_{col}` under
+> (`[spec:pgorm:sem:pipeline.qualify]`) — and aliased `s{i}_{col}` under
 > the writer's 63-byte-bounded spelling. An explicitly
 > aliased projection is what dissolves prqlc's `_expr_N` renaming: two
 > sources sharing a column name land under different prefixes by
@@ -590,7 +595,7 @@ of the crate, compiled in every build. Rules are grouped under
 > `take` / `take_range`, `join`, `window` and `append` (whose left-side
 > naming survives) leave every source addressable and compose freely ahead
 > of the terminal; construction itself stays infallible per
-> `[spec:pgorm:req:pipeline.errors+4]`.
+> `[spec:pgorm:req:pipeline.errors]`.
 >
 > `distinct` composes ahead of the terminal except where it settles the
 > pipeline into a binding, which is the one thing a per-source projection

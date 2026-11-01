@@ -6,8 +6,12 @@
 //! first written, so these tests read both: the source as a syntax tree, the
 //! register as the prose it is. That an internal shape cannot be named from
 //! outside the crate is the compiler's to say, so `compile-fail/` asks it.
+//!
+//! The spec's reader lives here, so `citations` holds the whole spec to how
+//! its prose cites a rule as well.
 
 mod baseline;
+mod citations;
 mod source;
 mod spec;
 

@@ -80,7 +80,7 @@ of keywords, statements, or expressions.
 > `'a\'` followed by the word `b`. Honouring the backslash there was a
 > defect of the same shape as the wider delimiter set below: `'C:\'` read as
 > still open, so a `$N` after it was taken into the body and never seen as a
-> placeholder (`[spec:pgorm:sem:sql.render.inject+3]`).
+> placeholder (`[spec:pgorm:sem:sql.render.inject]`).
 >
 > An escape string also runs on through each continuation segment: a `'`
 > reached across whitespace that holds at least one newline, where a `--`
@@ -98,7 +98,7 @@ of keywords, statements, or expressions.
 > defect rather than a courtesy: a backtick in PostgreSQL text made the
 > tokenizer read the rest of the statement as one opaque body, so a `$N`
 > after it was never seen as a placeholder — precisely the confusion the
-> tokenizer exists to prevent (`[spec:pgorm:sem:sql.render.inject+3]`). Both
+> tokenizer exists to prevent (`[spec:pgorm:sem:sql.render.inject]`). Both
 > characters are now `Punctuation`, as any other symbol is.
 
 ## Unquoting
@@ -136,7 +136,7 @@ of keywords, statements, or expressions.
 > form, for input whose `$` spellings carry their own grammar — the
 > placeholder template's `$$` escape (`sql.render.custom-expr`). The
 > delimiter set is PostgreSQL's own and no wider, and a backslash escapes
-> inside `E'…'` alone (`[spec:pgorm:req:sql.token.quoted+3]`). Remaining
+> inside `E'…'` alone (`[spec:pgorm:req:sql.token.quoted]`). Remaining
 > limitations: there is no `U&'…'` awareness — it lexes as the word `U`,
 > the punctuation `&` and a plain literal, whose body stays opaque because
 > PostgreSQL quotes a `U&` body by the standard-string rules — and the

@@ -1,9 +1,11 @@
-//! The spec's prose, read for the names and rule ids it writes in backticks.
+//! The spec's prose, read for the names and rule ids it writes in backticks
+//! and for the rules it cites.
 //!
 //! A rule is a blockquote opened by its `> [spec:pgorm:<verb>:<id>]` marker.
 //! Its lines are joined with single spaces, paragraphs kept apart, so a code
 //! span the text wraps across a line still reads as one span and nothing here
-//! depends on where a line breaks.
+//! depends on where a line breaks. A citation holds no space, so no line
+//! break falls inside one.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -13,6 +15,31 @@ use std::{
 
 pub fn spec_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../docs/spec")
+}
+
+/// Every Markdown file under `docs/spec`, nested directories included, in
+/// path order.
+pub fn spec_files() -> Vec<PathBuf> {
+    fn walk(dir: &Path, files: &mut Vec<PathBuf>) {
+        let entries =
+            fs::read_dir(dir).unwrap_or_else(|error| panic!("reading {}: {error}", dir.display()));
+        for entry in entries {
+            let path = entry.expect("directory entry").path();
+            if path.is_dir() {
+                walk(&path, files);
+            } else if path.extension().is_some_and(|extension| extension == "md") {
+                files.push(path);
+            }
+        }
+    }
+    let mut files = Vec::new();
+    walk(&spec_dir(), &mut files);
+    files.sort();
+    files
+}
+
+pub fn read_spec_file(file: &Path) -> String {
+    fs::read_to_string(file).unwrap_or_else(|error| panic!("reading {}: {error}", file.display()))
 }
 
 /// One rule's text, a string per paragraph.
@@ -25,8 +52,7 @@ impl Rule {
     /// Read the rule `id` out of `docs/spec/<file>`.
     pub fn read(file: &str, id: &str) -> Self {
         let file = spec_dir().join(file);
-        let text = fs::read_to_string(&file)
-            .unwrap_or_else(|error| panic!("reading {}: {error}", file.display()));
+        let text = read_spec_file(&file);
         let mut lines = text.lines();
         lines
             .by_ref()
@@ -80,33 +106,64 @@ impl Rule {
     }
 }
 
-/// The id a line defines when it is a rule marker, `> [spec:pgorm:req:a.b+3]`.
-fn defined_id(line: &str) -> Option<&str> {
+/// The id a line defines when it is a rule marker, `> [spec:pgorm:req:a.b+3]`:
+/// a blockquote line holding one bracketed citation and nothing else. A line
+/// of prose that opens with a citation goes on after it, so it is not one.
+pub fn defined_id(line: &str) -> Option<&str> {
     let marker = line.strip_prefix('>')?.trim();
-    let rest = marker.strip_prefix("[spec:pgorm:")?.strip_suffix(']')?;
-    let (_verb, id) = rest.split_once(':')?;
-    Some(id.split_once('+').map_or(id, |(id, _version)| id))
+    let cited = citation(marker)?;
+    (marker.starts_with('[') && cited.facet.is_none()).then_some(cited.id)
 }
 
 /// Every rule id the spec defines, across every file under `docs/spec`.
 pub fn defined_rule_ids() -> BTreeSet<String> {
-    fn walk(dir: &Path, ids: &mut BTreeSet<String>) {
-        let entries =
-            fs::read_dir(dir).unwrap_or_else(|error| panic!("reading {}: {error}", dir.display()));
-        for entry in entries {
-            let path = entry.expect("directory entry").path();
-            if path.is_dir() {
-                walk(&path, ids);
-            } else if path.extension().is_some_and(|extension| extension == "md") {
-                let text = fs::read_to_string(&path)
-                    .unwrap_or_else(|error| panic!("reading {}: {error}", path.display()));
-                ids.extend(text.lines().filter_map(defined_id).map(str::to_owned));
-            }
-        }
-    }
-    let mut ids = BTreeSet::new();
-    walk(&spec_dir(), &mut ids);
-    ids
+    spec_files()
+        .iter()
+        .flat_map(|file| {
+            read_spec_file(file)
+                .lines()
+                .filter_map(defined_id)
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// A rule as the spec's text cites one: bracketed, `[spec:pgorm:req:a.b+3]`,
+/// or bare, `a.b`, either with the version and the facet (`/test`) it names.
+pub struct Citation<'a> {
+    pub id: &'a str,
+    pub version: Option<&'a str>,
+    pub facet: Option<&'a str>,
+}
+
+/// Read `text` as one citation, bracketed or bare.
+pub fn citation(text: &str) -> Option<Citation<'_>> {
+    let cited = match text.strip_prefix("[spec:pgorm:") {
+        Some(rest) => rest.strip_suffix(']')?.split_once(':')?.1,
+        None => text,
+    };
+    let (cited, facet) = match cited.split_once('/') {
+        Some((cited, facet)) => (cited, Some(facet)),
+        None => (cited, None),
+    };
+    let (id, version) = match cited.split_once('+') {
+        Some((id, version)) => (id, Some(version)),
+        None => (cited, None),
+    };
+    let numbered = version.is_none_or(|version| {
+        !version.is_empty() && version.bytes().all(|byte| byte.is_ascii_digit())
+    });
+    (is_rule_id(id) && numbered).then_some(Citation { id, version, facet })
+}
+
+/// Every citation in `line`, bracketed, in backticks or bare. The line is cut
+/// at every character a citation cannot hold, and a sentence's closing
+/// punctuation is not part of what it ends.
+pub fn citations(line: &str) -> impl Iterator<Item = Citation<'_>> {
+    line.split(|c: char| !(c.is_ascii_alphanumeric() || "[]:._-+/".contains(c)))
+        .map(|token| token.trim_end_matches(['.', ':']))
+        .filter_map(citation)
 }
 
 /// The text of each inline code span, in order.

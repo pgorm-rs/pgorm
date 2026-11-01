@@ -16,7 +16,7 @@ These rules capture what the code does today, including known gaps.
 > `tokio_postgres::row::RowIndex`, i.e. a column name or ordinal),
 > `try_get` (a prefix plus column name, composed as `{pre}{col}` with no
 > separator through the bounded spelling of
-> `[spec:pgorm:sem:query.graph.writer+4]`, so a composition past
+> `[spec:pgorm:sem:query.graph.writer]`, so a composition past
 > PostgreSQL's 63-byte identifier bound looks up the same bounded name the
 > projection writers mint; an empty prefix uses the bare column name), and
 > `try_get_by_index` (ordinal position in the select list). Its fourth
@@ -106,11 +106,11 @@ These rules capture what the code does today, including known gaps.
 >
 > `Decimal` is not feature-gated, and `rust_decimal` is a required
 > dependency of `pgorm` rather than an optional one, because
-> `[spec:pgorm:def:exec.cursor.binding+4]`'s bind path is always compiled
+> `[spec:pgorm:def:exec.cursor.binding]`'s bind path is always compiled
 > and needs `Decimal`'s `ToSql` in every configuration — both for
 > `Value::Decimal`, an unconditional variant of the value model
-> (`[spec:pgorm:def:sql.value+3]`), and for the `numeric` arm of
-> `[spec:pgorm:req:exec.cursor.binding-coerce+2]`, which is how *every*
+> (`[spec:pgorm:def:sql.value]`), and for the `numeric` arm of
+> `[spec:pgorm:req:exec.cursor.binding-coerce]`, which is how *every*
 > integer and float reaches a `numeric` placeholder. `rust_decimal` is
 > compiled in any case, `pgorm-query` depending on it unconditionally; only
 > this edge turns on the `db-tokio-postgres` feature that carries the impl.
@@ -131,7 +131,7 @@ These rules capture what the code does today, including known gaps.
 > `jiff` is, like `rust_decimal`, a required dependency rather than an
 > optional one. The bind path writes a naive datetime itself rather than
 > through `postgres-types`
-> (`[spec:pgorm:req:exec.cursor.binding-gaps+3]`), so it names jiff's civil
+> (`[spec:pgorm:req:exec.cursor.binding-gaps]`), so it names jiff's civil
 > types in every configuration; an optional edge left a build without
 > `with-jiff` unable to compile. The crate is compiled in any case,
 > `pgorm-query` and tokio-postgres's `with-jiff-0_2` both depending on it, so
@@ -202,7 +202,7 @@ These rules capture what the code does today, including known gaps.
 > [spec:pgorm:req:exec.decode.interval+1]
 > `Interval` implements `TryGetable` through its own `FromSql`
 > (`[spec:pgorm:def:sql.value.interval]`), and `Vec<Interval>` does under
-> `postgres-array`, as the arrays of `[spec:pgorm:def:exec.decode.array+1]`
+> `postgres-array`, as the arrays of `[spec:pgorm:def:exec.decode.array]`
 > do, each reading a column's months, days and microseconds as the server
 > sent them. The prelude names `Interval`, and it implements
 > `IntoActiveValue`, so an entity field can be an `Interval`, an
@@ -212,14 +212,14 @@ These rules capture what the code does today, including known gaps.
 > interval it compares with, and a row decodes back field for field. Codegen
 > maps an `interval` column, and an array of them, to the type whatever the
 > column's field qualifier, carrying the qualifier in the column's
-> definition (`[spec:pgorm:sem:codegen.entity.types+7]`).
+> definition (`[spec:pgorm:sem:codegen.entity.types]`).
 
 > [spec:pgorm:def:exec.decode.range+3]
-> `Range<T>` and `Multirange<T>` (`[spec:pgorm:def:sql.value.range+4]`)
+> `Range<T>` and `Multirange<T>` (`[spec:pgorm:def:sql.value.range]`)
 > implement `TryGetable` for each built-in subtype: `i32`, `i64` and
 > `Decimal` unconditionally, and `jiff::civil::Date`,
 > `jiff::civil::DateTime` and `jiff::Timestamp` under `with-jiff`, the gate
-> their scalars have (`[spec:pgorm:def:exec.decode.types+3]`). `Range<T>`
+> their scalars have (`[spec:pgorm:def:exec.decode.types]`). `Range<T>`
 > alone implements it for the subtypes only a range type a schema created
 > ranges over (`[spec:pgorm:def:sql.value.created-range]`): `i16`, `f32`,
 > `f64` and `String` unconditionally, `jiff::civil::Time` under `with-jiff`
@@ -248,7 +248,7 @@ These rules capture what the code does today, including known gaps.
 > or a trailing byte the message does not hold. A multirange a schema
 > created is reported by tokio-postgres as a simple type, which neither
 > accepts: it is read as its text instead, by the newtype that names it
-> (`[spec:pgorm:def:sql.value.created-range+1]`). `TryGetable::accepts` answers through the newtype, so
+> (`[spec:pgorm:def:sql.value.created-range]`). `TryGetable::accepts` answers through the newtype, so
 > `VerifyStatement` reports a range column of another subtype or a
 > multirange read as a range.
 >
@@ -261,7 +261,7 @@ These rules capture what the code does today, including known gaps.
 > `int4`, but not `int8range[]`, `int4range` or `int4multirange[]` — and an
 > element the newtype refuses fails the whole array. A NULL element fails as
 > it does in every other `Vec<T>`. Their `ValueType` is the generic one
-> (`[spec:pgorm:def:sql.value.array+6]`).
+> (`[spec:pgorm:def:sql.value.array]`).
 
 > [spec:pgorm:def:exec.decode.many]
 > `TryGetableMany` extracts tuples from a row: `try_get_many` takes a
@@ -393,7 +393,7 @@ These rules capture what the code does today, including known gaps.
 > Columns the statement returns but the target does not read are not an
 > error: reading a subset is a legitimate projection. Prefixed decoding is
 > out — only the empty prefix is checked, so the `s{i}_` prefixes a source
-> graph decodes under (`[spec:pgorm:sem:query.graph.decode+1]`) and the tuple
+> graph decodes under (`[spec:pgorm:sem:query.graph.decode]`) and the tuple
 > targets of `TryGetableMany` (`exec.decode.many`), which are not
 > `FromQueryResult` types at all, have no verification path. A pass is
 > therefore not a proof
@@ -412,7 +412,7 @@ These rules capture what the code does today, including known gaps.
 > model, empty prefix), `SelectGetableValue<T, C>` (tuple by named columns
 > from the `C` enum), `SelectGetableTuple<T>` (tuple by ordinal), and
 > `GraphRow<E, S>` (a source graph's declared tuple, one prefix per decoded
-> source — `[spec:pgorm:sem:query.graph.decode+1]`).
+> source — `[spec:pgorm:sem:query.graph.decode]`).
 >
 > Conversions from a builder: `Select::into_model`, `into_partial_model`,
 > `into_values`, `into_tuple`, `from_raw_sql`; the constructors that take a
@@ -474,7 +474,7 @@ These rules capture what the code does today, including known gaps.
 > row through `from_raw_query_result`, aborting on the first decode
 > error. `Select::one`/`one_opt`/`all` delegate through `into_model`, and a
 > source graph's terminals through its own selector
-> (`[spec:pgorm:sem:query.graph.terminals+1]`).
+> (`[spec:pgorm:sem:query.graph.terminals]`).
 
 > [spec:pgorm:req:exec.tie-limit+1]
 > Every ORM path that sends a SELECT built from a `SelectStatement` MUST
@@ -707,10 +707,10 @@ These rules capture what the code does today, including known gaps.
 > matched-row count to report; returning `0` would spend the one signal
 > `Ok(0)` already carries on a second, incompatible meaning. Both many-row
 > terminals therefore refuse it with `Error::NothingToSet`
-> (`[spec:pgorm:def:error.model+8]`) — `exec` and `exec_returning_models`
+> (`[spec:pgorm:def:error.model]`) — `exec` and `exec_returning_models`
 > alike, so the choice of terminal cannot change whether the statement was
 > sent. The input is ordinary rather than exotic: `UpdateMany::set` skips
-> `Unchanged` and `NotSet` fields (`[spec:pgorm:sem:query.build.update+4]`),
+> `Unchanged` and `NotSet` fields (`[spec:pgorm:sem:query.build.update]`),
 > so a model read back from the database and handed straight to `set`
 > produces exactly it.
 >
@@ -722,7 +722,7 @@ These rules capture what the code does today, including known gaps.
 > called.
 >
 > A `TryUpdate` escape valve — the `TryInsertResult::Empty`
-> (`[spec:pgorm:sem:exec.crud.try-insert+4]`) of updates, letting a caller
+> (`[spec:pgorm:sem:exec.crud.try-insert]`) of updates, letting a caller
 > take "nothing to set" as an outcome rather than an error — is deliberately
 > NOT provided. `TryInsert` exists because a conflict clause makes "no row
 > written" a routine result of a statement that was sent; nothing to set is
@@ -787,7 +787,7 @@ These rules capture what the code does today, including known gaps.
 > (used by `Paginator::into_stream`) it is `Send`, so a streamed select can
 > be consumed from a spawned task. The graph's grouped read has no streamed
 > form: its output requires all rows of a root before any entry is complete
-> (`[spec:pgorm:sem:query.graph.grouped+1]`). Page-batched and keyset-windowed
+> (`[spec:pgorm:sem:query.graph.grouped]`). Page-batched and keyset-windowed
 > consumption remain available through `exec.paginator` and `exec.cursor`.
 
 > [spec:pgorm:sem:exec.stream.decode+1]
