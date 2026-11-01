@@ -4,7 +4,8 @@ from ._expressions import Expr, Condition
 from ._merge import Merge
 from ._native import _Connection, _Transaction
 from ._query_types import Compiled, Identifier
-from ._statements import Select, Table
+from ._statements import Select
+from ._from_items import Table
 from ._writes import Delete, Insert, Update
 
 _Format = TypeVar("_Format", Literal["text"], Literal["csv"], Literal["binary"])

@@ -631,46 +631,65 @@ the same terminals that run raw SQL.
 > by the name it answers to in the statement, and with NOWAIT or SKIP LOCKED,
 > through pgorm-query's own lock builder.
 
-> [spec:pgorm:req:bindings.with]
-> A WITH clause MUST hold common table expressions in call order, each named,
-> with an optional column list and an optional materialization (MATERIALIZED
-> or NOT MATERIALIZED). A body is a `Select`, or an INSERT, UPDATE, DELETE or
-> MERGE with a RETURNING list. `WITH RECURSIVE` holds exactly one, whose body
-> is a `Select`, with SEARCH (breadth or depth first, by an expression, into
-> a column) and CYCLE (by an expression, into a mark column, using a path
-> column). Every statement — SELECT, INSERT, UPDATE, DELETE and MERGE — takes
-> a WITH clause, and a MERGE's is never recursive, as PostgreSQL refuses it.
+> [spec:pgorm:req:bindings.with+1]
+> A WITH clause MUST hold common table expressions in call order, each named.
+> A body is a `Select`, or a MERGE with a RETURNING list. A SELECT and a MERGE
+> take a WITH clause.
 
-> [spec:pgorm:req:bindings.writes]
+> [spec:pgorm:req:bindings.cte-options]
+> A common table expression MUST take an optional column list and an optional
+> materialization, MATERIALIZED or NOT MATERIALIZED. `WITH RECURSIVE` MUST
+> hold exactly one, whose body is a `Select`, with SEARCH (breadth or depth
+> first, by an expression, into a column) and CYCLE (by an expression, into a
+> mark column, using a path column); a second one is a `ConstructionError`. A
+> MERGE's WITH clause is never recursive, as PostgreSQL refuses it, so a
+> recursive one given a MERGE is a `ConstructionError`.
+
+> [spec:pgorm:req:bindings.write-ctes]
+> INSERT, UPDATE and DELETE MUST each take a WITH clause (`bindings.with`),
+> and each, with a RETURNING list, MUST be a common table expression's body,
+> whose rows are those its RETURNING list yields.
+
+> [spec:pgorm:req:bindings.writes+1]
 > `insert`, `update` and `delete` MUST build pgorm-query's INSERT, UPDATE and
 > DELETE. An INSERT names its distinct columns before any row. Each `values`
-> call adds one row of exactly as many operands, by pgorm-query's arity check;
-> `select` takes its rows from a `Select` of as many columns instead; and
-> `default_values` writes one row of defaults, mixed with neither. It takes
-> `OVERRIDING SYSTEM VALUE` or `OVERRIDING USER VALUE`.
+> call adds one row of exactly as many operands, by pgorm-query's arity check,
+> and `default_values` writes one row of defaults, mixed with neither.
 >
 > `on_conflict` takes only a completed action: do nothing, answering any
-> conflict; or an arbiter — a non-empty list of columns and index
-> expressions, with an optional partial-index predicate, or a constraint by
-> name, which takes no predicate — followed by do nothing or a non-empty
-> update of columns taken from EXCLUDED or set to expressions, with an
-> optional condition.
+> conflict; or an arbiter — a non-empty list of columns, with an optional
+> partial-index predicate — followed by do nothing or a non-empty update of
+> columns taken from EXCLUDED or set to expressions, with an optional
+> condition.
 >
-> An UPDATE has at least one assignment, each column once, and reads further
-> FROM items through `from`; a DELETE reads them through `using`. An INSERT
-> with no row, an UPDATE with no assignment, and an UPDATE or DELETE with
-> neither a WHERE nor an explicit `all_rows()` MUST be refused with a
+> An UPDATE has at least one assignment, each column once. An INSERT with no
+> row, an UPDATE with no assignment, and an UPDATE or DELETE with neither a
+> WHERE nor an explicit `all_rows()` MUST be refused with a
 > `ConstructionError` when it is inspected or run. `returning` gives the
 > RETURNING list, every column when it is empty, and reads a written row's old
 > and new versions through `ReturningRow`'s old and new rows, renamed with
 > the `old_as` and `new_as` options.
 
-> [spec:pgorm:req:bindings.merge]
+> [spec:pgorm:req:bindings.write-sources]
+> An INSERT MUST take its rows from a `Select` of as many columns as it names,
+> through `select`, by pgorm-query's arity check and mixed with neither
+> `values` nor `default_values`, the `Select` checked as a subquery is as it
+> is read (`bindings.select`); and it MUST take `OVERRIDING SYSTEM VALUE` or
+> `OVERRIDING USER VALUE`. An UPDATE MUST read further FROM items through
+> `from`, and a DELETE through `using`, each a `Table` or a FROM item.
+
+> [spec:pgorm:req:bindings.conflict-arbiters]
+> A conflict arbiter's non-empty list MUST take index expressions beside
+> columns, its partial-index predicate covering both, and an arbiter MUST
+> instead name a constraint, `on_constraint(name)`, which takes no predicate:
+> a predicate given one is a `ConstructionError`.
+
+> [spec:pgorm:req:bindings.merge+1]
 > `merge(target, source, on)` MUST follow pgorm-query's MERGE typestate. Its
-> source is a table or any FROM item. It gives a `PendingMerge`, which has no
-> `inspect()` and which every terminal refuses with a `ConstructionError`,
-> because PostgreSQL refuses a MERGE with no WHEN arm; its first arm gives the
-> `Merge` statement. `when_matched` and `when_not_matched_by_source` take an
+> source is a table. It gives a `PendingMerge`, which has no `inspect()` and
+> which every terminal refuses with a `ConstructionError`, because PostgreSQL
+> refuses a MERGE with no WHEN arm; its first arm gives the `Merge`
+> statement. `when_matched` and `when_not_matched_by_source` take an
 > action on a target row — an update, which takes its first assignment and so
 > is never empty, a delete, or do nothing — and `when_not_matched` an action
 > on a source row — an insert, likewise never empty and taking OVERRIDING,
@@ -682,6 +701,11 @@ the same terminals that run raw SQL.
 > first in the list, its only form; and `only()` writes `ONLY` before the
 > target. A MERGE reads a common table expression and, with a RETURNING list,
 > is a common table expression's body (`bindings.with`).
+
+> [spec:pgorm:req:bindings.merge-sources]
+> A MERGE's source MUST be, beside a table, any FROM item: a subquery
+> (`bindings.from-subqueries`), a table function, a sampled table or
+> `JSON_TABLE`.
 
 > [spec:pgorm:req:bindings.windows]
 > `over` MUST attach a window only to what pgorm-query's `WindowFunction`

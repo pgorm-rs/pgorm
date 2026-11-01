@@ -5,6 +5,7 @@
 // [spec:pgorm:req:bindings.select+2/test]
 // [spec:pgorm:req:bindings.expressions+2/test]
 // [spec:pgorm:req:bindings.quantifiers+1/test]
+// [spec:pgorm:req:bindings.cte-options/test]
 
 import {
   all,

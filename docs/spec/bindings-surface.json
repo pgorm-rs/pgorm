@@ -267,6 +267,11 @@
       "pgorm.JsonValueBehavior": "a closed choice, a class of constants in Python and string literals in JavaScript (python.naming)",
       "pgorm.Overriding": "a closed choice, a class of constants in Python and string literals in JavaScript (python.naming)",
       "pgorm.SampleMethod": "a closed choice, a class of constants in Python and string literals in JavaScript (python.naming)",
+      "pgorm.LockStrength": "a closed choice, a class of constants in Python and string literals in JavaScript (python.naming)",
+      "pgorm.LockWait": "a closed choice, a class of constants in Python and string literals in JavaScript (python.naming)",
+      "pgorm.SearchOrder": "a closed choice, a class of constants in Python and string literals in JavaScript (python.naming)",
+      "pgorm.Search": "the value of With.recursive's search option, which JavaScript writes as an options object { order, by, set }: a Python option is one keyword argument, so the fields are its class's (python.naming)",
+      "pgorm.Cycle": "the value of With.recursive's cycle option, which JavaScript writes as an options object { by, set, using }: a Python option is one keyword argument, so the fields are its class's (python.naming)",
       "pgorm.IsolationLevel": "a closed choice, a class of constants in Python and string literals in JavaScript (python.naming)",
       "pgorm.TransactionMode": "a closed choice, a class of constants in Python and string literals in JavaScript (python.naming)",
       "pgorm.ActiveState": "a closed choice, a class of constants in Python and string literals in JavaScript (python.naming)",
@@ -296,17 +301,6 @@
       "pipeline.null": "literal(None) under a name of its own, which JavaScript cannot give a function since null is a reserved word there; JavaScript writes literal(null)"
     },
     "gaps": {
-      "pgorm.Select.as": "python-select-gaps",
-      "pgorm.Select.lock": "python-select-gaps",
-      "pgorm.Insert.overriding": "python-statement-gaps",
-      "pgorm.Insert.select": "python-statement-gaps",
-      "pgorm.Insert.with": "python-statement-gaps",
-      "pgorm.Update.from": "python-statement-gaps",
-      "pgorm.Update.with": "python-statement-gaps",
-      "pgorm.Delete.using": "python-statement-gaps",
-      "pgorm.Delete.with": "python-statement-gaps",
-      "pgorm.With.recursive": "python-statement-gaps",
-      "pgorm.Conflict.on_constraint": "python-statement-gaps"
     },
     "undecided": {
       "pgorm.Identifier": {"question": "shapes"},

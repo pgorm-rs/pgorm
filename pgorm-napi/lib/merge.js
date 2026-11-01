@@ -4,7 +4,8 @@
 // has no WHEN arm and so nothing to inspect or run, and its first arm gives
 // the `Merge` statement. Each arm's action is checked against the kind of row
 // the arm takes.
-// [spec:pgorm:req:bindings.merge]
+// [spec:pgorm:req:bindings.merge+1]
+// [spec:pgorm:req:bindings.merge-sources]
 
 import { arg, args, Builder, Handle, trusted, TRUSTED } from "./builder.js";
 import { native } from "./operations.js";

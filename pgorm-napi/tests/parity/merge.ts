@@ -1,6 +1,7 @@
 // The MERGE family's parity cases, held to `merge.json` as `select.ts`'s are
 // to theirs.
-// [spec:pgorm:req:bindings.merge/test]
+// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge-sources/test]
 
 import { bind, type Builder, col, merge, MergeAction, ReturningRow, select, Table, Value, With } from "../../lib/index.js";
 

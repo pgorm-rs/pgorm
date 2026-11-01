@@ -12,7 +12,7 @@ use pyo3::{prelude::*, types::PyDict};
 
 use crate::expressions::Compiled;
 
-fn module(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
+pub(super) fn module(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     let module = PyModule::new(py, "pgorm")?;
     crate::values::register(&module)?;
     crate::identifiers::register(&module)?;
@@ -24,7 +24,7 @@ fn module(py: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     Ok(globals)
 }
 
-fn parity(
+pub(super) fn parity(
     py: Python<'_>,
     globals: &Bound<'_, PyDict>,
     source: &str,
@@ -38,6 +38,20 @@ fn parity(
     let executable = super::compile(&object)?;
     assert_eq!(executable.sql, inspected.sql);
     assert_eq!(executable.values, inspected.values);
+    Ok(())
+}
+
+pub(super) fn refused<E: pyo3::PyTypeInfo>(
+    py: Python<'_>,
+    globals: &Bound<'_, PyDict>,
+    sources: &[&str],
+) -> PyResult<()> {
+    for source in sources {
+        let error = py
+            .eval(&CString::new(*source)?, Some(globals), None)
+            .expect_err(source);
+        assert!(error.is_instance_of::<E>(py), "{source}: {error}");
+    }
     Ok(())
 }
 
@@ -91,7 +105,7 @@ fn select_structure_matches_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.writes/test]
+// [spec:pgorm:req:bindings.writes+1/test]
 #[test]
 fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     Python::initialize();
@@ -128,7 +142,7 @@ fn inserts_and_defaults_match_rust_builders() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.writes/test]
+// [spec:pgorm:req:bindings.writes+1/test]
 #[test]
 fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     Python::initialize();
@@ -161,7 +175,7 @@ fn conflict_actions_keep_rust_typed_states() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.writes/test]
+// [spec:pgorm:req:bindings.writes+1/test]
 #[test]
 fn update_and_delete_keep_builder_parameter_order() -> PyResult<()> {
     Python::initialize();
@@ -219,7 +233,7 @@ fn raw_templates_use_the_rust_lexer() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.merge/test]
+// [spec:pgorm:req:bindings.merge+1/test]
 #[test]
 fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     Python::initialize();
@@ -288,8 +302,8 @@ fn merge_arms_match_the_rust_typestate() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.merge/test]
-// [spec:pgorm:req:bindings.with/test]
+// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.with+1/test]
 #[test]
 fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     Python::initialize();
@@ -334,7 +348,7 @@ fn merge_reads_and_feeds_common_table_expressions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.writes/test]
+// [spec:pgorm:req:bindings.writes+1/test]
 #[test]
 fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     Python::initialize();
@@ -388,7 +402,7 @@ fn returning_reads_and_renames_row_versions() -> PyResult<()> {
     })
 }
 
-// [spec:pgorm:req:bindings.merge/test]
+// [spec:pgorm:req:bindings.merge+1/test]
 #[test]
 fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
     Python::initialize();
@@ -406,7 +420,7 @@ fn merge_actions_are_typed_by_their_row() -> PyResult<()> {
             "pending.when_not_matched(p.MergeUpdate('id', 1))",
             "pending.when_not_matched(p.MatchedAction.Delete)",
             "pending.when_matched(p.MatchedAction.Delete).when_not_matched(p.MatchedAction.Delete)",
-            "p.With('w', p.Insert(a).default_values())",
+            "p.With('w', a)",
         ] {
             let error = py
                 .eval(&CString::new(source)?, Some(&globals), None)

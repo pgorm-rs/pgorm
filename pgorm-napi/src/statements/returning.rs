@@ -22,7 +22,7 @@ fn version(cx: &mut FunctionContext) -> NeonResult<ReturningRow> {
 }
 
 /// `returningCol(version, name)`: one column of the row's old or new version.
-// [spec:pgorm:req:bindings.writes]
+// [spec:pgorm:req:bindings.writes+1]
 fn returning_col(cx: &mut FunctionContext) -> NeonResult<Node> {
     let version = version(cx)?;
     let column = name_at(cx, 1)?;
@@ -39,7 +39,7 @@ fn returning_star(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// none — with the row's versions renamed by the names at `index + 1` and
 /// `index + 2`. An aliased item is written `expr AS "name"`, as pgorm-python
 /// writes one.
-// [spec:pgorm:req:bindings.writes]
+// [spec:pgorm:req:bindings.writes+1]
 pub(super) fn clause(cx: &mut FunctionContext, index: usize) -> NeonResult<ReturningClause> {
     let items = list(cx, index)?;
     let mut clause = if items.is_empty() {

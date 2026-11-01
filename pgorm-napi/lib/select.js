@@ -4,6 +4,8 @@
 // [spec:pgorm:req:bindings.select+2]
 // [spec:pgorm:req:bindings.from-subqueries]
 // [spec:pgorm:req:bindings.row-locks]
+// [spec:pgorm:req:bindings.with+1]
+// [spec:pgorm:req:bindings.cte-options]
 
 import { arg, args, Builder, trusted, TRUSTED } from "./builder.js";
 import { Expr } from "./expressions.js";

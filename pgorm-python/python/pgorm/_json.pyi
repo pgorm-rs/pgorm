@@ -2,7 +2,8 @@ from typing import Any, ClassVar, Literal, Never, TypeAlias
 from ._expressions import Expr, Condition
 from ._query_types import Identifier, OrderBy
 from ._schema import BuiltinType, DataType
-from ._statements import FromItem, Select
+from ._statements import Select
+from ._from_items import FromItem
 
 JsonType: TypeAlias = DataType | BuiltinType
 JsonValueType: TypeAlias = DataType | Literal["char", "varchar", "text", "smallint", "integer", "bigint", "real", "double", "numeric", "boolean", "date", "time", "timestamp", "timestamptz", "interval", "bytea", "bit", "varbit", "money", "uuid", "vector", "cidr", "inet", "macaddr", "ltree"]

@@ -130,9 +130,8 @@ from ._expressions import (
     literal as literal, call as call, tuple_expr as tuple_expr, domain_value as domain_value,
 )
 from ._statements import (
-    Table as Table, FromItem as FromItem, Select as Select, Join as Join,
-    SampleMethod as SampleMethod, TableFunction as TableFunction,
     GroupingElement as GroupingElement,
+    Select as Select, Join as Join, LockStrength as LockStrength, LockWait as LockWait,
 )
 from ._subqueries import (
     array as array, exists as exists, scalar as scalar,
@@ -176,7 +175,8 @@ from ._writes import (
 from ._merge import (
     MatchedAction as MatchedAction, NotMatchedAction as NotMatchedAction, Overriding as Overriding,
     MergeUpdate as MergeUpdate, MergeInsert as MergeInsert, PendingMerge as PendingMerge,
-    Merge as Merge, With as With, ReturningRow as ReturningRow, merge as merge,
+    Merge as Merge, With as With, SearchOrder as SearchOrder, Search as Search, Cycle as Cycle,
+    ReturningRow as ReturningRow, merge as merge,
 )
 from ._copy import (
     CopyFrom as CopyFrom, CopyTo as CopyTo, _CopyIn as _CopyIn, _CopyOut as _CopyOut,
@@ -186,4 +186,8 @@ from ._listen import Notification as Notification, _Listener as _Listener
 from ._runtime import (
     _Pool as _Pool, _Connection as _Connection, _Stream as _Stream,
     _Transaction as _Transaction, STATEMENT_CACHE_CHANNEL as STATEMENT_CACHE_CHANNEL,
+)
+from ._from_items import (
+    Table as Table, FromItem as FromItem, SampleMethod as SampleMethod,
+    TableFunction as TableFunction,
 )
