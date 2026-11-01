@@ -4,7 +4,7 @@ This chapter covers `src/query/`: the fluent builders that turn entities and
 ActiveModels into PostgreSQL statements (`select.rs`, `insert.rs`, `update.rs`,
 `delete.rs`, `join.rs`, `helper.rs`, `traits.rs`, `util.rs`) and
 the data-loader API (`loader.rs`). Rules are grouped under
-`[spec:pgorm:req:query.build+2]` and `[spec:pgorm:req:query.loader+1]`.
+`[spec:pgorm:req:query.build]` and `[spec:pgorm:req:query.loader]`.
 
 ## Query building
 
@@ -65,10 +65,10 @@ is what `EntityTrait::find()` produces.
 > `belongs_to_tbl_alias` does the same but qualifies the columns with a given
 > table alias. That alias is taken as `impl IntoName`, not as a `&str`: its
 > in-tree caller is `ModelTrait::find_linked`, which has a `LinkedAlias`
-> (`[spec:pgorm:req:entity.relation.linked+4]`) in hand and would otherwise
+> (`[spec:pgorm:req:entity.relation.linked]`) in hand and would otherwise
 > have to render it back to a string for the callee to parse into an
 > identifier again. A computed name passes as `Name::runtime(..)`: there is
-> no `IntoName for &str` (`[spec:pgorm:def:sql.types+9]`), so the conversion
+> no `IntoName for &str` (`[spec:pgorm:def:sql.types]`), so the conversion
 > is written rather than inferred.
 
 > [spec:pgorm:sem:query.build.modifiers+9]
@@ -106,11 +106,11 @@ is what `EntityTrait::find()` produces.
 > `SelectProjected<E>` carries the same method to start a projection over.
 > `Cursor<S, K>` — whose select list its own machinery owns — cannot clear
 > one at all, and neither can `SelectGraph<E, S>`, whose projection is
-> generated (`[spec:pgorm:sem:query.graph.slots+1]`).
+> generated (`[spec:pgorm:sem:query.graph.slots]`).
 >
 > `select(items)` is that clear and the projection that follows it in one
 > call, under the name the pipeline projects with
-> (`[spec:pgorm:req:pipeline.surface+1]`), so the verb means the same thing
+> (`[spec:pgorm:req:pipeline.surface]`), so the verb means the same thing
 > on both surfaces. It is inherent on the same three states, for the reason
 > `select_only` is: the destination is per-builder — `Select<E>`,
 > `SelectCustom<E>` and `SelectProjected<E>` all land on
@@ -134,7 +134,7 @@ is what `EntityTrait::find()` produces.
 > plus `columns`.
 >
 > One name per projection operation covers the name `select` itself: the
-> loader's `EntityOrSelect` conversion (`query.loader+1`), which spelled
+> loader's `EntityOrSelect` conversion (`query.loader`), which spelled
 > itself `select` and would be shadowed on `Select<E>` by the inherent
 > method, is `into_select`.
 >
@@ -187,25 +187,25 @@ is what `EntityTrait::find()` produces.
 
 > [spec:pgorm:sem:query.build.alias+2]
 > A name the ORM's own call sites introduce MUST be written as the `AliasName`
-> token (`[spec:pgorm:def:sql.types+9]`), not as a string repeated per site.
+> token (`[spec:pgorm:def:sql.types]`), not as a string repeated per site.
 > Every aliasing and referencing position on the builders takes it through the
 > existing conversions and needs no new one: the alias argument of `column_as`
 > / `expr_as` / `tbl_col_as`, the expression positions of `having`, `group_by`,
 > `order_by*` and `filter`, the qualifier of a `(table, column)` pair, the
 > table alias of `join_as` / `join_as_rev` / `from_alias`, a lateral join's
 > alias, a window name, and a CTE's name and columns. `alias` and `AliasName`
-> are accordingly members of the prelude (`[spec:pgorm:def:entity.prelude+8]`).
+> are accordingly members of the prelude (`[spec:pgorm:def:entity.prelude]`).
 >
 > Reaching the `Key` positions — `column_as`'s alias, `cursor_by`, a
 > cursor's secondary ordering — takes no extra impl at the ORM layer, because
-> `IntoKey` keys on `StaticName` (`[spec:pgorm:def:entity.traits+2]`) and
+> `IntoKey` keys on `StaticName` (`[spec:pgorm:def:entity.traits]`) and
 > `AliasName` is one, so a single token spelling reaches every position in the
 > crate and there is no position where a caller is pushed back to a string.
 >
 > `Name::runtime` is NOT deprecated by this and MUST remain: a name computed
 > at run time cannot be a `&'static str` token, and the ORM builds such names
 > itself — the loader's join-back alias, the source graph's `s{i}_` column
-> prefixes (`[spec:pgorm:sem:query.graph.writer+4]`), an entity's schema
+> prefixes (`[spec:pgorm:sem:query.graph.writer]`), an entity's schema
 > qualifier. The token is the paved road for the static case, not a
 > replacement for the dynamic one; each is the only spelling of its case.
 >
@@ -231,10 +231,10 @@ Joins are derived from `RelationDef` (`helper.rs` bottom half plus
 > cast to the enum (`entity.traits.column.enum-cast`), under `Condition::all()` or
 > `Condition::any()` according to `rel.condition_type`, a period pair adding
 > `from.p && to.p` among them, so a temporal relation joins each row whose
-> period overlaps (`[spec:pgorm:def:entity.relation.def+10]`); and any
+> period overlaps (`[spec:pgorm:def:entity.relation.def]`); and any
 > `rel.on_condition` closure is evaluated with the two identifiers and AND-ed
 > in. Because the columns are held as pairs
-> (`[spec:pgorm:def:entity.relation.def+10]`), the join MUST constrain every
+> (`[spec:pgorm:def:entity.relation.def]`), the join MUST constrain every
 > column the relation declares: there are no two lists to reconcile and so no
 > way to emit an under-constrained join.
 >
@@ -401,7 +401,7 @@ what makes it total over partially-set models.
 > explicitly supplied all-`NotSet` model both leave the value list empty, and
 > they are different requests. A caller who wants the empty batch reported
 > rather than inferred converts with `on_empty_do_nothing`
-> (`[spec:pgorm:sem:query.build.insert.empty-failsafe+5]`).
+> (`[spec:pgorm:sem:query.build.insert.empty-failsafe]`).
 >
 > `add` iterates every `A::Entity` column in order: `Set` and `Unchanged`
 > values are included (each value passed through `col.save_as(...)`, applying
@@ -420,7 +420,7 @@ what makes it total over partially-set models.
 > asked to write is not the key of the row the database wrote, and an
 > `ON CONFLICT DO UPDATE` landing on some other row made the difference
 > observable as a primary key that names no row. The key is now resolved from
-> `RETURNING` alone (`[spec:pgorm:sem:exec.crud.insert+6]`), so the builder has
+> `RETURNING` alone (`[spec:pgorm:sem:exec.crud.insert]`), so the builder has
 > nothing to remember.
 
 > [spec:pgorm:req:query.build.insert.uniform-columns+4]
@@ -466,7 +466,7 @@ what makes it total over partially-set models.
 > first model added — which always marks at least one column present — or one
 > of the two empty states: no model added at all (`Insert::many` over an empty
 > iterator), or only models that leave every column `NotSet`. `Insert`'s own
-> terminals hold those two apart (`[spec:pgorm:sem:query.build.insert+5]`), since
+> terminals hold those two apart (`[spec:pgorm:sem:query.build.insert]`), since
 > a blank model asks for a row of defaults and an empty batch asks for nothing.
 > `TryInsert` deliberately does not: every one of its execution paths (`exec`
 > and its row type's returning terminals) reads both as empty, so an
@@ -552,13 +552,13 @@ what makes it total over partially-set models.
 > Every loader operation issues one graph read (`[spec:pgorm:def:query.graph]`),
 > built the same way: the caller's target selector is re-rooted as the graph and
 > the input entity's own table is joined back as the single `Req` slot
-> (`[spec:pgorm:sem:query.graph.slots+1]`) under an internal alias, walking the
+> (`[spec:pgorm:sem:query.graph.slots]`) under an internal alias, walking the
 > relation backwards because the root is the target rather than the input. The
 > relation therefore reaches SQL through the graph's one edge walker and the
-> `join_condition` behind it (`[spec:pgorm:sem:query.build.join+5]`), whole: its
+> `join_condition` behind it (`[spec:pgorm:sem:query.build.join]`), whole: its
 > column pairs, its authored `on_condition` — receiving its two identifiers in
 > the roles it was written with, `RelationDef::rev` itself re-swapping them
-> whenever a def is reversed (`[spec:pgorm:def:entity.relation.def+10]`) — and
+> whenever a def is reversed (`[spec:pgorm:def:entity.relation.def]`) — and
 > its `condition_type`, `All` or `Any`. A loader MUST NOT rebuild any
 > part of a relation as a predicate of its own, which is what makes dropping a
 > part of one unrepresentable rather than merely unintended.
@@ -569,12 +569,12 @@ what makes it total over partially-set models.
 > handed names a table the read does not have. The target side keeps its own
 > name, being the root, which is why a relation whose target is anything but an
 > unaliased table cannot be read at all: it is refused up front with the error of
-> [spec:pgorm:req:query.loader.table-ref-limitation+3] rather than rendering SQL
+> [spec:pgorm:req:query.loader.table-ref-limitation] rather than rendering SQL
 > that names a table the statement does not select from.
 >
 > Keys are collected in input order: for each input model, `extract_key` walks
 > the from side of the relation's `columns`, projected as an `Key`
-> (`[spec:pgorm:def:entity.relation.def+10]`), into one `ValueTuple` — one walk
+> (`[spec:pgorm:def:entity.relation.def]`), into one `ValueTuple` — one walk
 > at every arity, resolving each column name back to the entity's `Column` enum
 > via `FromStr`. A name that does not map is a caller-authored
 > relation naming a column its model does not have, so `extract_key` MUST
@@ -604,7 +604,7 @@ what makes it total over partially-set models.
 > multiplicity: a target is returned once per input-entity row whose key matches
 > it, so a relation whose from side is not unique in the input entity's table
 > repeats that target within the key's bucket. It is the price
-> `[spec:pgorm:sem:query.loader.many-to-many+3]` already pays, for the same
+> `[spec:pgorm:sem:query.loader.many-to-many]` already pays, for the same
 > reason.
 
 > [spec:pgorm:sem:query.loader.regroup+6]
@@ -612,7 +612,7 @@ what makes it total over partially-set models.
 > from the input model each returned row carries back beside its target, not on
 > a key re-derived from the target. The from-side key is the relation's
 > `from_key()`, a temporal relation's period included
-> (`[spec:pgorm:def:entity.relation.def+10]`), so rows of one key in different
+> (`[spec:pgorm:def:entity.relation.def]`), so rows of one key in different
 > periods are filed apart, each under the versions its own period overlaps. Reading the key off the side the input came
 > from is what lets the loader honour a relation that files one target under
 > several keys — an `Any` composition, an `on_condition` that is not an equality
@@ -627,7 +627,7 @@ what makes it total over partially-set models.
 > non-empty one holds — counted by the target entity's own primary key, not by
 > the bucket's length, because the read joins the input entity's table back and
 > so repeats a target once per matching input-entity row
-> (`[spec:pgorm:sem:query.loader.batching+7]`): a repeat is the join's doing and
+> (`[spec:pgorm:sem:query.loader.batching]`): a repeat is the join's doing and
 > MUST collapse. Two or more *distinct* target rows under one key contradict the
 > `HasOne` the relation declares — a missing `UNIQUE` on the target's key
 > columns, typically — and MUST be reported as `Err(Error::Query)` naming how
@@ -653,13 +653,13 @@ what makes it total over partially-set models.
 > (`[spec:pgorm:def:query.graph]`). The caller's target selector is re-rooted
 > as the graph: the statement keeps its FROM, its filters, its ordering and
 > its limit, and gives up only its projection, which the one writer
-> (`[spec:pgorm:sem:query.graph.writer+4]`) regenerates under `s0_`. Clearing
+> (`[spec:pgorm:sem:query.graph.writer]`) regenerates under `s0_`. Clearing
 > the caller's select list before projecting is what keeps a graph's select
 > list generated from its declaration rather than inherited from a builder
 > whose list a caller may have edited. The junction enters as a `via()` hop —
 > joined because the path runs through it, projected never — and the input
 > entity's own table as the single `Req` slot
-> (`[spec:pgorm:sem:query.graph.slots+1]`), joined back under an internal alias
+> (`[spec:pgorm:sem:query.graph.slots]`), joined back under an internal alias
 > so that a self-referencing many-to-many does not name one table twice and so
 > that the key predicate — the via relation's from side against the input
 > keys — qualifies against that alias. Each returned row decodes as
@@ -672,7 +672,7 @@ what makes it total over partially-set models.
 > rather than the input entity. That reversal is a direction, not a change of
 > meaning: an authored `on_condition` MUST still receive its two identifiers
 > in the roles the relation was written with
-> (`[spec:pgorm:def:entity.relation.def+10]`), so the loader re-swaps the
+> (`[spec:pgorm:def:entity.relation.def]`), so the loader re-swaps the
 > closure's arguments when it reverses a def. The `via()` hop joins LEFT and
 > the slot INNER, which selects the rows two INNER joins did: the slot's ON
 > references the junction's columns and NULLs do not satisfy it.
@@ -690,7 +690,7 @@ what makes it total over partially-set models.
 > absent from the join and so is dropped from the list, and a shared target is
 > cloned into every referencing input. A returned key absent from the seeded
 > buckets is reported as `Err(Error::Query)` on the same terms as
-> `[spec:pgorm:sem:query.loader.regroup+6]`.
+> `[spec:pgorm:sem:query.loader.regroup]`.
 >
 > Because the targets are read by one query rather than reassembled from a
 > key map, an `order_by` on the caller's `Select` orders every bucket. Without

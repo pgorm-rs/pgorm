@@ -32,7 +32,7 @@ it.
 > producer.
 >
 > `NothingToSet` is the counter-case: it exists because
-> `[spec:pgorm:sem:exec.crud.update+7]` raises it, and it names the statement
+> `[spec:pgorm:sem:exec.crud.update]` raises it, and it names the statement
 > that could not be sent rather than a row that was not found — an update
 > with no column to set, which is not the `Ok(0)` of a `WHERE` that matched
 > nothing.
