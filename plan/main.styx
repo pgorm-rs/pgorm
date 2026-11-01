@@ -15760,12 +15760,20 @@ children (
         title "PyValue::from_rust returns its value, not a result that can no longer fail"
         kind @refactor
         deps (scalar-kinds-shared)
+        sealed true
         log (
             {
                 at 2026-11-01T02:30:56.444023Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by scalar-kinds-shared: once every Value kind has a name in pgorm-query's table, pgorm-python's PyValue::from_rust can no longer fail, but it still returns a PyResult, kept to avoid touching its 62 call sites (pgorm-napi's and the replay harness's equivalents became infallible). A result that cannot be an error tells every caller to handle a failure that does not exist; make it return the value and drop the error handling at each call site."
+            }
+
+            {
+                at 2026-11-01T13:23:55.908888Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -15865,6 +15873,7 @@ children (
         id napi-model-range-operands
         title "JavaScript's model and registered column comparisons accept a Range or Multirange value in their types, as their runtime does"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-11-01T12:27:53.759868Z
@@ -15878,6 +15887,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @decision
                 text "Expr's value-taking methods take their operand through the receiver (eq<S>(this: S, other: ComparisonOperand<S> | Quantified), and ModelOperand<S> for between, distinctness, containment, overlap and the range positions), and ModelColumn / EntityColumn carry their operand type as a #private-branded phantom instead of redeclaring the methods. A column override taking a Range (no Operand) is refused by TypeScript (TS2416) and leaves the column unassignable to Expr; a never-typed overload per method would also pass but adds a visible overload to every method and breaks calls on a union of columns. FieldOperand and ColumnOperand now exclude only null from the kind's input type rather than extracting the Operand subset, which also admits a vector column's Float32Array, as the runtime converts it. Python needs no change: ModelColumn and EntityColumn type every value operand Any."
+            }
+
+            {
+                at 2026-11-01T13:23:56.003973Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
