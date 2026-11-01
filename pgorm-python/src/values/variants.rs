@@ -22,7 +22,7 @@ fn no_value_kind_reaches_a_conversions_wildcard_arm() -> PyResult<()> {
             .call0()?;
         for kind in ArrayType::variants().into_iter().chain(ArrayType::kinds()) {
             match convert::from_python(&foreign, &kind) {
-                Ok(value) => panic!("{kind:?} converted a bare object() into {value:?}"),
+                Ok(_) => panic!("{kind:?} converted a bare object() into a value"),
                 Err(error) => assert!(!unrepresented_kind(&error), "{kind:?}: {error}"),
             }
             assert!(
