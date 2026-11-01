@@ -1,6 +1,6 @@
 schema_version 7
 
-last_sync_at 2026-11-01T01:12:26.188322Z
+last_sync_at 2026-11-01T03:02:37.492868Z
 
 rule_versions (
     {id bindings.api, version 0}
@@ -10,13 +10,15 @@ rule_versions (
     {id bindings.codegen, version 0}
     {id bindings.collations, version 0}
     {id bindings.column-operators, version 1}
+    {id bindings.conflict-arbiters, version 0}
     {id bindings.connections, version 2}
     {id bindings.copy, version 0}
     {id bindings.copy-rows, version 0}
     {id bindings.created-ranges, version 0}
+    {id bindings.cte-options, version 0}
     {id bindings.cursors, version 0}
     {id bindings.delegation, version 0}
-    {id bindings.entities, version 2}
+    {id bindings.entities, version 3}
     {id bindings.entity-graphs, version 2}
     {id bindings.entity-reads, version 2}
     {id bindings.entity-versions, version 2}
@@ -27,12 +29,13 @@ rule_versions (
     {id bindings.graphs, version 0}
     {id bindings.identifiers, version 2}
     {id bindings.listen, version 2}
-    {id bindings.merge, version 0}
+    {id bindings.merge, version 1}
+    {id bindings.merge-sources, version 0}
     {id bindings.model-columns, version 1}
     {id bindings.model-reads, version 0}
     {id bindings.model-records, version 0}
     {id bindings.model-writes, version 1}
-    {id bindings.models, version 3}
+    {id bindings.models, version 4}
     {id bindings.operands, version 0}
     {id bindings.optional, version 0}
     {id bindings.pagination, version 0}
@@ -65,13 +68,15 @@ rule_versions (
     {id bindings.sql-json, version 0}
     {id bindings.statements, version 0}
     {id bindings.streams, version 0}
-    {id bindings.surface, version 0}
+    {id bindings.surface, version 1}
     {id bindings.transactions, version 0}
     {id bindings.value-tags, version 0}
     {id bindings.values, version 0}
     {id bindings.windows, version 0}
-    {id bindings.with, version 0}
-    {id bindings.writes, version 0}
+    {id bindings.with, version 1}
+    {id bindings.write-ctes, version 0}
+    {id bindings.write-sources, version 0}
+    {id bindings.writes, version 1}
     {id codegen.entity, version 5}
     {id codegen.entity.compact, version 1}
     {id codegen.entity.compact.attrs, version 8}
@@ -435,6 +440,7 @@ rule_versions (
     {id sql.value.conversions, version 1}
     {id sql.value.interval, version 2}
     {id sql.value.interval-text, version 1}
+    {id sql.value.kinds, version 0}
     {id sql.value.render, version 2}
     {id sql.value.tuple, version 3}
     {id sql.value.value-type, version 3}
@@ -451,8 +457,10 @@ derived_priorities (
     {id big-unsigned-binding, priority 0, derived_at 2026-09-06T16:36:02.710141Z}
     {id binding-coverage-per-impl, priority 1, derived_at 2026-10-30T13:42:29.080898Z}
     {id binding-describe-shapes, priority 1, derived_at 2026-10-31T22:52:03.347907Z}
+    {id binding-graph-describe-shapes, priority 0, derived_at 2026-11-01T03:02:37.492868Z}
     {id binding-renames, priority 1, derived_at 2026-10-30T14:41:04.802037Z}
     {id binding-spec-consolidation, priority 0, derived_at 2026-10-26T20:21:09.753689Z}
+    {id binding-statement-defects, priority 0, derived_at 2026-11-01T03:02:37.492868Z}
     {id binding-variant-coverage, priority 1, derived_at 2026-10-26T20:21:09.753689Z}
     {id bindings-array-subquery, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
     {id bindings-copy-created-multiranges, priority 3, derived_at 2026-10-26T20:21:09.753689Z}
@@ -646,6 +654,7 @@ derived_priorities (
     {id napi-connections, priority 2, derived_at 2026-10-09T14:17:42.819993Z}
     {id napi-domain-entity-test, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
     {id napi-entities, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
+    {id napi-model-created-multirange, priority 0, derived_at 2026-11-01T03:02:37.492868Z}
     {id napi-models, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
     {id napi-packaging, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
     {id napi-pipeline, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
@@ -745,6 +754,7 @@ derived_priorities (
     {id python-campaign-write-versions, priority 3, derived_at 2026-10-09T14:17:42.819993Z}
     {id python-case-expressions, priority 1, derived_at 2026-10-26T20:21:09.753689Z}
     {id python-column-collation, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
+    {id python-conflict-merge-shapes, priority 0, derived_at 2026-11-01T03:02:37.492868Z}
     {id python-copy-typing-cases, priority 2, derived_at 2026-10-24T06:20:32.099314Z}
     {id python-created-range-domain-subtype, priority 0, derived_at 2026-10-26T20:21:09.753689Z}
     {id python-created-ranges, priority 0, derived_at 2026-10-09T14:17:42.819993Z}
@@ -773,6 +783,7 @@ derived_priorities (
     {id python-stream-truth-testing, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
     {id python-truth-testing-rest, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
     {id python-typing-check-symlinked-tmp, priority 0, derived_at 2026-10-09T14:17:42.819993Z}
+    {id python-value-from-rust-infallible, priority 2, derived_at 2026-11-01T03:02:37.492868Z}
     {id python-view-body-check, priority 3, derived_at 2026-10-24T06:20:32.099314Z}
     {id python.acceptance, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
     {id python.codegen, priority 3, derived_at 2026-09-08T15:34:01.846701Z}
@@ -944,9 +955,9 @@ assertions (
     {id between-render-parens, kind @complete, author "brendan@necessary.nu", at 2026-10-23T20:14:51.562869Z}
     {id big-unsigned-binding, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:24.191318Z}
     {id binding-coverage-per-impl, kind @complete, author "brendan@necessary.nu", at 2026-10-30T14:18:38.065807Z}
-    {id binding-describe-shapes, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:44.983153Z}
+    {id binding-describe-shapes, kind @complete, author "brendan@necessary.nu", at 2026-11-01T03:02:51.587914Z}
     {id binding-renames, kind @complete, author "brendan@necessary.nu", at 2026-10-30T14:35:54.859252Z}
-    {id binding-variant-coverage, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:45.333805Z}
+    {id binding-variant-coverage, kind @complete, author "brendan@necessary.nu", at 2026-11-01T03:02:50.884953Z}
     {id bindings-array-subquery, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:53:58.290968Z}
     {id bindings-copy-created-multiranges, kind @complete, author "brendan@necessary.nu", at 2026-10-26T10:21:29.151829Z}
     {id bindings-expression-gaps, kind @complete, author "brendan@necessary.nu", at 2026-10-26T17:15:31.190363Z}
@@ -1201,11 +1212,11 @@ assertions (
     {id python-created-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:45:27.273279Z}
     {id python-datatype-export, kind @complete, author "brendan@necessary.nu", at 2026-10-19T12:56:06.241222Z}
     {id python-ddl-factories, kind @complete, author "brendan@necessary.nu", at 2026-10-31T22:52:13.77853Z}
-    {id python-hook-refusal-class, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:44.640722Z}
+    {id python-hook-refusal-class, kind @complete, author "brendan@necessary.nu", at 2026-11-01T03:02:51.173922Z}
     {id python-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:34:09.315805Z}
     {id python-listen-header-duplicate, kind @complete, author "brendan@necessary.nu", at 2026-10-26T00:02:49.425118Z}
     {id python-merge-and-row-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:16:36.872555Z}
-    {id python-model-created-multirange, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:45.807746Z}
+    {id python-model-created-multirange, kind @complete, author "brendan@necessary.nu", at 2026-11-01T03:02:51.396983Z}
     {id python-model-shapes, kind @complete, author "brendan@necessary.nu", at 2026-10-31T22:52:13.637711Z}
     {id python-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:19:17.720063Z}
     {id python-schema-refusal-test, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:20:32.030006Z}
@@ -1355,10 +1366,12 @@ impl_evidence (
         bindings.codegen
         bindings.collations
         bindings.column-operators
+        bindings.conflict-arbiters
         bindings.connections
         bindings.copy
         bindings.copy-rows
         bindings.created-ranges
+        bindings.cte-options
         bindings.cursors
         bindings.delegation
         bindings.entities
@@ -1373,6 +1386,7 @@ impl_evidence (
         bindings.identifiers
         bindings.listen
         bindings.merge
+        bindings.merge-sources
         bindings.model-columns
         bindings.model-reads
         bindings.model-records
@@ -1415,6 +1429,8 @@ impl_evidence (
         bindings.values
         bindings.windows
         bindings.with
+        bindings.write-ctes
+        bindings.write-sources
         bindings.writes
         napi.application
         napi.cancellation
@@ -1453,10 +1469,12 @@ impl_evidence (
         {impl_name javascript, rule bindings.codegen}
         {impl_name javascript, rule bindings.collations}
         {impl_name javascript, rule bindings.column-operators}
+        {impl_name javascript, rule bindings.conflict-arbiters}
         {impl_name javascript, rule bindings.connections}
         {impl_name javascript, rule bindings.copy}
         {impl_name javascript, rule bindings.copy-rows}
         {impl_name javascript, rule bindings.created-ranges}
+        {impl_name javascript, rule bindings.cte-options}
         {impl_name javascript, rule bindings.cursors}
         {impl_name javascript, rule bindings.delegation}
         {impl_name javascript, rule bindings.entities}
@@ -1471,6 +1489,7 @@ impl_evidence (
         {impl_name javascript, rule bindings.identifiers}
         {impl_name javascript, rule bindings.listen}
         {impl_name javascript, rule bindings.merge}
+        {impl_name javascript, rule bindings.merge-sources}
         {impl_name javascript, rule bindings.model-columns}
         {impl_name javascript, rule bindings.model-reads}
         {impl_name javascript, rule bindings.model-records}
@@ -1511,6 +1530,8 @@ impl_evidence (
         {impl_name javascript, rule bindings.values}
         {impl_name javascript, rule bindings.windows}
         {impl_name javascript, rule bindings.with}
+        {impl_name javascript, rule bindings.write-ctes}
+        {impl_name javascript, rule bindings.write-sources}
         {impl_name javascript, rule bindings.writes}
         {impl_name javascript, rule napi.application}
         {impl_name javascript, rule napi.cancellation}
@@ -1586,6 +1607,109 @@ impl_evidence (
         {impl_name python, rule python.typing}
         {impl_name python, rule python.value-tags}
         {impl_name python, rule python.values}
+    ), rule_versions_seen (
+        {id bindings.api, version 0}
+        {id bindings.argument-errors, version 1}
+        {id bindings.cancellation, version 0}
+        {id bindings.case, version 0}
+        {id bindings.codegen, version 0}
+        {id bindings.collations, version 0}
+        {id bindings.column-operators, version 1}
+        {id bindings.conflict-arbiters, version 0}
+        {id bindings.connections, version 2}
+        {id bindings.copy, version 0}
+        {id bindings.copy-rows, version 0}
+        {id bindings.created-ranges, version 0}
+        {id bindings.cte-options, version 0}
+        {id bindings.cursors, version 0}
+        {id bindings.delegation, version 0}
+        {id bindings.entities, version 3}
+        {id bindings.entity-graphs, version 2}
+        {id bindings.entity-reads, version 2}
+        {id bindings.entity-versions, version 2}
+        {id bindings.entity-writes, version 0}
+        {id bindings.errors, version 3}
+        {id bindings.expressions, version 2}
+        {id bindings.from-subqueries, version 0}
+        {id bindings.graphs, version 0}
+        {id bindings.identifiers, version 2}
+        {id bindings.listen, version 2}
+        {id bindings.merge, version 1}
+        {id bindings.merge-sources, version 0}
+        {id bindings.model-columns, version 1}
+        {id bindings.model-reads, version 0}
+        {id bindings.model-records, version 0}
+        {id bindings.model-writes, version 1}
+        {id bindings.models, version 4}
+        {id bindings.operands, version 0}
+        {id bindings.optional, version 0}
+        {id bindings.pagination, version 0}
+        {id bindings.pipeline, version 0}
+        {id bindings.pipeline-binder, version 0}
+        {id bindings.pipeline-expressions, version 2}
+        {id bindings.pipeline-sources, version 2}
+        {id bindings.ranges, version 0}
+        {id bindings.registered-pools, version 0}
+        {id bindings.relation-conditions, version 0}
+        {id bindings.relations, version 0}
+        {id bindings.results, version 2}
+        {id bindings.row-count, version 0}
+        {id bindings.row-locks, version 0}
+        {id bindings.rows, version 0}
+        {id bindings.runtime, version 0}
+        {id bindings.schema, version 0}
+        {id bindings.schema-alter, version 0}
+        {id bindings.schema-api, version 2}
+        {id bindings.schema-domains, version 2}
+        {id bindings.schema-from-entity, version 0}
+        {id bindings.schema-indexes, version 0}
+        {id bindings.schema-schemas, version 0}
+        {id bindings.schema-sequences, version 0}
+        {id bindings.schema-tables, version 0}
+        {id bindings.schema-types, version 0}
+        {id bindings.schema-views, version 2}
+        {id bindings.select, version 2}
+        {id bindings.sql-json, version 0}
+        {id bindings.statements, version 0}
+        {id bindings.streams, version 0}
+        {id bindings.surface, version 1}
+        {id bindings.transactions, version 0}
+        {id bindings.value-tags, version 0}
+        {id bindings.values, version 0}
+        {id bindings.windows, version 0}
+        {id bindings.with, version 1}
+        {id bindings.write-ctes, version 0}
+        {id bindings.write-sources, version 0}
+        {id bindings.writes, version 1}
+        {id napi.application, version 2}
+        {id napi.cancellation, version 1}
+        {id napi.codegen, version 1}
+        {id napi.errors, version 3}
+        {id napi.lifecycle, version 2}
+        {id napi.naming, version 3}
+        {id napi.pipeline-table-names, version 0}
+        {id napi.raw, version 0}
+        {id napi.records, version 0}
+        {id napi.runtime, version 1}
+        {id napi.temporal, version 1}
+        {id napi.transactions, version 3}
+        {id napi.typing, version 1}
+        {id napi.values, version 1}
+        {id python.api, version 1}
+        {id python.cancellation, version 1}
+        {id python.capabilities, version 2}
+        {id python.codegen, version 3}
+        {id python.expressions, version 7}
+        {id python.lifecycle, version 3}
+        {id python.naming, version 2}
+        {id python.pipeline, version 0}
+        {id python.records, version 0}
+        {id python.runtime, version 1}
+        {id python.transactions, version 3}
+        {id python.truth-testing, version 3}
+        {id python.typing, version 1}
+        {id python.value-tags, version 1}
+        {id python.values, version 7}
     )}
     {id codegen.generate, covered_rules (
         codegen.entity
@@ -2260,11 +2384,22 @@ impl_evidence (
         {impl_name python, rule bindings.models}
         {impl_name python, rule bindings.pagination}
         {impl_name python, rule bindings.relations}
+    ), rule_versions_seen (
+        {id bindings.cursors, version 0}
+        {id bindings.graphs, version 0}
+        {id bindings.model-reads, version 0}
+        {id bindings.model-records, version 0}
+        {id bindings.model-writes, version 1}
+        {id bindings.models, version 4}
+        {id bindings.pagination, version 0}
+        {id bindings.relations, version 0}
     )}
     {id python-registered-pools, covered_rules (
         bindings.registered-pools
     ), covered_claims (
         {impl_name python, rule bindings.registered-pools}
+    ), rule_versions_seen (
+        {id bindings.registered-pools, version 0}
     )}
     {id python-schema-gaps, covered_rules (
         bindings.schema-alter
@@ -2294,6 +2429,9 @@ impl_evidence (
     ), covered_claims (
         {impl_name python, rule bindings.from-subqueries}
         {impl_name python, rule bindings.row-locks}
+    ), rule_versions_seen (
+        {id bindings.from-subqueries, version 0}
+        {id bindings.row-locks, version 0}
     )}
     {id python-statement-gaps, covered_rules (
         bindings.conflict-arbiters
@@ -2313,6 +2451,15 @@ impl_evidence (
         {impl_name python, rule bindings.write-ctes}
         {impl_name python, rule bindings.write-sources}
         {impl_name python, rule bindings.writes}
+    ), rule_versions_seen (
+        {id bindings.conflict-arbiters, version 0}
+        {id bindings.cte-options, version 0}
+        {id bindings.merge, version 1}
+        {id bindings.merge-sources, version 0}
+        {id bindings.with, version 1}
+        {id bindings.write-ctes, version 0}
+        {id bindings.write-sources, version 0}
+        {id bindings.writes, version 1}
     )}
     {id python.acceptance, covered_rules (
         python.acceptance
@@ -2381,6 +2528,8 @@ impl_evidence (
         sql.value.kinds
     ), covered_claims (
         {impl_name main, rule sql.value.kinds}
+    ), rule_versions_seen (
+        {id sql.value.kinds, version 0}
     )}
     {id single-cast-node, covered_rules (
         sql.ast.cast-shape
