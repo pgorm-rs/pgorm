@@ -959,9 +959,9 @@ assertions (
     {id big-unsigned-binding, kind @complete, author "brendan@necessary.nu", at 2026-09-05T20:09:24.191318Z}
     {id binding-coverage-per-impl, kind @complete, author "brendan@necessary.nu", at 2026-10-30T14:18:38.065807Z}
     {id binding-describe-shapes, kind @complete, author "brendan@necessary.nu", at 2026-11-01T03:02:51.587914Z}
-    {id binding-graph-describe-shapes, kind @doing, author "brendan@necessary.nu", at 2026-11-01T03:07:18.140202Z}
+    {id binding-graph-describe-shapes, kind @complete, author "brendan@necessary.nu", at 2026-11-01T12:27:44.245853Z}
     {id binding-renames, kind @complete, author "brendan@necessary.nu", at 2026-10-30T14:35:54.859252Z}
-    {id binding-statement-defects, kind @doing, author "brendan@necessary.nu", at 2026-11-01T03:07:24.696175Z}
+    {id binding-statement-defects, kind @complete, author "brendan@necessary.nu", at 2026-11-01T12:27:44.145896Z}
     {id binding-variant-coverage, kind @complete, author "brendan@necessary.nu", at 2026-11-01T03:02:50.884953Z}
     {id bindings-array-subquery, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:53:58.290968Z}
     {id bindings-copy-created-multiranges, kind @complete, author "brendan@necessary.nu", at 2026-10-26T10:21:29.151829Z}
@@ -1131,7 +1131,7 @@ assertions (
     {id napi-addon-size, kind @complete, author "brendan@necessary.nu", at 2026-10-18T14:41:20.074691Z}
     {id napi-binding-decisions, kind @complete, author "brendan@necessary.nu", at 2026-10-30T15:22:24.475936Z}
     {id napi-domain-entity-test, kind @complete, author "brendan@necessary.nu", at 2026-10-18T22:48:59.551771Z}
-    {id napi-model-created-multirange, kind @doing, author "brendan@necessary.nu", at 2026-11-01T03:07:25.737224Z}
+    {id napi-model-created-multirange, kind @complete, author "brendan@necessary.nu", at 2026-11-01T12:27:44.342793Z}
     {id napi-racing-fixture-timing, kind @complete, author "brendan@necessary.nu", at 2026-10-26T00:16:03.973045Z}
     {id napi-schema-statement-name, kind @complete, author "brendan@necessary.nu", at 2026-10-26T00:13:51.100898Z}
     {id nested-source-from-entry, kind @complete, author "brendan@necessary.nu", at 2026-09-15T12:40:14.356897Z}
@@ -1213,7 +1213,7 @@ assertions (
     {id python-application-check-names, kind @complete, author "brendan@necessary.nu", at 2026-10-06T12:22:29.683239Z}
     {id python-campaign-entity-key-attributes, kind @complete, author "brendan@necessary.nu", at 2026-10-09T00:36:38.298184Z}
     {id python-campaign-write-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-09T01:01:46.308791Z}
-    {id python-conflict-merge-shapes, kind @doing, author "brendan@necessary.nu", at 2026-11-01T03:07:16.603624Z}
+    {id python-conflict-merge-shapes, kind @complete, author "brendan@necessary.nu", at 2026-11-01T12:27:44.044976Z}
     {id python-copy-typing-cases, kind @complete, author "brendan@necessary.nu", at 2026-10-19T10:48:39.938347Z}
     {id python-created-range-domain-subtype, kind @complete, author "brendan@necessary.nu", at 2026-10-26T14:07:08.379524Z}
     {id python-created-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:45:27.273279Z}
