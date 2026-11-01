@@ -6304,6 +6304,13 @@ children (
                         text "Re-checked 2026-10-18 at python.values +4 (python-statement-typing, 73a0ada5, which dropped the leftover feature condition and stated the created-range limits): the six built-in range types and their multiranges convert with no feature gate; a created range converts both ways, its result column decoding through the subtype's codec to its own kind; a created multirange converts as a value, its result column raising DecodeError (results/ranges.rs, the driver reporting no subtype) so it is read cast to text; arrays of a created range or multirange are refused both ways (values/mod.rs, results/ranges.rs)."
                         after_done true
                     }
+
+                    {
+                        at 2026-11-01T14:51:55.446791Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -6357,6 +6364,13 @@ children (
                         kind @note
                         text "Delivered again at python.expressions +1: the merges of branches cut before the 2026-10-18 re-check restored the node's stale rule_versions_seen through the plan merge driver (filed in nplan's DEFECTS.md)."
                         after_done true
+                    }
+
+                    {
+                        at 2026-11-01T14:52:03.735212Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -6506,6 +6520,13 @@ children (
                         text "python.errors +1 (sql-error-check-not-null): a constraint violation raises the DatabaseError subclass named for it (UniqueViolationError, ForeignKeyViolationError, CheckViolationError, NotNullViolationError, ExclusionViolationError) and DatabaseError carries datatype, the domain a domain constraint names."
                         after_done true
                     }
+
+                    {
+                        at 2026-11-01T14:52:03.845156Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -6548,6 +6569,13 @@ children (
                         kind @note
                         text "Final installed-wheel regression: 69 tests passed against the disposable PostgreSQL/TLS fixture. Native library suite: 15 tests passed, including independent Rust expression/statement parity and Decimal/time/array/JSON codec parity/rejection. Stream cases cover pending-pull cancellation, foreign-loop rejection without consuming the owner, EOF lease reuse, early discard, abandonment, idle shutdown and late SQLSTATE errors. The pending-pull fixture now consumes partial network frames in a task rather than assuming complete-row flushes; acquisition timeout is 0.5s to allow replacement connections under concurrent compiler load, while cancellation/shutdown checks retain 1s operation budgets."
                     }
+
+                    {
+                        at 2026-11-01T14:52:03.954577Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -6585,6 +6613,13 @@ children (
                         kind @note
                         text "Implemented a scoped Rust owner task retaining real borrowed DatabaseTransaction/savepoint frames, with owned typed commands and a borrowed ConnectionTrait adapter. Parent connection/savepoint reservations persist until completion acknowledgement. Explicit finish/context/abandonment paths await native rollback or discard uncertain leases; cancelled requests abort the entire owner, with no extra retry. Supports ordinary builders, runtime models, registered ActiveModel hooks/entity queries, graphs/cursors and typed pipeline source tuples; transaction streaming is explicitly not exposed. All 107 installed Python tests pass, including 10 transaction tests with bounded cancellation/shutdown. Fresh downstream application checker passed 8 Rust, 9 entity, 7 graph, 5 source, 1 schema and 3 registered-transaction tests plus 8 independent cursor parity cases. Runnable transaction documentation example passed."
                     }
+
+                    {
+                        at 2026-11-01T14:52:04.047698Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -6621,6 +6656,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Runtime Model/Column descriptors now lower declarations, exact typed comparisons, SELECT, INSERT, UPDATE and DELETE through the existing native builders. Declared field keys become projection aliases; primary-key conjunctions support composite keys; omitted fields, SQL NULL and JSON null remain distinct. Installed PostgreSQL tests cover CRUD, default rows, aliases/self-joins, strict decoding failures, 19 scalar wire kinds and qualified enum arrays. All 84 standalone Python tests pass. Strict mypy checks the five implementation modules; precise native fetch overloads also remove Any returns from their Connection dependency. Canonical Record tags are explicit in model_policy; Value-only u64/char/local/fixed variants fail at declaration rather than claiming incompatible decoded models."
+                    }
+
+                    {
+                        at 2026-11-01T14:52:04.140793Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -6691,6 +6733,13 @@ children (
                         text "Re-checked 2026-10-18 at python.entities +3 (python-statement-typing, 73a0ada5): describe()'s relations now report condition_type (\"all\"/\"any\") and on_condition (present/absent) beside columns and the PERIOD pair, with enforcement and deferrability described as what the server holds the key's rows to; covered by a native unit test (entities/relations.rs), graph_parity.rs and registered_temporal.py, and the terminals list is asserted against reachable methods in registered_entities.py. The application check (checks/entities.py) passed."
                         after_done true
                     }
+
+                    {
+                        at 2026-11-01T14:52:04.2333Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -6727,6 +6776,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Implemented concrete registrations for the Rust slotless shape and one-through-six Req/Opt slots, using actual SelectGraph/GraphRow decoding into registered EntityModels. The installed application wheel passed all seven graph tests and nine entity regressions, including every source arity, mixed required/optional models, quoted aliases, absent-vs-decode-error behavior, invalid input and lock-wait cancellation. Five native tests cover registry rejection and SQL/Value parity. Eight installed Python keyset result sequences match independent Rust SelectGraph cursors, including full/primary boundaries, last-page reversal, window replacement and qualified-enum boundaries. Capabilities explicitly limit cursors to one root order column and omit unsupported graph terminals and cursor inspection."
+                    }
+
+                    {
+                        at 2026-11-01T14:52:04.327416Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -6805,6 +6861,13 @@ children (
                         kind @note
                         text "Separated the concrete async source read from QueryBackend's small BoxFuture adapter so the implementation logic is explicit outside the shared boxing idiom. Compiler checks preserve the same borrowed lifetimes and Send requirements. All previous semantic checks remain passing; preparing the final quality-gated delivery."
                     }
+
+                    {
+                        at 2026-11-01T14:52:04.418531Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -6846,6 +6909,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "The installed codegen workflow now scaffolds a native application crate, builds and installs a probe wheel, emits deterministic concrete model/ActiveModel/graph wrappers and stubs from compiled metadata, then rebuilds and installs the final wheel. PostgreSQL CRUD/optional-graph execution and compatibility failures passed. Pinned mypy 1.18.2 accepts the concrete consumer and rejects four invalid field/optional-shape uses. The checker isolates standalone Cargo artifacts because downstream dependency builds otherwise overwrite the shared cdylib output without its standalone initializer. Documentation records build-time compilation, exact enum identities, unknown custom type Any, and native operation mappings."
+                    }
+
+                    {
+                        at 2026-11-01T14:52:04.523146Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -6890,6 +6960,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @note
                         text "Installed-wheel signature audit corrected native positional-only parameters, two keyword names and opaque constructors across all shipped native stubs; it also found and fixed Python 3.14 annotation evaluation shadowed by the generated ModelView.native property. Whole package passes strict mypy (35 standalone / 36 generated source files). The ordinary schema/CRUD/join/transaction/savepoint/pipeline/stream application executes directly against PostgreSQL. Final standalone wheel passes all 110 tests, runtime signature/export checks, positive typing and all 13 expected invalid diagnostics; target/python-typing/summary.json records installed stub hashes. Compiled workflow rebuilt three clean environments and passed concrete typing, four invalid diagnostics, generated CRUD/graphs, compatibility and signature checks (target/python-typing-codegen/summary.json). DatabaseError diagnostics are consistently optional for client-side cardinality failures and populated for server errors. All ten required staged checks pass. Upstream codegen/macros review remains recorded for final acceptance."
+                    }
+
+                    {
+                        at 2026-11-01T14:52:04.626711Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -7050,6 +7127,13 @@ children (
                         kind @note
                         text "Re-covered: python.schema+1 moved after this node's delivery (1c883ab5, every Python schema object and Compiled refuse truth testing), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
                         after_done true
+                    }
+
+                    {
+                        at 2026-11-01T14:52:04.721561Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -12225,12 +12309,20 @@ children (
                 title "JavaScript connects, pools, runs bound SQL, and scopes transactions and savepoints"
                 kind @feat
                 deps (napi-values)
+                sealed true
                 log (
                     {
                         at 2026-10-09T12:36:58.256413Z
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-11-01T14:52:18.239639Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -12240,6 +12332,7 @@ children (
                 title "JavaScript builds pgorm-query's statements and expressions: SELECT, INSERT, UPDATE, DELETE, MERGE, ON CONFLICT, RETURNING row versions, SQL/JSON, windows, ranges"
                 kind @feat
                 deps (napi-connections)
+                sealed true
                 log (
                     {
                         at 2026-10-09T13:49:05.293337Z
@@ -12287,6 +12380,13 @@ children (
                         text "Re-covered: napi.expressions+4 moved after this node's delivery (merged in 289e49b1), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
                         after_done true
                     }
+
+                    {
+                        at 2026-11-01T14:52:18.33172Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -12295,12 +12395,20 @@ children (
                 title "JavaScript builds DDL: tables, keys, constraints, types, sequences, indexes and their alterations"
                 kind @feat
                 deps (napi-statements)
+                sealed true
                 log (
                     {
                         at 2026-10-09T15:04:11.602908Z
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-11-01T14:52:18.423314Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -12310,12 +12418,20 @@ children (
                 title "JavaScript declares models and uses them: CRUD, relations, graphs, cursors and pagination"
                 kind @feat
                 deps (napi-statements)
+                sealed true
                 log (
                     {
                         at 2026-10-09T15:11:22.062663Z
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-11-01T14:52:18.515554Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -12325,6 +12441,7 @@ children (
                 title "A Rust application registers its entities with the binding, and JavaScript uses them through it"
                 kind @feat
                 deps (napi-models)
+                sealed true
                 log (
                     {
                         at 2026-10-09T16:09:42.135283Z
@@ -12356,6 +12473,13 @@ children (
                         text "Re-covered: napi.entity-reads+2 moved after this node's delivery (merged in 289e49b1), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
                         after_done true
                     }
+
+                    {
+                        at 2026-11-01T14:52:18.606333Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
+                    }
                 )
             }
 
@@ -12364,12 +12488,20 @@ children (
                 title "JavaScript composes pgorm's PRQL-shaped pipeline over sources"
                 kind @feat
                 deps (napi-statements)
+                sealed true
                 log (
                     {
                         at 2026-10-09T15:38:42.159141Z
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-11-01T14:52:18.700222Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -12435,6 +12567,7 @@ children (
                 title "JavaScript pipelines read registered Rust entities as sources and decode them into their models through select_sources"
                 kind @feat
                 deps (napi-pipeline napi-entities)
+                sealed true
                 log (
                     {
                         at 2026-10-09T15:54:39.911344Z
@@ -12448,6 +12581,13 @@ children (
                         author "brendan@necessary.nu"
                         kind @status
                         text "Todo → Doing (nplan start)"
+                    }
+
+                    {
+                        at 2026-11-01T14:52:18.798158Z
+                        author "brendan@necessary.nu"
+                        kind @status
+                        text "Todo → Done (nplan complete)"
                     }
                 )
             }
@@ -12841,6 +12981,7 @@ children (
         title "Every remaining pgorm-python query object refuses truth testing: entity write terminals, windows, WITH, FROM items, joins, tables, conflicts, frames and MERGE actions"
         kind @fix
         deps (python-schema-truth-testing sql-select-extras select-named-windows)
+        sealed true
         log (
             {
                 at 2026-10-18T17:34:04.304813Z
@@ -12855,6 +12996,13 @@ children (
                 kind @note
                 text "Re-covered: python.truth-testing+1 moved after this node's delivery (b9ac84d3, every Python stream refuses truth testing, as Listener does), every reference is pinned at the current version (nplan_spec_stale clean), and test-run-isolation's state refresh surfaced the drift."
                 after_done true
+            }
+
+            {
+                at 2026-11-01T14:52:18.890898Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
@@ -13043,6 +13191,7 @@ children (
         title "Python's ColumnDef names a collation, as Rust's column definitions do"
         kind @feat
         deps (sql-domains)
+        sealed true
         log (
             {
                 at 2026-10-18T21:52:40.505628Z
@@ -13056,6 +13205,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-11-01T14:52:18.979779Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }
@@ -13192,6 +13348,7 @@ children (
         title "Python expressions take a COLLATE, as Rust's and JavaScript's do"
         kind @feat
         deps (python-column-collation)
+        sealed true
         log (
             {
                 at 2026-10-19T07:51:50.788134Z
@@ -13205,6 +13362,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @status
                 text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-11-01T14:52:19.069641Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }

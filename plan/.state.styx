@@ -1370,6 +1370,28 @@ assertions (
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
     {id spec-prose-unversioned-refs, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:08:08.271095Z}
     {id view-check-rule-callers, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:08:08.366707Z}
+    {id python.values, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:51:55.446791Z}
+    {id python.expressions, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:03.735212Z}
+    {id python.runtime, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:03.845156Z}
+    {id python.results, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:03.954577Z}
+    {id python.transactions, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:04.047698Z}
+    {id python.models, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:04.140793Z}
+    {id python.entities, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:04.2333Z}
+    {id python.graph, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:04.327416Z}
+    {id python.pipeline, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:04.418531Z}
+    {id python.codegen, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:04.523146Z}
+    {id python.typing, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:04.626711Z}
+    {id python.schema, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:04.721561Z}
+    {id napi-connections, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:18.239639Z}
+    {id napi-statements, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:18.33172Z}
+    {id napi-schema, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:18.423314Z}
+    {id napi-models, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:18.515554Z}
+    {id napi-entities, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:18.606333Z}
+    {id napi-pipeline, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:18.700222Z}
+    {id napi-pipeline-sources, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:18.798158Z}
+    {id python-truth-testing-rest, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:18.890898Z}
+    {id python-column-collation, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:18.979779Z}
+    {id python-expr-collate, kind @complete, author "brendan@necessary.nu", at 2026-11-01T14:52:19.069641Z}
 )
 
 impl_evidence (
