@@ -994,7 +994,7 @@ pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 > (`bindings.models`), and a registered column's through its registration's
 > (`bindings.entities`).
 
-> [spec:pgorm:req:bindings.model-records]
+> [spec:pgorm:req:bindings.model-records+1]
 > A model's terminals MUST decode each row into a record keyed by field, in
 > declaration order, its values those `bindings.values` declares. Each field
 > MUST be found by the result column its statement projected it under, and the
@@ -1005,6 +1005,13 @@ pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 > another schema's enum, is a `DecodeError` rather than a value of the wrong
 > type. A NULL in a field that is not nullable, and a label an enum field does
 > not list, MUST be a `DecodeError`, never a value.
+>
+> A created multirange's field is read from its text, since the driver
+> reports a column of one with no subtype (`bindings.created-ranges`): every
+> statement a model builds MUST project it cast to `text`, as pgorm's
+> `ColumnTrait::select_as` reads an entity's, its result column is held to
+> `text`, and its text MUST be read as a `Multirange` of the declared
+> subtype, text that subtype does not read being a `DecodeError`.
 
 > [spec:pgorm:req:bindings.model-reads]
 > `find()` MUST select every field, `select(fields)` the fields it names, and

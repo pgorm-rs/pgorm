@@ -7,7 +7,7 @@
 // [spec:pgorm:req:bindings.models+4]
 
 import { ConstructionError } from "./errors.js";
-import { modelColumn } from "./model-columns.js";
+import { modelColumn, readsText } from "./model-columns.js";
 import { native } from "./operations.js";
 
 /**
@@ -81,6 +81,21 @@ export function fieldOf(shape, name) {
  */
 export function qualified(field, qualifier) {
   return modelColumn(native.exprCol(field.sql, qualifier, undefined), field.field, field.column);
+}
+
+/**
+ * `expr`, a field's column, as a statement projects it under the result
+ * column `name`: as it is when that is the column's own name, aliased
+ * otherwise, and cast to `text` when the field is read from its text
+ * (`readsText`).
+ *
+ * @param {Field} field
+ * @param {import("./expressions.js").Expr} expr
+ * @param {string} name
+ */
+export function projected(field, expr, name) {
+  if (readsText(field.column)) return expr.cast("text").as(name);
+  return name === field.sql ? expr : expr.as(name);
 }
 
 /**

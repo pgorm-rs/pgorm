@@ -15670,6 +15670,20 @@ children (
                 kind @note
                 text "Found by python-model-created-multirange (scalar-kinds-shared branch): the filing note was wrong that JavaScript's models decode a created multirange. A probe shows an insert succeeds but returning().one() and find().all() throw DecodeError \"the type is not supported\". Give pgorm-napi's model decode what Python's got: project the column cast to text as ColumnTrait::select_as does, read it back as a Multirange of the declared subtype (DecodeError for text it cannot parse), with live tests of insert-returning, NULL, a filter, find_by_key, a change terminal and a graph read."
             }
+
+            {
+                at 2026-11-01T03:07:25.737224Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-11-01T09:30:18.336131Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Built: pgorm-napi's model statements project a CreatedMultirange field cast to text (model-shape.js projected(), used by the SELECT, RETURNING, the update/upsert version lists and model graphs), model-decode.js holds that column to text and reads it through a new native modelReadText(kind, text) (src/models/mod.rs), which reads the text as a Multirange of the declared subtype through write::plain, text the subtype does not read a DecodeError. bindings.model-records+1 states the text read for both bindings (Python's python-model-created-multirange did the same without a rule); annotations re-pinned in both. Live test in tests/models.test.ts: insert-returning, NULL, a filter (through a Value: a model column's comparison types take no bare Range or Multirange, a typing gap left as it was), find_by_key, the i64-subtype DecodeError, returningChange and a graph read."
+            }
         )
     }
 
