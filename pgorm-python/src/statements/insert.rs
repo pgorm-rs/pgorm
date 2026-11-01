@@ -57,11 +57,13 @@ impl PyInsert {
         }
     }
 
+    // [spec:pgorm:req:bindings.writes+1]
+    /// The distinct columns the rows fill, named once, before any row.
     #[pyo3(signature = (*columns))]
     fn columns(&self, columns: &Bound<'_, PyTuple>) -> PyResult<Self> {
-        if self.rows != Rows::None {
+        if self.rows != Rows::None || !self.columns.is_empty() {
             return Err(ConstructionError::new_err(
-                "insert columns must be chosen before rows",
+                "an insert names its columns once, before any row",
             ));
         }
         let mut names = HashSet::new();

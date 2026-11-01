@@ -202,6 +202,25 @@ test("a write that cannot run is refused before anything is sent", async () => {
   assert.equal(await pool().execute(deleteFrom(account).allRows()), 1);
 });
 
+// [spec:pgorm:req:bindings.statements/test]
+// [spec:pgorm:req:bindings.write-ctes/test]
+test("a write that could not run is refused as a WITH clause reads it", () => {
+  const ids = select(col("id")).from(account);
+  const cannot = [
+    [insert(account), /INSERT needs rows/],
+    [insert(account).columns("id"), /INSERT needs rows/],
+    [update(account).set("name", "x"), /UPDATE needs where/],
+    [update(account).allRows(), /at least one set/],
+    [deleteFrom(account), /DELETE needs where/],
+  ] as const;
+  for (const [write, reason] of cannot) {
+    assert.throws(() => new With("w", write), refused(reason));
+    assert.throws(() => new With("w", ids).cte("v", write), refused(reason));
+  }
+  const runnable = new With("w", deleteFrom(account).where(col("id").eq(1)).returning([col("id")]));
+  assert.match(select().from(new Table("w")).with(runnable).inspect().sql, /^WITH "w" AS \(DELETE FROM/);
+});
+
 // [spec:pgorm:req:bindings.writes+1/test]
 // [spec:pgorm:req:bindings.argument-errors+1/test]
 // [spec:pgorm:req:bindings.write-sources/test]
@@ -212,6 +231,7 @@ test("shapes an INSERT, an UPDATE or a conflict cannot take are refused as they 
   assert.throws(() => (insert(account).columns as () => unknown).call(insert(account)), refused(/defaultValues/));
   assert.throws(() => insert(account).columns("a").values(1, 2), refused(/mismatch: 1 != 2/));
   assert.throws(() => insert(account).columns("a").values(1).columns("b"), refused(/once, before any row/));
+  assert.throws(() => insert(account).columns("a").columns("b"), refused(/once, before any row/));
   assert.throws(() => insert(account).columns("a", "b").select(select(col("x"))), refused(/mismatch: 2 != 1/));
   assert.throws(() => insert(account).columns("a").values(1).defaultValues(), refused(/mixes with neither/));
   assert.throws(() => insert(account).defaultValues().columns("a"), refused(/once, before any row/));

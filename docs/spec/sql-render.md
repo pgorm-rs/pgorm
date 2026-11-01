@@ -734,12 +734,12 @@ an ideal Postgres renderer would emit.
 
 ## CTEs
 
-> [spec:pgorm:req:sql.render.cte+4]
+> [spec:pgorm:req:sql.render.cte+5]
 > A `WithClause` renders `WITH ` followed by its comma-separated common table
 > expressions; a `RecursiveWithClause` renders `WITH RECURSIVE ` followed by the
 > single one it holds. Each CTE renders as: quoted table name; optional
 > ` ("col", …)` column list; ` AS `; optional materialization hint
-> (` MATERIALIZED ` or `NOT MATERIALIZED `); then the parenthesized
+> (`MATERIALIZED ` or `NOT MATERIALIZED `); then the parenthesized
 > sub-statement followed by a trailing space — so the separator between two CTEs
 > reads `) , ` rather than `), `. For the recursive form the options render
 > after the CTE: `SEARCH BREADTH FIRST BY ` / `SEARCH DEPTH FIRST BY ` expr

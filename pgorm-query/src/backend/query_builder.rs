@@ -896,7 +896,7 @@ impl QueryBuilder {
         }
     }
 
-    // [spec:pgorm:req:sql.render.cte+4]
+    // [spec:pgorm:req:sql.render.cte+5]
     pub(crate) fn prepare_with_clause(&self, with_clause: &AnyWithClause, sql: &mut dyn SqlWriter) {
         match with_clause {
             AnyWithClause::Plain(plain) => self.prepare_plain_with_clause(plain, sql),
@@ -985,13 +985,10 @@ impl QueryBuilder {
         cte: &CommonTableExpression,
         sql: &mut dyn SqlWriter,
     ) {
-        if let Some(materialized) = cte.materialized {
-            write!(
-                sql,
-                "{} MATERIALIZED ",
-                if materialized { "" } else { "NOT" }
-            )
-            .unwrap()
+        match cte.materialized {
+            Some(true) => write!(sql, "MATERIALIZED ").unwrap(),
+            Some(false) => write!(sql, "NOT MATERIALIZED ").unwrap(),
+            None => {}
         }
     }
 

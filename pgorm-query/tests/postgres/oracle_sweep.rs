@@ -272,7 +272,7 @@ fn sweep_union_and_locking_shapes() {
 }
 
 // [spec:pgorm:req:sql.render.oracle+4/test]    common table expressions
-// [spec:pgorm:req:sql.render.cte+4/test]
+// [spec:pgorm:req:sql.render.cte+5/test]
 #[test]
 fn sweep_cte_shapes() {
     let named = |name: &str| {

@@ -1358,6 +1358,8 @@ assertions (
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id view-check-dedup, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:16:21.425085Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
+    {id python-conflict-merge-shapes, kind @doing, author "brendan@necessary.nu", at 2026-11-01T03:07:16.603624Z}
+    {id binding-statement-defects, kind @doing, author "brendan@necessary.nu", at 2026-11-01T03:07:24.696175Z}
 )
 
 impl_evidence (

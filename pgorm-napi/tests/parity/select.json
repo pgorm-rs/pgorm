@@ -88,7 +88,7 @@
     "values": []
   },
   "with": {
-    "sql": "WITH \"recent\" (\"id\") AS  MATERIALIZED (SELECT \"id\" FROM \"t\" WHERE \"at\" > $1) , \"older\" AS NOT MATERIALIZED (SELECT \"id\" FROM \"recent\") SELECT * FROM \"older\"",
+    "sql": "WITH \"recent\" (\"id\") AS MATERIALIZED (SELECT \"id\" FROM \"t\" WHERE \"at\" > $1) , \"older\" AS NOT MATERIALIZED (SELECT \"id\" FROM \"recent\") SELECT * FROM \"older\"",
     "values": [["i64","1"]]
   },
   "with-recursive": {

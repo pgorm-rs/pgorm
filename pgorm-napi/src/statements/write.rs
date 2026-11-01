@@ -65,25 +65,45 @@ pub(crate) struct Delete {
     guarded: bool,
 }
 
-/// The SQL and values a write builds, or why it cannot run.
+impl Insert {
+    pub(crate) fn check(&self) -> Result<(), &'static str> {
+        match self.rows {
+            Rows::None => Err("an INSERT needs rows: values(..), select(..) or defaultValues()"),
+            _ => Ok(()),
+        }
+    }
+}
+
+impl Update {
+    pub(crate) fn check(&self) -> Result<(), &'static str> {
+        if self.inner.get_values().is_empty() {
+            Err("an UPDATE needs at least one set(column, value)")
+        } else if !self.guarded {
+            Err("an UPDATE needs where(..), or allRows() to say it means every row")
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl Delete {
+    pub(crate) fn check(&self) -> Result<(), &'static str> {
+        if self.guarded {
+            Ok(())
+        } else {
+            Err("a DELETE needs where(..), or allRows() to say it means every row")
+        }
+    }
+}
+
+/// The SQL and values a write builds, or why it cannot run: its `check()`,
+/// which a WITH clause reading the write as a body refuses it by too.
 // [spec:pgorm:req:bindings.writes+1]
 pub(crate) fn built(node: &Node) -> Option<Result<(String, Values), &'static str>> {
     Some(match node {
-        Node::Insert(insert) if insert.rows == Rows::None => {
-            Err("an INSERT needs rows: values(..), select(..) or defaultValues()")
-        }
-        Node::Insert(insert) => Ok(insert.inner.build()),
-        Node::Update(update) if update.inner.get_values().is_empty() => {
-            Err("an UPDATE needs at least one set(column, value)")
-        }
-        Node::Update(update) if !update.guarded => {
-            Err("an UPDATE needs where(..), or allRows() to say it means every row")
-        }
-        Node::Update(update) => Ok(update.inner.build()),
-        Node::Delete(delete) if !delete.guarded => {
-            Err("a DELETE needs where(..), or allRows() to say it means every row")
-        }
-        Node::Delete(delete) => Ok(delete.inner.build()),
+        Node::Insert(insert) => insert.check().map(|()| insert.inner.build()),
+        Node::Update(update) => update.check().map(|()| update.inner.build()),
+        Node::Delete(delete) => delete.check().map(|()| delete.inner.build()),
         _ => return None,
     })
 }

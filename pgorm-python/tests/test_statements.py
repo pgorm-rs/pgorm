@@ -95,6 +95,7 @@ class StatementTests(unittest.TestCase):
         with self.assertRaises(ConstructionError):
             base.inspect()
 
+    # [spec:pgorm:req:bindings.writes+1/test]
     def test_insert_rejects_incomplete_or_inconsistent_shapes(self):
         table = Table("account")
         for build in [lambda: insert(table).inspect(),
@@ -103,6 +104,8 @@ class StatementTests(unittest.TestCase):
                       lambda: insert(table).columns(),
                       lambda: insert(table).columns("id").values(1, 2),
                       lambda: insert(table).columns("id").values(1).columns("name"),
+                      lambda: insert(table).columns("id").columns("name"),
+                      lambda: insert(table).default_values().columns("id"),
                       lambda: insert(table).columns("id").default_values(),
                       lambda: insert(table).default_values().values()]:
             with self.assertRaises(ConstructionError):
