@@ -15010,6 +15010,14 @@ children (
                 kind @note
                 text "Spec split 2026-11-01: bindings.writes+1 keeps values / default_values, a column arbiter with its partial-index predicate, the assignment and guard refusals and RETURNING; bindings.merge+1 keeps a table source; bindings.with+1 keeps named CTEs in call order with Select and MERGE bodies, on SELECT and MERGE. The parts Python lacked are five rules of their own: bindings.write-sources (INSERT .. SELECT, OVERRIDING, UPDATE .. FROM, DELETE .. USING), bindings.conflict-arbiters (index expressions beside columns, on_constraint(name) taking no predicate), bindings.merge-sources (any FROM item as a MERGE's source), bindings.write-ctes (WITH on INSERT, UPDATE and DELETE, and a write with RETURNING as a CTE body) and bindings.cte-options (column lists, MATERIALIZED, WITH RECURSIVE with SEARCH and CYCLE, a second CTE in a recursive clause and a recursive clause before a MERGE refused). Python claims the five here; JavaScript's side (pgorm-napi src/statements write.rs, conflict.rs, merge.rs, with.rs, lib writes/conflicts/merge/select and their tests and parity files) is claimed by binding-spec-consolidation. Python spells SEARCH and CYCLE as Search(order, by, set) and Cycle(by, set, using) with the closed choice SearchOrder, the values of With.recursive's search= and cycle= options, where JavaScript passes options objects; the three are python.only in bindings-surface.json."
             }
+
+            {
+                at 2026-11-01T12:27:12.115382Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-read after bindings.writes and bindings.merge moved to +2 (python-conflict-merge-shapes, 938680a4): conflict targets are now named with Conflict.on and MERGE actions with MergeAction's factories, a write a WITH clause reads is refused as it could not run, and columns are named once; Python's write sources, write CTEs and merge sources this node built are unchanged by it, and every reference is pinned at the current version."
+                after_done true
+            }
         )
     }
 
