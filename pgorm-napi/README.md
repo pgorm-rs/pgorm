@@ -492,7 +492,7 @@ await pool.query(select().from(new Table("booking"))
   `strictlyRightOf` (`>>`), `notExtendRightOf` (`&<`), `notExtendLeftOf`
   (`&>`) and `adjacentTo` (`-|-`) over ranges and multiranges. A range binds
   as a `Value` naming its kind — a built-in one or a `CreatedRange` — never
-  inferred.
+  inferred, unless a model's column, whose kind is declared, takes it.
 - **Regular expressions, text search and JSON paths**: `regex` (`~`),
   `notRegex` (`!~`), `iregex` (`~*`) and `notIregex` (`!~*`) match POSIX
   regular expressions, the pattern bound unless it is an expression.
@@ -575,8 +575,9 @@ const pages = Account.find().orderBy(Account.col("id").asc()).paginate(50);
   `orderBy`, `limit`, `offset`, and `join(relation)` to filter on a related
   row; `all`, `one`, `optional`, `count` on a pool, connection or
   transaction, and `stream` on a pool or connection. `col(field)` compares
-  through the field's kind — an enum's label binds cast to its type — and
-  refuses `null`, which `isNull()` tests.
+  through the field's kind — an enum's label binds cast to its type, and a
+  range or multirange field takes a `Range` or `Multirange` as it stands —
+  and refuses `null`, which `isNull()` tests.
 - **Writes**: a field left out stays out — the table's default on insert,
   the column unchanged on update — and one set to `null` writes NULL. An
   update or delete needs `where` or `allRows()`. `returning(..fields)` reads

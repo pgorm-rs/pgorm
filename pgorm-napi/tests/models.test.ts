@@ -305,7 +305,7 @@ test("a created multirange field is projected as its text and read as the multir
   assert.deepStrictEqual(await Slot.insert({ id: 2, open: null }).returning("open").one(pool()), { open: null });
   assert.equal((await Slot.findByKey({ id: 2 }).one(pool())).open, null);
   assert.deepStrictEqual(await Slot.findByKey({ id: 1 }).one(pool()), { id: 1, open: hours });
-  const filtered = Slot.find().where(Slot.col("open").eq(new Value(hours, kind)));
+  const filtered = Slot.find().where(Slot.col("open").eq(hours));
   assert.deepStrictEqual(await filtered.all(pool()), [{ id: 1, open: hours }]);
   // The text is read through the declared subtype, so text that subtype does
   // not read is a DecodeError, never a value of another type.

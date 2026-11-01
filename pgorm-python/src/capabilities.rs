@@ -266,7 +266,7 @@ pub(crate) fn capabilities<'py>(module: &Bound<'py, PyModule>) -> PyResult<Bound
     let mut manifest = manifest();
     let registry_object = module.getattr("_registry")?;
     let registry = registry_object.extract::<PyRef<'_, crate::entities::NativeRegistry>>()?;
-    manifest["registrations"]["entities"] = registry.0.describe()?.into();
+    manifest["registrations"]["entities"] = registry.0.describe().into();
     manifest["registrations"]["graphs"] = registry
         .0
         .graphs

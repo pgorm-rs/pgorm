@@ -39,11 +39,11 @@ pub struct PyValue {
 
 impl PyValue {
     /// Wrap a Rust value without changing its variant or payload.
-    pub fn from_rust(inner: Value) -> PyResult<Self> {
-        Ok(Self {
+    pub fn from_rust(inner: Value) -> Self {
+        Self {
             tag: types::rust_tag(&inner),
             inner,
-        })
+        }
     }
 
     /// Borrow the value for Rust builder and parameter APIs.
@@ -200,9 +200,9 @@ impl PyValue {
 
     #[staticmethod]
     fn json(value: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Self::from_rust(Value::Json(Some(Box::new(
+        Ok(Self::from_rust(Value::Json(Some(Box::new(
             json::from_python(value, 0).map_err(construction_error)?,
-        ))))
+        )))))
     }
 
     #[staticmethod]
@@ -278,12 +278,8 @@ impl PyValue {
         json::to_python(py, &snapshot::encode(self)?)
     }
 
-    fn __repr__(&self) -> PyResult<String> {
-        Ok(format!(
-            "Value(kind={:?}, is_null={})",
-            self.kind(),
-            self.is_null()
-        ))
+    fn __repr__(&self) -> String {
+        format!("Value(kind={:?}, is_null={})", self.kind(), self.is_null())
     }
 }
 
