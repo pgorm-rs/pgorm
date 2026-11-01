@@ -8,7 +8,8 @@
 // [spec:pgorm:req:bindings.select+2]
 // [spec:pgorm:req:bindings.from-subqueries]
 // [spec:pgorm:req:bindings.row-locks]
-// [spec:pgorm:req:bindings.with]
+// [spec:pgorm:req:bindings.with+1]
+// [spec:pgorm:req:bindings.cte-options]
 
 import type { Aliased, Builder, Expr, OrderBy, Predicate } from "./expressions.d.ts";
 import type { Merge } from "./merge.d.ts";

@@ -491,7 +491,8 @@ test("a locking read takes its rows' locks, OF an aliased schema-qualified table
   });
 });
 
-// [spec:pgorm:req:bindings.with/test]
+// [spec:pgorm:req:bindings.with+1/test]
+// [spec:pgorm:req:bindings.cte-options/test]
 test("common table expressions, recursive ones with SEARCH and CYCLE included, run", async () => {
   const clicks = new With("clicks", select(event.col("account_id")).from(event).where(event.col("kind").eq("click")), {
     columns: ["who"],

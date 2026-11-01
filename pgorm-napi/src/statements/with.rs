@@ -22,7 +22,9 @@ pub(super) const EXPORTS: &[(&str, super::Build)] = &[
 /// The common table expression at `index`: its name, its body — whose rows
 /// are a `Select`'s, or a write's RETURNING rows — its column names and its
 /// materialization.
-// [spec:pgorm:req:bindings.with]
+// [spec:pgorm:req:bindings.with+1]
+// [spec:pgorm:req:bindings.write-ctes]
+// [spec:pgorm:req:bindings.cte-options]
 fn expression<'cx>(
     cx: &mut FunctionContext<'cx>,
     index: usize,
@@ -69,6 +71,7 @@ fn with_new(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `withCte(clause, name, body, columns, materialized)`: one more common
 /// table expression, after the clause's others; a recursive clause holds
 /// exactly one.
+// [spec:pgorm:req:bindings.cte-options]
 fn with_cte(cx: &mut FunctionContext) -> NeonResult<Node> {
     let Node::With(AnyWithClause::Plain(mut clause)) = this(cx, 0)? else {
         return refuse(
@@ -84,7 +87,8 @@ fn with_cte(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `withRecursive(name, body, columns, materialized, search, cycle)`:
 /// `WITH RECURSIVE`, with `SEARCH BREADTH | DEPTH FIRST BY expr SET name`
 /// and `CYCLE expr SET name USING name` when they are given.
-// [spec:pgorm:req:bindings.with]
+// [spec:pgorm:req:bindings.with+1]
+// [spec:pgorm:req:bindings.cte-options]
 fn with_recursive(cx: &mut FunctionContext) -> NeonResult<Node> {
     let expression = expression(cx, 0)?;
     let mut clause = RecursiveWithClause::new(expression);

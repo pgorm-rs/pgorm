@@ -60,6 +60,15 @@ impl PyOverriding {
     }
 }
 
+impl PyOverriding {
+    pub(super) fn rust(&self) -> Overriding {
+        match self {
+            Self::SystemValue => Overriding::SystemValue,
+            Self::UserValue => Overriding::UserValue,
+        }
+    }
+}
+
 /// `UPDATE SET column = value, ..` for a target row.
 #[pyclass(name = "MergeUpdate", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -123,12 +132,8 @@ impl PyMergeInsert {
 
     /// `OVERRIDING SYSTEM VALUE` or `OVERRIDING USER VALUE`; the last call wins.
     fn overriding(&self, overriding: PyOverriding) -> Self {
-        let overriding = match overriding {
-            PyOverriding::SystemValue => Overriding::SystemValue,
-            PyOverriding::UserValue => Overriding::UserValue,
-        };
         Self {
-            inner: self.inner.clone().overriding(overriding),
+            inner: self.inner.clone().overriding(overriding.rust()),
         }
     }
 

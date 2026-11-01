@@ -18,7 +18,7 @@ use crate::{errors::ConstructionError, expressions::Compiled};
 type Arg<'a, 'py> = &'a Bound<'py, PyAny>;
 type Opt<'a, 'py> = Option<&'a Bound<'py, PyAny>>;
 
-// [spec:pgorm:req:bindings.merge]
+// [spec:pgorm:req:bindings.merge+1]
 /// `MERGE INTO target USING source ON condition` before its first WHEN arm.
 #[pyclass(name = "PendingMerge", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -27,6 +27,7 @@ pub struct PyPendingMerge {
 }
 
 // [spec:pgorm:req:bindings.from-subqueries]
+// [spec:pgorm:req:bindings.merge-sources]
 /// Begin a MERGE. Its source is a `Table` or any FROM item, a query made one
 /// by `Select.as_` among them.
 #[pyfunction]
@@ -165,10 +166,11 @@ impl PyMerge {
         next
     }
 
-    fn with_(&self, clause: PyRef<'_, PyWith>) -> Self {
+    // [spec:pgorm:req:bindings.cte-options]
+    fn with_(&self, clause: PyRef<'_, PyWith>) -> PyResult<Self> {
         let mut next = self.clone();
-        next.inner.with(clause.inner.clone());
-        next
+        next.inner.with(clause.plain()?);
+        Ok(next)
     }
 
     fn only(&self) -> Self {

@@ -11,7 +11,7 @@ def quoted(name):
     return '"' + name.replace('"', '""') + '"'
 
 
-# [spec:pgorm:req:bindings.merge/test]
+# [spec:pgorm:req:bindings.merge+1/test]
 class MergeTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -117,6 +117,7 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.final(), [(1, "one", 10), (2, "two", 50), (3, "three", 30)])
 
     # [spec:pgorm:req:bindings.from-subqueries/test]
+    # [spec:pgorm:req:bindings.merge-sources/test]
     async def test_a_subquery_is_a_source(self):
         t = self.target
         staged = (p.Select(p.col("id"), p.col("name")).from_(p.Table(self.source_name))
@@ -181,8 +182,8 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(hasattr(pending, "inspect"))
 
 
-# [spec:pgorm:req:bindings.writes/test]
-# [spec:pgorm:req:bindings.merge/test]
+# [spec:pgorm:req:bindings.writes+1/test]
+# [spec:pgorm:req:bindings.merge+1/test]
 class ReturningVersionTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)

@@ -2393,17 +2393,23 @@ impl_evidence (
         {impl_name python, rule bindings.row-locks}
     )}
     {id python-statement-gaps, covered_rules (
+        bindings.conflict-arbiters
+        bindings.cte-options
         bindings.merge
+        bindings.merge-sources
         bindings.with
+        bindings.write-ctes
+        bindings.write-sources
         bindings.writes
     ), covered_claims (
+        {impl_name python, rule bindings.conflict-arbiters}
+        {impl_name python, rule bindings.cte-options}
         {impl_name python, rule bindings.merge}
+        {impl_name python, rule bindings.merge-sources}
         {impl_name python, rule bindings.with}
+        {impl_name python, rule bindings.write-ctes}
+        {impl_name python, rule bindings.write-sources}
         {impl_name python, rule bindings.writes}
-    ), rule_versions_seen (
-        {id bindings.merge, version 0}
-        {id bindings.with, version 0}
-        {id bindings.writes, version 0}
     )}
     {id python.acceptance, covered_rules (
         python.acceptance

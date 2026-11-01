@@ -22,6 +22,8 @@ mod tests;
 mod window;
 mod with;
 mod write;
+#[cfg(test)]
+mod write_tests;
 
 pub(crate) use capabilities::operations as capabilities;
 pub(crate) use common::condition;
@@ -48,7 +50,7 @@ pub use window::{
     PyExtendedWindow, PyFrame, PyFrameCurrentRow, PyFrameExclusion, PyFrameFollowing,
     PyFramePreceding, PyFrameType, PyWindow, PyWindowFunction, PyWindowed,
 };
-pub use with::{PyReturningRow, PyWith};
+pub use with::{PyCycle, PyReturningRow, PySearch, PySearchOrder, PyWith};
 pub use write::{PyDelete, PyUpdate};
 
 /// Prepare the same validated builder state exposed by Python's inspection API.
@@ -126,6 +128,9 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyNotMatchedAction>()?;
     module.add_class::<PyOverriding>()?;
     module.add_class::<PyWith>()?;
+    module.add_class::<PySearchOrder>()?;
+    module.add_class::<PySearch>()?;
+    module.add_class::<PyCycle>()?;
     module.add_class::<PyReturningRow>()?;
     module.add_function(wrap_pyfunction!(merge::merge, module)?)?;
     Ok(())

@@ -136,6 +136,7 @@ pub(crate) fn check(file: &str, built: Vec<(&str, (String, Values))>) {
 
 // [spec:pgorm:req:bindings.select+2/test]
 // [spec:pgorm:req:bindings.expressions+2/test]
+// [spec:pgorm:req:bindings.cte-options/test]
 #[test]
 fn select_family_matches_its_golden_file() {
     check(
@@ -144,7 +145,10 @@ fn select_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:bindings.writes/test]
+// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.write-sources/test]
+// [spec:pgorm:req:bindings.conflict-arbiters/test]
+// [spec:pgorm:req:bindings.write-ctes/test]
 #[test]
 fn writes_family_matches_its_golden_file() {
     check(
@@ -153,7 +157,8 @@ fn writes_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:bindings.merge/test]
+// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge-sources/test]
 #[test]
 fn merge_family_matches_its_golden_file() {
     check(

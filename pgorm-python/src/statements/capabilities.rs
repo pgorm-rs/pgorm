@@ -121,6 +121,12 @@ pub(crate) fn operations() -> Map<String, Value> {
         ),
         ("insert.columns", "pgorm_query::InsertStatement::columns"),
         ("insert.values", "pgorm_query::InsertStatement::values"),
+        ("insert.select", "pgorm_query::InsertStatement::select_from"),
+        (
+            "insert.overriding",
+            "pgorm_query::InsertStatement::overriding, Overriding",
+        ),
+        ("insert.with_", "pgorm_query::InsertStatement::with"),
         (
             "insert.default_values",
             "pgorm_query::InsertStatement::or_default_values",
@@ -140,6 +146,8 @@ pub(crate) fn operations() -> Map<String, Value> {
         ),
         ("update.set", "pgorm_query::UpdateStatement::value"),
         ("update.where", "pgorm_query::UpdateStatement::cond_where"),
+        ("update.from_", "pgorm_query::UpdateStatement::from, FromItem"),
+        ("update.with_", "pgorm_query::UpdateStatement::with"),
         (
             "update.all_rows",
             "pgorm_query::UpdateStatement with explicit unrestricted intent",
@@ -154,6 +162,8 @@ pub(crate) fn operations() -> Map<String, Value> {
             "pgorm_query::Query::delete, DeleteStatement::from_table",
         ),
         ("delete.where", "pgorm_query::DeleteStatement::cond_where"),
+        ("delete.using", "pgorm_query::DeleteStatement::using, FromItem"),
+        ("delete.with_", "pgorm_query::DeleteStatement::with"),
         (
             "delete.all_rows",
             "pgorm_query::DeleteStatement with explicit unrestricted intent",
@@ -166,7 +176,11 @@ pub(crate) fn operations() -> Map<String, Value> {
         ("conflict.do_nothing", "pgorm_query::OnConflict::do_nothing"),
         (
             "conflict.target",
-            "pgorm_query::OnConflict::column, ConflictTarget::and_column",
+            "pgorm_query::OnConflict::{column, expr}, ConflictTarget::{and_column, and_expr}",
+        ),
+        (
+            "conflict.on_constraint",
+            "pgorm_query::OnConflict::constraint, ConflictConstraint::{do_nothing, update_column, value}",
         ),
         (
             "conflict.target.where",
@@ -225,7 +239,11 @@ pub(crate) fn operations() -> Map<String, Value> {
         ),
         (
             "with",
-            "pgorm_query::WithClause::{new, cte}, CommonTableExpression::new",
+            "pgorm_query::WithClause::{new, cte}, CommonTableExpression::{new, column, materialized}",
+        ),
+        (
+            "with.recursive",
+            "pgorm_query::RecursiveWithClause::{new, search, cycle}, Search::new, SearchOrder, Cycle::new",
         ),
         ("merge", "pgorm_query::Query::merge, PendingMerge, FromItem"),
         (

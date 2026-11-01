@@ -175,7 +175,8 @@ from ._writes import (
 from ._merge import (
     MatchedAction as MatchedAction, NotMatchedAction as NotMatchedAction, Overriding as Overriding,
     MergeUpdate as MergeUpdate, MergeInsert as MergeInsert, PendingMerge as PendingMerge,
-    Merge as Merge, With as With, ReturningRow as ReturningRow, merge as merge,
+    Merge as Merge, With as With, SearchOrder as SearchOrder, Search as Search, Cycle as Cycle,
+    ReturningRow as ReturningRow, merge as merge,
 )
 from ._copy import (
     CopyFrom as CopyFrom, CopyTo as CopyTo, _CopyIn as _CopyIn, _CopyOut as _CopyOut,

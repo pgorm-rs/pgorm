@@ -354,9 +354,15 @@ remain selectable on writes.
 
 INSERT columns are distinct identifiers and must be chosen before adding rows.
 Each `values(*items)` call adds one row using Rust's fallible arity check.
-An insert with no rows raises an error; `default_values()` explicitly requests
-one default row through Rust's `or_default_values`. It cannot be mixed with
-columns or ordinary rows. Its current PostgreSQL spelling is `VALUES (DEFAULT)`.
+`select(query)` takes the rows a `Select` of as many columns yields instead,
+through Rust's `select_from`, and mixes with no other rows; the query's tie
+limit and windows are checked as it is read. An insert with no rows raises an
+error; `default_values()` explicitly requests one default row through Rust's
+`or_default_values`. It cannot be mixed with columns or ordinary rows. Its
+current PostgreSQL spelling is `VALUES (DEFAULT)`.
+`overriding(Overriding.SystemValue)` writes a supplied value into an
+`ALWAYS` identity column, and `Overriding.UserValue` discards one for the
+generated value; the last call wins.
 
 UPDATE requires at least one assignment. Duplicate assignments raise an error.
 UPDATE and DELETE require a `.where(...)` call or explicit `.all_rows()` before
@@ -364,6 +370,11 @@ inspection/execution preparation. A predicate can intentionally be true: this
 guard requires authored intent and does not prove that a query affects few rows.
 `.all_rows()` permits a statement without a predicate; it does not remove an
 existing predicate.
+
+`update.from_(item)` and `delete.using(item)` read further sources, a `Table`
+or a `FromItem` each, as a SELECT's `from_` does: `UPDATE .. FROM` and
+`DELETE .. USING`. `insert`, `update` and `delete` each take
+`.with_(With(..))`, the last call winning.
 
 `.returning(*items)` accepts expressions and projection aliases. With no items
 it requests `RETURNING *`. It replaces the previous RETURNING clause through
@@ -397,6 +408,36 @@ would otherwise take the keyword silently. A renamed version no longer answers
 to the keyword (`42P01`), a name that clashes with one of the statement's
 relations is refused (`42712`), and so is one name for both versions. The
 names are identifiers, quoted.
+
+## Common table expressions
+
+`With(name, query, columns=[..], materialized=..)` holds its first common
+table expression and `.cte(name, query, ..)` appends another, which may read
+the ones before it. A body is a `Select`, or an `Insert`, `Update`, `Delete`
+or `Merge` whose rows are those its RETURNING list yields; a write that could
+not run (no rows, no assignment, or neither `where` nor `all_rows()`) raises
+`ConstructionError` as the clause reads it, as a `Select`'s tie limit does.
+`columns` names the expression's columns, and `materialized=True` or `False`
+writes `MATERIALIZED` or `NOT MATERIALIZED`.
+
+```python
+from pgorm import Cycle, Search, SearchOrder, Select, Table, TypeName, With, bind, col
+
+one = bind(1).cast(TypeName("int4"))
+body = Select(one.as_("n")).union_all(
+    Select(col("n") + one).from_(Table("r")).where(col("n") < 5))
+counting = With.recursive("r", body, columns=["n"],
+                          search=Search(SearchOrder.Breadth, col("n"), "ord"),
+                          cycle=Cycle(col("n"), "looped", "path"))
+query = Select(col("n")).from_(Table("r")).order_by(col("ord").asc()).with_(counting)
+```
+
+`With.recursive(name, select, ..)` writes `WITH RECURSIVE` over exactly one
+expression, whose body is a `Select`; `.cte` on it raises `ConstructionError`.
+`search=Search(order, by, set)` adds `SEARCH BREADTH FIRST` or `DEPTH FIRST BY
+by SET set`, and `cycle=Cycle(by, set, using)` adds `CYCLE by SET set USING
+using`. A MERGE takes no recursive clause, which PostgreSQL refuses, so
+`merge.with_` raises `ConstructionError` for one.
 
 ## MERGE
 
@@ -460,8 +501,11 @@ merge))` reads the rows its RETURNING list yields. A value in a CTE's own
 ## Conflict actions
 
 `Conflict.do_nothing()` selects Rust's untargeted `ON CONFLICT DO NOTHING`.
-`ConflictTarget(*columns)` requires a nonempty target and preserves the Rust
-target/action states:
+`ConflictTarget(*targets)` requires a nonempty inference target of column
+names and index expressions (`call("lower", col("email"))`), and
+`Conflict.on_constraint(name)` names a constraint outright, `ON CONSTRAINT`,
+which takes no predicate: its `.where` raises `ConstructionError`. Both
+preserve the Rust target/action states:
 
 | Operation | Rust API |
 | --- | --- |
