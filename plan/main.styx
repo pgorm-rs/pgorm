@@ -14915,6 +14915,14 @@ children (
                 kind @decision
                 text "Operator 2026-10-31: \"do all those things\", on three shapes under decision (7). (A) Python's one ModelWrite becomes ModelInsert, ModelUpdate and ModelDelete as JavaScript's are, each with only its own methods, and ModelWrite is deleted. (B) Column.validate and Column.value become private, and Column.describe and EntityColumn.describe are deleted, a column's details read through Model.describe() and Entity.describe() as JavaScript reads them. (C) Python's DDL builders are made only by their factory functions (create_table, alter_table and the rest), as JavaScript's are and as Python's Expr is made only by col() and bind(); the classes stay for annotations and isinstance but cannot be called."
             }
+
+            {
+                at 2026-11-01T01:19:24.94103Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-read after bindings.argument-errors moved to +1 (python-case-expressions merge, 82bebaed): its example of a misplaced quantifier now defers to bindings.quantifiers, as JavaScript's quantified operators do; every reference is pinned at +1."
+                after_done true
+            }
         )
     }
 
