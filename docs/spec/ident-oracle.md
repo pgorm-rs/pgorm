@@ -224,7 +224,7 @@ the modules under `tests/identifier_oracle/`.
 >
 > - `PipelineError::UnquotableIdentifier`, for any identifier carrying `"` or
 >   NUL, beginning with `$`, or equal to `*`. This is pgorm's screen, which
->   runs before prqlc is called (`[spec:pgorm:req:pipeline.errors+4]`). The
+>   runs before prqlc is called (`[spec:pgorm:req:pipeline.errors]`). The
 >   corpus hits it with every quote-bearing name, `$1`, `$$`, `$tag$` and
 >   `*`.
 > - `PipelineError::ReservedAlias`, for an alias PRQL reserves. The corpus

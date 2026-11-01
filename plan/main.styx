@@ -13141,6 +13141,7 @@ children (
         title "Rule text cites other rules without a version pin, so a bump does not leave stale numbers in prose"
         kind @docs
         deps (domain-enum-predicates binding-spec-consolidation)
+        sealed true
         log (
             {
                 at 2026-10-19T07:41:29.162922Z
@@ -13175,6 +13176,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "Also (2026-10-26): pipeline.surface does not list compares_as or Named::col yet (pipeline-untyped-enum-casts); add them in the same pass if its text is touched."
+            }
+
+            {
+                at 2026-11-01T14:08:08.271095Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -13559,6 +13567,7 @@ children (
         title "The tie-limit and window rules name the view constructors among the places their checks run"
         kind @docs
         deps (rust-view-body-check)
+        sealed true
         log (
             {
                 at 2026-10-19T12:38:40.801421Z
@@ -13579,6 +13588,13 @@ children (
                 author "brendan@necessary.nu"
                 kind @note
                 text "check-clauses-shared (f72f55ea) bumped sql.ast.select.tie-limit to +2: it now names check_clauses as the one check every executor, both bindings, a stored definition's body and a COPY TO's source call. The tie-limit half of this node is done by that text; sql.ast.window-statement (+8) still names only the executors and the bindings."
+            }
+
+            {
+                at 2026-11-01T14:08:08.366707Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Done (nplan complete)"
             }
         )
     }

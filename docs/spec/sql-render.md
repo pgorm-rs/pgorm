@@ -69,7 +69,7 @@ an ideal Postgres renderer would emit.
 > query keyword opens a statement whether it begins the render bare or
 > follows its opening parentheses: the grammar lets a statement begin with
 > `(` only as a parenthesised query, which is how a grouped set operation's
-> render begins (`[spec:pgorm:sem:sql.ast.select.union+2]`), and a bare
+> render begins (`[spec:pgorm:sem:sql.ast.select.union]`), and a bare
 > `VALUES` or `TABLE` query, which no builder renders today, is a statement
 > the shim parses the day one does.
 > Rendered fragments that are not whole statements — a parenthesised operand,
@@ -150,7 +150,7 @@ an ideal Postgres renderer would emit.
 > A pin names a type the value can be *bound* as, not necessarily the type its
 > own `ToSql` impl would name: `TinyInt` pins to `int2` — rather than to the
 > one-byte `"char"` an `i8` binds as by default — because the numeric coercion
-> of `[spec:pgorm:req:exec.cursor.binding-coerce+2]` widens it, and because
+> of `[spec:pgorm:req:exec.cursor.binding-coerce]` widens it, and because
 > `CAST($1::int2 AS text)` yields the digits of the number where
 > `CAST($1::"char" AS text)` would yield the character with that code point.
 > `Unsigned` pins to `int8` rather than `oid` for the same reason. The one
@@ -266,7 +266,7 @@ an ideal Postgres renderer would emit.
 > datetime `%Y-%m-%d %H:%M:%S%.f %:z`, always at `+00:00` because the value
 > carries an instant rather than an offset. Sub-second digits are kept, to the
 > microsecond PostgreSQL stores and the parameter path binds
-> (`sql.value.render+2`); `%.f` omits the fraction and its dot when it is zero,
+> (`sql.value.render`); `%.f` omits the fraction and its dot when it is zero,
 > so a whole second renders as it would without the directive. A format
 > string MUST NOT name a field its value lacks: an unfillable directive is
 > written through into the rendered text rather than refused. `Uuid`,
@@ -289,7 +289,7 @@ an ideal Postgres renderer would emit.
 > own literal, `NULL` for no bound and a bracket pair for inclusivity —
 > `int4range(1, 5, '[)')` — and the empty range as `'empty'::int4range`;
 > `Multirange(ty, Some(m))` as `ty`'s multirange constructor over those,
-> `int4multirange()` when empty (`sql.value.render+2`).
+> `int4multirange()` when empty (`sql.value.render`).
 >
 > `Keyword` expressions render as bare `NULL`, `CURRENT_DATE`, `CURRENT_TIME`,
 > or `CURRENT_TIMESTAMP` — the whole lexicon, with no caller-supplied arm.
@@ -720,13 +720,13 @@ an ideal Postgres renderer would emit.
 > (`sql.render.table-sample`). Contexts that require a plain identifier reference — DDL
 > statements, index and foreign-key targets — take a `TableName` instead, so
 > a value-bearing reference never reaches them
-> (`[spec:pgorm:sem:sql.ddl.panics+4]`).
+> (`[spec:pgorm:sem:sql.ddl.panics]`).
 >
 > `FromItem::Template` renders `(<fragment>\n) AS "alias"`. The fragment is
 > the `SqlTemplate`'s resolved segments written in order: each text segment
 > verbatim, each resolved value through the ordinary expression path, so the
 > fragment's `$N` renumber into the enclosing statement's parameter space
-> (`[spec:pgorm:req:sql.render.custom-expr+3]`). The newline before the
+> (`[spec:pgorm:req:sql.render.custom-expr]`). The newline before the
 > closing parenthesis is unconditional and load-bearing: the fragment is
 > foreign text that may end inside a `--` comment, which would otherwise
 > swallow the parenthesis. It is written here rather than required of
@@ -1063,14 +1063,14 @@ an ideal Postgres renderer would emit.
 > `SqlTemplate::from_sql(sql, values)` is the second constructor, for text
 > that is real SQL rather than a template authored for this machinery — a
 > caller's own statement, which is where relation-position fragments come
-> from (`[spec:pgorm:def:sql.types.table-ref+7]`). It differs in the `$`
+> from (`[spec:pgorm:def:sql.types.table-ref]`). It differs in the `$`
 > grammar and in nothing else: only `$N` is a substitution, and every other
 > `$` is reproduced verbatim — `$$` included, because in real SQL `$$` opens
 > a dollar-quoted body rather than standing in for a literal `$`. This is
-> the reading `[spec:pgorm:sem:sql.render.inject+3]` already does, and it is
+> the reading `[spec:pgorm:sem:sql.render.inject]` already does, and it is
 > PostgreSQL's own, since the tokenizer reads comments as space and
 > dollar-quoted and `E'…'` bodies as quoted
-> (`[spec:pgorm:sem:sql.token.limits+3]`). `MalformedPlaceholder` is
+> (`[spec:pgorm:sem:sql.token.limits]`). `MalformedPlaceholder` is
 > therefore unreachable from this constructor. Its values are `Value`s, not
 > arbitrary expressions: a `$N` in real SQL is a bind marker, and admitting
 > an expression there would turn a parameterised statement into a spliced

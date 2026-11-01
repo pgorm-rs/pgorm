@@ -10,7 +10,7 @@ explicit limitations.
 > [spec:pgorm:def:entity.traits+2]
 > The entity trait family is defined in `src/entity/` and re-exported from
 > `pgorm::entity` (`src/entity/mod.rs`). Its base identifier contract is
-> `pgorm_query::StaticName` (`[spec:pgorm:def:sql.types+9]`), re-exported from
+> `pgorm_query::StaticName` (`[spec:pgorm:def:sql.types]`), re-exported from
 > `base_entity.rs`: `SqlName + Copy + Debug + 'static` plus
 > `as_str(&self) -> &str`. There MUST be exactly one such trait in the
 > workspace. The entity layer used to declare a second of its own under a
@@ -43,7 +43,7 @@ explicit limitations.
 > way, so a raw statement reads and writes the table `find()` does and never a
 > same-named one `search_path` finds first: the `SqlName` `DeriveEntity` writes
 > answers `schema_name` as its `table_schema`, which `IntoTableName` reads
-> (`[spec:pgorm:def:sql.types.table-ref+7]`). An entity whose `SqlName` is written
+> (`[spec:pgorm:def:sql.types.table-ref]`). An entity whose `SqlName` is written
 > by hand qualifies there only if it answers `table_schema` too.
 
 > [spec:pgorm:req:entity.traits.crud+4]
@@ -109,7 +109,7 @@ explicit limitations.
 >
 > `json_key()` names the key the column occupies in a JSON object, which is a
 > different namespace from the SQL name `StaticName::as_str` gives: the `with-json`
-> conversions of `[spec:pgorm:req:entity.active-model.json+3]` deserialize through the
+> conversions of `[spec:pgorm:req:entity.active-model.json]` deserialize through the
 > entity's `Model`, so the key is the model field's name as `serde` spells it.
 > `DeriveEntityModel` MUST emit it from the field the column was derived from and the
 > `serde` renames declared on that field and its struct; the trait's default falls back
@@ -130,7 +130,7 @@ explicit limitations.
 > (the latter accepting arbitrary expressions), `identity()` /
 > `identity_by_default()` (`GENERATED ALWAYS` / `BY DEFAULT AS IDENTITY`), and
 > `generated(expr, kind)` (`GENERATED ALWAYS AS (<expr>) { STORED | VIRTUAL }`, the
-> kind a `GeneratedKind` that is always stated, `[spec:pgorm:req:sql.ddl.column-def+12]`).
+> kind a `GeneratedKind` that is always stated, `[spec:pgorm:req:sql.ddl.column-def]`).
 > `get_column_type()` and `is_null()` expose the type and nullability for introspection.
 >
 > `default` is one slot, `Option<ColumnDefault>`, holding a default expression, an
@@ -150,7 +150,7 @@ explicit limitations.
 > behave alike there; they differ in what the schema can say about them, since
 > PostgreSQL refuses a virtual column that is `unique` or `indexed` (`0A000`) — a
 > refusal the derive makes at compile time
-> (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`) and a hand-written
+> (`[spec:pgorm:sem:macros.derive.entity-model.column-def]`) and a hand-written
 > definition meets when its schema is created.
 
 > [spec:pgorm:sem:entity.traits.column.enum-cast+12]
@@ -300,7 +300,7 @@ explicit limitations.
 > its `ColumnDef` (`entity.traits.column-def`). `without_overlaps()`, `false`
 > unless a key overrides it, says the key is PostgreSQL 18's temporal key,
 > its last column the period compared for overlap where the rest are compared
-> for equality (`[spec:pgorm:req:sql.ddl.create-table+16]`). The key value is
+> for equality (`[spec:pgorm:req:sql.ddl.create-table]`). The key value is
 > still the whole key, period included, and a lookup by it is by equality:
 > equal periods overlap and an empty one is refused (`23514`), so at most one
 > row holds a value of the key, and `find_by_id`, an update and a delete by
@@ -405,7 +405,7 @@ explicit limitations.
 > detect the first at all.
 >
 > The error is unreachable through a derived ActiveModel, whose fields are its
-> entity's columns by construction (`[spec:pgorm:sem:macros.derive.active-model+3]`);
+> entity's columns by construction (`[spec:pgorm:sem:macros.derive.active-model]`);
 > it exists for hand-written implementations, which can disagree with their
 > `Entity`. pgorm's own callers, all of which iterate the entity's own columns,
 > therefore either propagate it (`Update::one`'s filter and value preparation,
@@ -416,7 +416,7 @@ explicit limitations.
 >
 > `get_primary_key_value`
 > reads `PrimaryKeyArity::ARITY` values, in primary-key iteration order, into one
-> `ValueTuple` (`[spec:pgorm:def:sql.value.tuple+3]`) whatever the arity, and
+> `ValueTuple` (`[spec:pgorm:def:sql.value.tuple]`) whatever the arity, and
 > MUST return `None` if any key component is `NotSet`.
 > `is_changed` returns `true` when any attribute is in the `Set` state.
 
@@ -431,7 +431,7 @@ explicit limitations.
 > variants with equal payloads.
 >
 > The `Set` state has three spellings, and documentation and examples MUST use the
-> free `set(value)` function (`[spec:pgorm:req:entity.active-model.from-sugar+1]`) for
+> free `set(value)` function (`[spec:pgorm:req:entity.active-model.from-sugar]`) for
 > construction: it is the only one that converts into the column type. The `Set(v)`
 > variant and the `ActiveValue::set(v)` associated constructor both pin `v` to `V`
 > exactly, and remain the spelling where the variant itself is the subject — pattern
@@ -477,7 +477,7 @@ explicit limitations.
 > associated constructor can offer this — a variant admits no conversion, and the
 > associated form is bound by the `V` of the impl block. `set` is exported at the crate
 > root and is the spelling documentation uses
-> (`[spec:pgorm:def:entity.active-model.active-value+1]`).
+> (`[spec:pgorm:def:entity.active-model.active-value]`).
 
 > [spec:pgorm:req:entity.active-model.persistence+2]
 > `ActiveModelTrait::insert` MUST execute via `Insert::exec_returning_model`, so on
@@ -490,7 +490,7 @@ explicit limitations.
 > `ConnectionTrait` (`src/entity/active_model.rs`). `insert` and `update` are the
 > trait's only write entry points, and which of them runs is the caller's stated
 > choice rather than a property of the model
-> (`[spec:pgorm:req:entity.active-model.save+1]`). Both accept a primary key in
+> (`[spec:pgorm:req:entity.active-model.save]`). Both accept a primary key in
 > either the `Set` or the `Unchanged` state.
 
 > [spec:pgorm:req:entity.active-model.save+1]
@@ -501,7 +501,7 @@ explicit limitations.
 > key, whose caller must populate that key to name the row at all, could never reach
 > `insert` through it, and creating such a row was possible only by bypassing the
 > ActiveModel API. Intent that is unrepresentable in the input is stated by the caller
-> instead: `insert` and `update` (`[spec:pgorm:req:entity.active-model.persistence+1]`)
+> instead: `insert` and `update` (`[spec:pgorm:req:entity.active-model.persistence]`)
 > are separate entry points, and insert-or-update in a single statement is expressed
 > explicitly through `Insert::on_conflict`. The removal is deliberate and `save` MUST
 > NOT be reintroduced under this or another name (`src/entity/active_model.rs`).
@@ -552,7 +552,7 @@ explicit limitations.
 > Presence detection and deserialization MUST read the same key namespace, and that
 > namespace is `serde`'s: the key a column occupies is the model field's name as
 > `serde` spells it, read from `ColumnTrait::json_key`
-> (`[spec:pgorm:def:entity.traits.column+6]`) — never the SQL column name, which the
+> (`[spec:pgorm:def:entity.traits.column]`) — never the SQL column name, which the
 > deserializer never sees. `DeriveEntityModel` computes each column's key from the
 > field it derived that column from, applying `#[serde(rename = "..")]` and
 > `#[serde(rename_all = "..")]` (the deserialize half where the split form is used);
@@ -639,7 +639,7 @@ explicit limitations.
 > whose arity is only known at runtime. `IntoBoundary<K>` is the matching
 > relation on the value side, implemented exactly for the tuples whose length `K`
 > describes — plus, for `K = ValueTuple`, every `IntoValueTuple`. A consumer that
-> pairs a column set with values (`[spec:pgorm:sem:exec.cursor.keyset+5]`)
+> pairs a column set with values (`[spec:pgorm:sem:exec.cursor.keyset]`)
 > therefore gets the arity agreement from the type system rather than by
 > checking it, and the `Key` case is the only one left to check.
 >
@@ -667,7 +667,7 @@ explicit limitations.
 > never checked, with no referential triggers — or deferrable, and the
 > relation says so: `RelationBuilder::enforcement(e)` and `deferrability(d)`
 > set the two fields, which `rev()` keeps and the conversion into a foreign
-> key carries (`[spec:pgorm:req:entity.relation.fk+5]`), so the schema
+> key carries (`[spec:pgorm:req:entity.relation.fk]`), so the schema
 > generated from an entity creates the key the entity describes rather than
 > one enforced and checked at once. A `NOT ENFORCED` key admits a row whose
 > columns reference nothing, and the relation's readers take such a row as
@@ -688,7 +688,7 @@ explicit limitations.
 > and `from_key()` / `to_key()` end with the period column, since a row's
 > period is part of what identifies the rows a join reached. The relation
 > joins a row to each row whose period overlaps its own
-> (`[spec:pgorm:sem:query.build.join+4]`), of which there may be several: the
+> (`[spec:pgorm:sem:query.build.join]`), of which there may be several: the
 > versions of a temporal key that together cover the row's period, which the
 > server holds the foreign key to. So the relation's readers reach each such
 > version: `find_related` and a graph slot return each, a required slot
@@ -731,12 +731,12 @@ explicit limitations.
 > the walk gives them — the joined side re-aliased `r{i}`, the far side re-pointed
 > at `r{i-1}`, which the innermost hop leaves at whatever identifier its relation
 > already qualifies by — and the join itself is the crate's reverse edge,
-> `QuerySelect::join_as_rev` (`[spec:pgorm:sem:query.build.join+4]`). The ON
+> `QuerySelect::join_as_rev` (`[spec:pgorm:sem:query.build.join]`). The ON
 > clause is therefore the one `join_condition` every other join in the crate
 > emits, so a hop honours everything its relation declares: every `(from, to)`
 > column pair, the `condition_type` that combines them, and the `on_condition`
 > closure, which receives the two bound names in the roles the relation was
-> written with (`[spec:pgorm:def:entity.relation.def+10]`). There is no second
+> written with (`[spec:pgorm:def:entity.relation.def]`). There is no second
 > walker for the first to drift from.
 >
 > Those aliases are a type, `LinkedAlias`, whose `hop(i)` renders `r{i}` — not a
@@ -785,7 +785,7 @@ explicit limitations.
 > Both conversions are total and MUST stay so: a `ColumnPairs` is non-empty and
 > balanced by construction and a foreign key is built from exactly that, so the
 > first pair goes to the constructor and the rest are appended
-> (`[spec:pgorm:req:sql.ddl.foreign-key+5]`). There is no unpaired or empty
+> (`[spec:pgorm:req:sql.ddl.foreign-key]`). There is no unpaired or empty
 > column set on either side of the conversion for it to fail on.
 
 ## Prelude
@@ -811,7 +811,7 @@ explicit limitations.
 > names an entity definition needs (`Expr`, `Name`, `StringLen`,
 > `ForeignKeyAction`, `Func`, `Arc`), with the range vocabulary a field of a range
 > column is written in — `Range`, `Multirange` and `RangeType`
-> (`[spec:pgorm:def:sql.value.range+4]`) — so a generated entity's
+> (`[spec:pgorm:def:sql.value.range]`) — so a generated entity's
 > `Range<i32>` field and `ColumnType::Range(RangeType::Int4)` resolve through
 > the glob, and `CreatedRange` with its derive `DeriveCreatedRange`
 > (`[spec:pgorm:def:sql.value.created-range]`), so a generated
@@ -819,7 +819,7 @@ explicit limitations.
 > own: an explicit import shadows a glob. The interval value `Interval`
 > (`[spec:pgorm:def:sql.value.interval]`) is a member, with the qualifier
 > vocabulary an interval column's type is written in — `IntervalSpec`,
-> `PgInterval` and `IntervalPrecision` (`[spec:pgorm:def:sql.types.column-type+10]`)
+> `PgInterval` and `IntervalPrecision` (`[spec:pgorm:def:sql.types.column-type]`)
 > — so a generated entity's
 > `column_type = "Interval(IntervalSpec::Fields(PgInterval::YearToMonth))"`
 > and `ColumnType::Interval(IntervalSpec::Any(None))` resolve through the
@@ -838,21 +838,21 @@ explicit limitations.
 > It also carries the relation vocabulary an entity definition and its call
 > sites write: `Related`, `Linked`, `RelationDef`, `RelationTrait`, and the
 > `RelatedLink` witness that spares a `Related` chain from being restated as a
-> hand-written `Linked` (`[spec:pgorm:req:entity.relation.linked+4]`).
+> hand-written `Linked` (`[spec:pgorm:req:entity.relation.linked]`).
 >
 > The alias vocabulary `alias` and `AliasName` are members
-> (`[spec:pgorm:sem:query.build.alias+2]`) on the same grounds as `Expr`: a name
+> (`[spec:pgorm:sem:query.build.alias]`) on the same grounds as `Expr`: a name
 > the query introduces is written where the query is written, and a token is
 > only cheaper than `Name::runtime` when it is already in scope. `Func` is a
 > member on the same grounds: a field's `default_expr` is Rust written in the
-> entity's own module (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`),
+> entity's own module (`[spec:pgorm:sem:macros.derive.entity-model.column-def]`),
 > and `default_expr = "Func::uuidv7()"` — a key PostgreSQL fills time-ordered
-> (`[spec:pgorm:def:sql.ast.func+10]`) — resolves through the glob. `LinkedAlias` is
+> (`[spec:pgorm:def:sql.ast.func]`) — resolves through the glob. `LinkedAlias` is
 > NOT a member — it is reached as the return of a `Linked` method, so a caller
 > never has to name the type.
 >
 > `StaticName` is a member — pgorm_query's, re-exported
-> (`[spec:pgorm:def:entity.traits+2]`). The entity layer once declared a
+> (`[spec:pgorm:def:entity.traits]`). The entity layer once declared a
 > second trait of its own with the same method and an incompatible signature,
 > and a prelude that globs one of them into every file made that collision
 > reachable from anywhere; there is now one trait, so the hazard is retired

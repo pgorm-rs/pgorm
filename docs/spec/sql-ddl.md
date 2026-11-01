@@ -35,7 +35,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > one.
 >
 > `TypeCreateStatement` and `TypeAlterStatement` push their enum labels through
-> `push_param` (`[spec:pgorm:req:sql.render.ddl.enum-type+5]`), so they have a
+> `push_param` (`[spec:pgorm:req:sql.render.ddl.enum-type]`), so they have a
 > second rendering and MUST expose it as `build() -> (String, Values)` beside
 > the `build_collect(sink)` they already had — the capability named, rather
 > than reachable only by constructing a `SqlWriterValues` and calling the
@@ -93,7 +93,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > writes `.to_owned()` or `.clone()` and sees the copy in the source, rather
 > than the embedder cloning or draining a `&mut` behind their back. Reuse after
 > the call therefore has one outcome across all of them
-> (`[spec:pgorm:req:sql.ast+2]`).
+> (`[spec:pgorm:req:sql.ast]`).
 >
 > Rendering MUST emit `CREATE TABLE [IF NOT EXISTS ]<table> ( ... )` with the
 > body in this fixed order: column definitions, then the primary key, then the
@@ -113,7 +113,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `TableKey<K>`, whose kind `K` is `Primary` or `Unique`: a non-empty ordered
 > column list started at its first column (`TableKey::new(c)`) and extended by
 > `col(c)` or, for a computed list, `cols(iter)`, with `name`, `include` and
-> `deferrability` (`[spec:pgorm:req:sql.ddl.deferrability+4]`). `IntoTableKey<K>`
+> `deferrability` (`[spec:pgorm:req:sql.ddl.deferrability]`). `IntoTableKey<K>`
 > converts any `IntoKeyColumns` — one column (any `IntoName`) or a tuple of
 > one to twelve columns, the widest a primary key's value is
 > (`entity.traits.primary-key`) — or a key already built. `IntoKeyColumns`
@@ -135,13 +135,13 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > written inside the one it constrains — and has no rendering of its own, no
 > `Display` and no build path, because PostgreSQL spells it only inside a
 > table statement; `ALTER TABLE` adds the same type
-> (`[spec:pgorm:req:sql.ddl.alter-table+12]`). Its readers are `get_name()`,
+> (`[spec:pgorm:req:sql.ddl.alter-table]`). Its readers are `get_name()`,
 > `get_columns()`, `get_include()`, `get_deferrability()` and
 > `get_without_overlaps()`. Its columns,
 > not the key, are what an `ON CONFLICT` target naming the key takes:
 > `OnConflict::columns` accepts the same `IntoKeyColumns`, and no `TableKey`,
 > whose name and options an inference target cannot carry
-> (`[spec:pgorm:req:sql.ast.on-conflict+4]`).
+> (`[spec:pgorm:req:sql.ast.on-conflict]`).
 >
 > Either kind may be PostgreSQL 18's temporal key: `without_overlaps(c)` ends
 > it `"c" WITHOUT OVERLAPS`, a later call replacing the column, and
@@ -170,9 +170,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > server's knowledge, which a key naming columns cannot see: the column must
 > be a range or multirange (`42804`), and a scalar column beside it needs a
 > GiST operator class, which the `btree_gist` extension gives
-> (`[spec:pgorm:req:sql.ddl.extension+5]`; `42704` without it). A temporal key
+> (`[spec:pgorm:req:sql.ddl.extension]`; `42704` without it). A temporal key
 > is no unique index, which is what an `ON CONFLICT` arbiter by inference
-> needs (`[spec:pgorm:req:sql.ast.on-conflict+4]`).
+> needs (`[spec:pgorm:req:sql.ast.on-conflict]`).
 >
 > A key names each of its columns once, its `WITHOUT OVERLAPS` column among
 > them: PostgreSQL refuses a key naming a column twice (`42701`, *column "a"
@@ -192,7 +192,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `codegen.entity.transform`). The included columns are no part of the key:
 > `INCLUDE` may name a key column or one column twice, and the server
 > accepts both. An `ON CONFLICT` target is not a key and takes a repeat too
-> (`[spec:pgorm:req:sql.ast.on-conflict+4]`).
+> (`[spec:pgorm:req:sql.ast.on-conflict]`).
 >
 > A table has one primary key, and PostgreSQL refuses a second in every
 > spelling (`42P16`, *multiple primary keys for table are not allowed*): on two
@@ -202,7 +202,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > options with it, as a second `raw_suffix()` replaces the first; the unique
 > keys are a list `unique()` appends to. A column has no key clause of its own
 > — `ColumnDef` has no `primary_key()` or `unique_key()` and `ColumnSpec` no
-> key arm (`[spec:pgorm:req:sql.ddl.column-def+12]`) — so a key is declared on
+> key arm (`[spec:pgorm:req:sql.ddl.column-def]`) — so a key is declared on
 > the table and only there, and keys always render after the columns, one
 > form per concept. Two primary keys therefore have no representation
 > (`[dec:pgorm:invalid-states-unrepresentable]`); the live suite holds a table
@@ -221,10 +221,10 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `get_expr()`, `get_name()`, `get_enforcement()` and `is_no_inherit()`. It
 > renders `[CONSTRAINT "name" ]CHECK (<expr>)[ NO INHERIT][ ENFORCED | NOT
 > ENFORCED]` wherever it stands — here, on a
-> column (`[spec:pgorm:req:sql.ddl.column-def+12]`) and after `ALTER TABLE`'s
-> `ADD` (`[spec:pgorm:req:sql.ddl.alter-table+12]`) — and has no
+> column (`[spec:pgorm:req:sql.ddl.column-def]`) and after `ALTER TABLE`'s
+> `ADD` (`[spec:pgorm:req:sql.ddl.alter-table]`) — and has no
 > deferrability, which PostgreSQL never gives a `CHECK`
-> (`[spec:pgorm:req:sql.ddl.deferrability+4]`). Each position takes any
+> (`[spec:pgorm:req:sql.ddl.deferrability]`). Each position takes any
 > `IntoCheck`: an expression, which is the unnamed, enforced constraint, or a
 > `Check` already built, as a key position takes a column or a `TableKey`.
 > `NO INHERIT` keeps the constraint from a table created `INHERITS` this
@@ -236,7 +236,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > table's constraints always reach its partitions, so the server refuses it
 > there (`42P16`), in `CREATE TABLE` and after `ADD` alike. A `CHECK` is
 > never `NOT VALID` here: that is an `ALTER TABLE`'s
-> (`[spec:pgorm:req:sql.ddl.alter-table+12]`).
+> (`[spec:pgorm:req:sql.ddl.alter-table]`).
 >
 > After the closing parenthesis only the `extra` string follows (e.g.
 > `USING columnar`). There are no table options: the MySQL-era `TableOpt`
@@ -256,7 +256,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > parenthesis has no constructor
 > (`[dec:pgorm:invalid-states-unrepresentable]`). `take()` moves every
 > accumulated part out and copies only that name, for the same reason
-> (`[spec:pgorm:req:sql.ast+2]`).
+> (`[spec:pgorm:req:sql.ast]`).
 >
 > A statement with no columns renders `CREATE TABLE <table> (  )`, and that is
 > deliberately left buildable: PostgreSQL accepts a table with no columns, so
@@ -279,12 +279,12 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > A column carries no key. A primary or unique key is the table's, a tuple of
 > one or more columns declared on the table
-> (`[spec:pgorm:req:sql.ddl.create-table+16]`), so `ColumnSpec` has no
+> (`[spec:pgorm:req:sql.ddl.create-table]`), so `ColumnSpec` has no
 > `UniqueKey` or `PrimaryKey` arm and `ColumnDef` no `unique_key()`,
 > `primary_key()` or their deferrability variants: a key on a column was the
 > spelling that let one table hold two primary keys, and adding a key to a
 > table that exists is `ALTER TABLE`'s `add_primary_key` / `add_unique`
-> (`[spec:pgorm:req:sql.ddl.alter-table+12]`), not a column's.
+> (`[spec:pgorm:req:sql.ddl.alter-table]`), not a column's.
 >
 > A column MUST render as the quoted name, one space, the type spelling, then
 > ` COLLATE ` and the collation's quoted name when it has one
@@ -292,7 +292,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `[CONSTRAINT "name" ]NOT NULL[ NO INHERIT]`, `DEFAULT <expr>`,
 > `[CONSTRAINT "name" ]CHECK (<expr>)[ ENFORCED | NOT ENFORCED]` — `check(c)`
 > takes the `IntoCheck` a table's `check()` does
-> (`[spec:pgorm:req:sql.ddl.create-table+16]`) —
+> (`[spec:pgorm:req:sql.ddl.create-table]`) —
 > `GENERATED ALWAYS AS (<expr>) { STORED | VIRTUAL }`,
 > `GENERATED { ALWAYS | BY DEFAULT } AS IDENTITY[ (<options>)]`, and
 > `RawSuffix` verbatim.
@@ -328,7 +328,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > VALID` has no column-level spelling — the grammar refuses it in `CREATE
 > TABLE` and `ADD COLUMN` alike (`42601`) — and so no setter: a not-null
 > constraint is added `NOT VALID` by `ALTER TABLE`'s `add_not_null`
-> (`[spec:pgorm:req:sql.ddl.alter-table+12]`). A `NOT NULL` is never deferrable
+> (`[spec:pgorm:req:sql.ddl.alter-table]`). A `NOT NULL` is never deferrable
 > (`42601` on a column, `0A000` at table level) nor `[NOT] ENFORCED` (likewise).
 > The constraint is dropped by a modified column's `Null` spec, `ALTER COLUMN
 > "c" DROP NOT NULL`, whatever its name, and by `DROP CONSTRAINT "name"`;
@@ -342,7 +342,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > nothing there: the live suite's server creates a table-level `NOT NULL c NOT
 > VALID` valid (`convalidated`), a new table having no rows to leave
 > unchecked. So the concept has one form in `CREATE TABLE`, as a key does
-> (`[spec:pgorm:req:sql.ddl.create-table+16]`).
+> (`[spec:pgorm:req:sql.ddl.create-table]`).
 >
 > A generated column is one of PostgreSQL's two kinds, `GeneratedKind::Stored`
 > (computed when the row is written, kept on disk) or `GeneratedKind::Virtual`
@@ -357,7 +357,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > backwards and once stood for a render no release before 18 parsed
 > (`[dec:pgorm:invalid-states-unrepresentable]`); that flag MUST NOT return.
 > pgorm targets PostgreSQL 18, the release the oracle parses with and the
-> live server runs (`[spec:pgorm:req:sql.render.oracle+4]`), so a virtual
+> live server runs (`[spec:pgorm:req:sql.render.oracle]`), so a virtual
 > column is no longer a render the builder has to keep from 17.
 >
 > What the server refuses around a generated column is the server's
@@ -497,13 +497,13 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > MUST NOT return. The statement has no `take()` for the same reason: moving the
 > options out would leave the action-less statement this type exists to rule
 > out, and a `take()` that copied instead would be a promise the name does not
-> keep (`[spec:pgorm:req:sql.ast+2]`) — a second copy is `.to_owned()`.
+> keep (`[spec:pgorm:req:sql.ast]`) — a second copy is `.to_owned()`.
 >
 > `add_foreign_key` — on both `PendingTableAlter` and `TableAlterStatement` —
 > takes any `IntoAddedConstraint<TableForeignKey>` by value, as `add_column`
 > takes `IntoColumnDef`: an embedder consumes what it embeds, and a borrow
 > that silently cloned would be the third reuse-outcome
-> `[spec:pgorm:req:sql.ddl.create-table+16]` rules out.
+> `[spec:pgorm:req:sql.ddl.create-table]` rules out.
 >
 > A foreign key or a `CHECK` may be added `NOT VALID`, leaving the rows
 > already there unchecked while every row written from then on is held to it.
@@ -537,9 +537,9 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > tuple or a built `TableKey` — by value, and render `ADD [CONSTRAINT "name"
 > ]PRIMARY KEY (cols)…` / `ADD [CONSTRAINT "name" ]UNIQUE [NULLS NOT DISTINCT
 > ](cols)…` with the key's `INCLUDE` and deferrability, the table-level
-> spelling of `[spec:pgorm:req:sql.ddl.create-table+16]` after `ADD`. They are
+> spelling of `[spec:pgorm:req:sql.ddl.create-table]` after `ADD`. They are
 > how a key is added to a table that exists, now that a column carries none
-> (`[spec:pgorm:req:sql.ddl.column-def+12]`): the `ADD COLUMN … UNIQUE` and
+> (`[spec:pgorm:req:sql.ddl.column-def]`): the `ADD COLUMN … UNIQUE` and
 > `ADD UNIQUE ("c")` a column's key spec used to render are this, one key at a
 > time. Whether the table already has a primary key is the server's
 > knowledge, not the builder's; a second is refused there (`42P16`).
@@ -609,7 +609,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > which leaves the rows already there unchecked while holding new rows at once
 > (`23502`); `convalidated` stays false until `validate_constraint` checks
 > them. Without `NOT VALID` a null already there refuses the action (`23502`).
-> A column has one not-null constraint (`[spec:pgorm:req:sql.ddl.column-def+12]`),
+> A column has one not-null constraint (`[spec:pgorm:req:sql.ddl.column-def]`),
 > so the action against a column that has one does nothing where the one there
 > already says as much — the same name or none, the same `NO INHERIT`, and
 > valid where this one is — and is refused (`55000`) where it does not: a
@@ -620,7 +620,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > whose constraint is still `NOT VALID` is refused as well (`55000`).
 >
 > `add_check(c)`, on both types, takes any `IntoAddedConstraint<Check>` — an
-> `IntoCheck` (`[spec:pgorm:req:sql.ddl.create-table+16]`) or a `NotValid<Check>`
+> `IntoCheck` (`[spec:pgorm:req:sql.ddl.create-table]`) or a `NotValid<Check>`
 > — and renders `ADD [CONSTRAINT "name" ]CHECK (<expr>)[ NO INHERIT][ ENFORCED
 > | NOT ENFORCED][ NOT VALID]`: the rows already there are checked and one
 > that breaks the condition refuses the action (`23514`), unless the
@@ -665,7 +665,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > A generated column's expression is changed by an action of its own, not by
 > a modified column's `Generated` spec, which would carry a kind PostgreSQL
-> cannot change (`[spec:pgorm:req:sql.ddl.column-def+12]`) and so describe an
+> cannot change (`[spec:pgorm:req:sql.ddl.column-def]`) and so describe an
 > alteration no statement makes. `set_expression(column, expr)`, on both
 > `PendingTableAlter` and `TableAlterStatement`, renders `ALTER COLUMN "c" SET
 > EXPRESSION AS (<expr>)` (PostgreSQL 17): the column keeps its kind and the
@@ -709,7 +709,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > All three take their targets in the constructor, because PostgreSQL rejects
 > every one of these statements with the name left out: `Table::drop(table)`
 > seeds the list and `table()` appends the rest, in the pattern
-> `[spec:pgorm:req:sql.ddl.index-create+8]` uses for index columns, so the
+> `[spec:pgorm:req:sql.ddl.index-create]` uses for index columns, so the
 > empty `DROP TABLE ` cannot be built; `Table::rename(from, to)` and
 > `Table::truncate(table)` take theirs whole and expose no setter. `take()` on
 > a drop copies the target list rather than moving it, so no target-less husk
@@ -724,7 +724,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `Comment::on_column(table, column, text)` are the only constructors and both
 > take target and text up front, so every `CommentStatement` denotes a
 > complete statement and no build path can fail or panic. The target table is
-> a `TableName` (`[spec:pgorm:def:sql.types.table-ref+7]`) — the same type
+> a `TableName` (`[spec:pgorm:def:sql.types.table-ref]`) — the same type
 > every other DDL statement targets, reached through `IntoTableName` from an
 > iden or a `(schema, table)` tuple — so a comment can only name a table the
 > DDL beside it could also name, and there is no conversion to fail.
@@ -750,20 +750,20 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > either reading; text with no backslash has nothing to disambiguate and MUST
 > keep the plain form, so the common rendering is unchanged.
 >
-> This is NOT `[spec:pgorm:req:sql.render.string-escape+1]`, which additionally
+> This is NOT `[spec:pgorm:req:sql.render.string-escape]`, which additionally
 > maps control characters to their `E''` spellings. Comment text is prose and a
 > newline in it is a newline; only what the grammar forces is rewritten.
 >
 > The comment text a `TableCreateStatement` carries — its own
-> (`[spec:pgorm:req:sql.ddl.create-table+8]`) and each `ColumnSpec::Comment`
-> (`[spec:pgorm:req:sql.ddl.column-def+4]`) — MUST be reachable as those
+> (`[spec:pgorm:req:sql.ddl.create-table]`) and each `ColumnSpec::Comment`
+> (`[spec:pgorm:req:sql.ddl.column-def]`) — MUST be reachable as those
 > statements: `TableCreateStatement::comments()` returns one
 > `CommentStatement` per carried comment, the table's first and then one per
 > commented column in column order, each targeting the statement's own table.
 > The setters therefore describe a table completely and no carried text is
 > unrenderable. They MUST NOT instead be appended to the create statement's
 > own SQL: that string is executed as a single prepared statement
-> (`[spec:pgorm:sem:conn.pool.statement-cache+2]`), and PostgreSQL refuses to
+> (`[spec:pgorm:sem:conn.pool.statement-cache]`), and PostgreSQL refuses to
 > prepare a string holding more than one command, so appending would trade a
 > comment silently dropped for a `CREATE TABLE` that no longer runs.
 
@@ -777,11 +777,11 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > MUST both be non-empty by construction: `Index::create(table, col)` and
 > `IndexCreateStatement::new(table, col)` take the table and the first column
 > and `col()` appends the rest, in the pattern
-> `[spec:pgorm:def:sql.ast.with+4]` uses for CTEs, and there is no `table()`
+> `[spec:pgorm:def:sql.ast.with]` uses for CTEs, and there is no `table()`
 > setter. It has no `take()` at all: moving the table or the columns out would
 > leave exactly the target-less, column-less husk the constructor rules out, and
 > a `take()` that copied instead would be a promise the name does not keep
-> (`[spec:pgorm:req:sql.ast+2]`) — a second copy is `.to_owned()`. PostgreSQL rejects an empty
+> (`[spec:pgorm:req:sql.ast]`) — a second copy is `.to_owned()`. PostgreSQL rejects an empty
 > column list (`CREATE INDEX ... ()`) and rejects `CREATE INDEX "n" ON  (...)`
 > at the parenthesis, so both states are unreachable rather than checked
 > (`[dec:pgorm:invalid-states-unrepresentable]`). The index *name* is the one
@@ -791,7 +791,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `is_unique_key()` and `kind()` read it back. There is no primary-key kind,
 > because PostgreSQL spells `PRIMARY KEY` only as a table constraint and never
 > as `CREATE INDEX`; the primary key is the table's `TableKey`
-> (`[spec:pgorm:req:sql.ddl.create-table+16]`), and so the standalone
+> (`[spec:pgorm:req:sql.ddl.create-table]`), and so the standalone
 > renderer has no primary key to be handed. `IntoIndexColumn` accepts an
 > iden, an `(iden, IndexOrder)` pair, or an `IndexColumn` built outright, and
 > nothing else: the MySQL prefix-length forms
@@ -834,14 +834,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > An `IndexCreateStatement` renders only as `CREATE INDEX`: it does not
 > convert into the `TableKey` a table declares
-> (`[spec:pgorm:req:sql.ddl.create-table+16]`), which is a type of its own
+> (`[spec:pgorm:req:sql.ddl.create-table]`), which is a type of its own
 > because nearly everything this statement carries — the `Plain` kind, an
 > expression or ordered entry, an operator class, the predicate, the access
 > method — is a syntax error in a table constraint. The split runs both
 > ways: deferrability, which a key takes and `CREATE INDEX` does not, is a
 > field of `TableKey` and not of this statement, whose standalone rendering
 > would have to drop it or emit a syntax error
-> (`[spec:pgorm:req:sql.ddl.deferrability+4]`).
+> (`[spec:pgorm:req:sql.ddl.deferrability]`).
 >
 > `CONCURRENTLY` MUST NOT be offered. It is not a property of the index but of
 > how the statement runs: PostgreSQL refuses it inside a transaction block, and
@@ -886,7 +886,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > wrapping it has a `take()`: moving the tables and the first pair out would
 > leave exactly the husk the constructor rules out, and a `take()` that copied
 > them would be a promise the name does not keep
-> (`[spec:pgorm:req:sql.ast+2]`). A second copy is `.to_owned()`.
+> (`[spec:pgorm:req:sql.ast]`). A second copy is `.to_owned()`.
 >
 > A foreign key may be PostgreSQL 18's temporal one: `period(column,
 > ref_column)`, on `TableForeignKey` and `ForeignKeyCreateStatement`, closes
@@ -900,7 +900,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > is refused (`23503`), and so is deleting a parent row a child's period
 > needs; the plain foreign key over the same pairs, the control, is refused
 > outright (`42830`), `PERIOD` being the only way to reference a key ending
-> `WITHOUT OVERLAPS` (`[spec:pgorm:req:sql.ddl.create-table+16]`). PostgreSQL
+> `WITHOUT OVERLAPS` (`[spec:pgorm:req:sql.ddl.create-table]`). PostgreSQL
 > takes `PERIOD` on the last column of each list alone and refuses a list it
 > is the only column of (both `42601`), and refuses it on one side without
 > the other (`42830`). So the pair is a slot of its own, written last on both
@@ -927,7 +927,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `DELETE ... FOR PORTION OF` that was withdrawn from 19 before its release.
 > Deferrability and enforcement a temporal key takes as a plain one does.
 >
-> `Deferrability` is the one enum of `[spec:pgorm:req:sql.ddl.deferrability+4]`,
+> `Deferrability` is the one enum of `[spec:pgorm:req:sql.ddl.deferrability]`,
 > which unique and primary keys share. The foreign key is the case with a use
 > an ORM meets — rows that reference each other, which only a check deferred
 > to `COMMIT` lets a transaction insert.
@@ -941,13 +941,13 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > is restamped onto the owning table by `TableCreateStatement::foreign_key`:
 > an embedded key constrains the table it sits inside and MUST NOT name
 > another. That embedder, and the
-> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table+12]`, take the key by
+> `add_foreign_key` of `[spec:pgorm:req:sql.ddl.alter-table]`, take the key by
 > value (`Into<ForeignKeyCreateStatement>` and `Into<TableForeignKey>`
 > respectively) rather than by reference: an embedder consumes what it embeds,
 > so a caller who reuses the key writes the copy
-> (`[spec:pgorm:req:sql.ddl.create-table+16]`). A foreign key is dropped by
+> (`[spec:pgorm:req:sql.ddl.create-table]`). A foreign key is dropped by
 > name as a constraint of any kind is, by `drop_constraint`
-> (`[spec:pgorm:req:sql.ddl.alter-table+12]`): `ForeignKey::drop` and the
+> (`[spec:pgorm:req:sql.ddl.alter-table]`): `ForeignKey::drop` and the
 > `ForeignKeyDropStatement` it built rendered that same `ALTER TABLE <table>
 > DROP CONSTRAINT "name"` under a name for one kind, and are gone with the
 > `Drop` arm of `ForeignKeyStatement`; they MUST NOT return. Foreign-key table
@@ -971,14 +971,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > The one enum qualifies every constraint the builder spells that PostgreSQL
 > lets defer. A foreign key carries it as a field
-> (`[spec:pgorm:req:sql.ddl.foreign-key+10]`). A primary or unique key carries
+> (`[spec:pgorm:req:sql.ddl.foreign-key]`). A primary or unique key carries
 > it on its `TableKey`, whose `deferrability(d)` sets it
-> (`[spec:pgorm:req:sql.ddl.create-table+16]`): it follows the key's column
+> (`[spec:pgorm:req:sql.ddl.create-table]`): it follows the key's column
 > list and any `INCLUDE`, in `CREATE TABLE` and after `ALTER TABLE`'s `ADD`
-> alike (`[spec:pgorm:req:sql.ddl.alter-table+12]`). A column carries no key
+> alike (`[spec:pgorm:req:sql.ddl.alter-table]`). A column carries no key
 > and so no key's deferrability: the column spellings that did —
 > `unique_key_deferrability(d)` and `primary_key_deferrability(d)` — are gone
-> with the column keys (`[spec:pgorm:req:sql.ddl.column-def+12]`), and the
+> with the column keys (`[spec:pgorm:req:sql.ddl.column-def]`), and the
 > clause has one position it can be written in, the one PostgreSQL's grammar
 > puts it.
 >
@@ -1025,8 +1025,8 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > is the server's default, so a builder emitting it would assert a choice the
 > caller did not make, and `Enforced` renders only because a caller said it.
 >
-> A foreign key carries it as a field (`[spec:pgorm:req:sql.ddl.foreign-key+10]`)
-> and a `CHECK` constraint on its `Check` (`[spec:pgorm:req:sql.ddl.create-table+16]`),
+> A foreign key carries it as a field (`[spec:pgorm:req:sql.ddl.foreign-key]`)
+> and a `CHECK` constraint on its `Check` (`[spec:pgorm:req:sql.ddl.create-table]`),
 > and nothing else can, because nothing else takes it: PostgreSQL refuses
 > `[NOT] ENFORCED` on a primary key, a unique key, a `NOT NULL` and an
 > `EXCLUDE` at table level (`0A000`, "... constraints cannot be marked NOT
@@ -1046,7 +1046,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `DEFERRABLE` (the server records both, the deferral meaning nothing while
 > nothing is checked); a `CHECK` stays undeferrable either way (`0A000`).
 > `VALIDATE CONSTRAINT` refuses it (`55000`). `ALTER CONSTRAINT "name"
-> ENFORCED` / `NOT ENFORCED` (`ConstraintChange`, `[spec:pgorm:req:sql.ddl.alter-table+12]`)
+> ENFORCED` / `NOT ENFORCED` (`ConstraintChange`, `[spec:pgorm:req:sql.ddl.alter-table]`)
 > moves a foreign key between the two, `ENFORCED` checking every row as it
 > goes (`23503`) and `NOT ENFORCED` leaving it not valid. From PostgreSQL 19
 > it moves a `CHECK` the same way, `ENFORCED` refusing a row that breaks the
@@ -1081,7 +1081,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > the labels pass through the value pipeline, i.e. single-quoted string
 > literals in `to_string` builds and bind parameters in parameterised builds.
 > `TypeAs` has three variants, `Enum`, `Composite`
-> (`[spec:pgorm:req:sql.ddl.type-composite+2]`) and `Range`
+> (`[spec:pgorm:req:sql.ddl.type-composite]`) and `Range`
 > (`[spec:pgorm:req:sql.ddl.type-range]`), and what a type is, is that
 > one slot: `as_enum()` and `values()` on a composite or a range replace it
 > with a label list, as `as_composite()` and `attribute()` and `as_range()`
@@ -1110,7 +1110,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > constructible (`[dec:pgorm:invalid-states-unrepresentable]`), the same
 > `PendingTableAlter` shape `Table::alter` uses. Its attribute methods consume
 > it into the composite's own statements instead, `CompositeAlterStatement`
-> and `AttributeRenameStatement` (`[spec:pgorm:req:sql.ddl.type-composite+2]`):
+> and `AttributeRenameStatement` (`[spec:pgorm:req:sql.ddl.type-composite]`):
 > a composite's changes chain and take a behavior, which no enumeration
 > option does, so they are not `TypeAlterOpt` variants that a label method
 > could be applied to.
@@ -1124,14 +1124,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > None of this is particular to an enumeration. `DROP TYPE` and `RENAME TO`
 > name a type of any kind and serve a composite unchanged
-> (`[spec:pgorm:req:sql.ddl.type-composite+2]`); the label options are an
+> (`[spec:pgorm:req:sql.ddl.type-composite]`); the label options are an
 > enumeration's, and the server refuses them on any other type (`42809`).
 
 ## Composite types
 
 > [spec:pgorm:req:sql.ddl.type-composite+2]
 > `TypeCreateStatement` defines a composite type — a row type — beside the
-> enumeration of `[spec:pgorm:req:sql.ddl.type-enum+7]` and the range of
+> enumeration of `[spec:pgorm:req:sql.ddl.type-enum]` and the range of
 > `[spec:pgorm:req:sql.ddl.type-range]`. `as_composite()`
 > makes it one, and `attribute(name, type)` and `attribute_collated(name,
 > type, collation)` append an attribute, implying `as_composite()` when it has
@@ -1141,7 +1141,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > A composite MUST render `CREATE TYPE <name> AS (<attribute>, ...)`, each
 > attribute its name as a quoted identifier, one space, its `ColumnType` as a
-> column writes it (`[spec:pgorm:def:sql.render.ddl.types+6]`), and then
+> column writes it (`[spec:pgorm:def:sql.render.ddl.types]`), and then
 > ` COLLATE <collation>` when it has one, quoted as
 > `[spec:pgorm:req:sql.render.collate]` writes a column's. The parentheses
 > MUST be present for an empty list too: `CREATE TYPE "t" AS ()` is the empty
@@ -1171,7 +1171,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > an enum*).
 >
 > A composite's attributes are altered by `ALTER TYPE`, and a
-> `PendingTypeAlter` (`[spec:pgorm:req:sql.ddl.type-alter-drop+7]`) starts
+> `PendingTypeAlter` (`[spec:pgorm:req:sql.ddl.type-alter-drop]`) starts
 > either of two statements. `add_attribute(name, type)`,
 > `add_attribute_collated(name, type, collation)`, `drop_attribute(name)`,
 > `drop_attribute_if_exists(name)`, `alter_attribute(name, type)` and
@@ -1184,7 +1184,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > ]"a"` and `ALTER ATTRIBUTE "a" TYPE <type>[ COLLATE c]`; `changes()` reads
 > them back, never empty, so the change-less alteration has no constructor. A
 > change's behavior is a slot of the statement: `cascade()` and `restrict()`
-> set a `DropBehavior` (`[spec:pgorm:req:sql.ddl.alter-table+12]`), the last
+> set a `DropBehavior` (`[spec:pgorm:req:sql.ddl.alter-table]`), the last
 > winning, read back by `get_behavior()`, and it is written after every
 > change, since the grammar gives each change one; an unsaid behavior is
 > `RESTRICT`. `rename_attribute(from, to)` consumes the pending alter into an
@@ -1226,8 +1226,8 @@ behaviour, including the leftovers from the multi-backend ancestry.
 
 > [spec:pgorm:req:sql.ddl.type-range+2]
 > `TypeCreateStatement::as_range(definition)` defines a range type, beside the
-> enumeration of `[spec:pgorm:req:sql.ddl.type-enum+7]` and the composite of
-> `[spec:pgorm:req:sql.ddl.type-composite+2]`, in the one slot what a type is
+> enumeration of `[spec:pgorm:req:sql.ddl.type-enum]` and the composite of
+> `[spec:pgorm:req:sql.ddl.type-composite]`, in the one slot what a type is
 > occupies (`TypeAs::Range`), so it replaces a label or attribute list and is
 > replaced by one. The definition is an `extension::RangeDefinition`,
 > constructed over its subtype, `RangeDefinition::new(subtype)`, because
@@ -1235,7 +1235,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > range type without one does not construct
 > (`[dec:pgorm:invalid-states-unrepresentable]`). The subtype is a
 > `ColumnType`, written as a column's type is
-> (`[spec:pgorm:def:sql.render.ddl.types+6]`), so a type created elsewhere is
+> (`[spec:pgorm:def:sql.render.ddl.types]`), so a type created elsewhere is
 > named by `ColumnType::named`; PostgreSQL discards a type modifier there, so
 > a range over `varchar(10)` is a range over `varchar`.
 >
@@ -1269,7 +1269,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > (`42P17`), refuses a shell type as an SQL function's argument (`42P13`) and
 > as a PL/pgSQL function's result (`0A000`), which leaves a C function — a
 > function body, outside the builder as `CREATE FUNCTION` is
-> (`[spec:pgorm:req:sql.scope+11]`). A range without one is continuous, as
+> (`[spec:pgorm:req:sql.scope]`). A range without one is continuous, as
 > `numrange` is: its bounds are stored as written.
 >
 > The rest is the server's to refuse, with its own codes: a collation on a
@@ -1287,7 +1287,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `Range<T>` value reaches such a column through that cast, there being no
 > cast between two range types. Its multirange travels as its text too, and
 > is read as its text, because tokio-postgres reports it as a simple type
-> (`[spec:pgorm:req:exec.cursor.binding-range+1]`); a column of one is
+> (`[spec:pgorm:req:exec.cursor.binding-range]`); a column of one is
 > `ColumnType::CreatedMultirange`.
 
 ## Sequences
@@ -1318,11 +1318,11 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >   <new>`.
 >
 > Every statement renders through `Display` alone: a sequence carries names
-> and integers and nothing to bind (`[spec:pgorm:req:sql.ddl+8]`).
+> and integers and nothing to bind (`[spec:pgorm:req:sql.ddl]`).
 >
 > The options are one vocabulary for every position that takes them, a
 > standalone sequence's and an identity column's
-> (`[spec:pgorm:req:sql.ddl.column-def+12]`): `SequenceOption` is `IncrementBy`,
+> (`[spec:pgorm:req:sql.ddl.column-def]`): `SequenceOption` is `IncrementBy`,
 > `MinValue` / `NoMinValue`, `MaxValue` / `NoMaxValue`, `StartWith`, `Cache`
 > and `Cycle` / `NoCycle`, each number an `i64` written as an integer literal,
 > `i64::MIN` and `i64::MAX` included. `SequenceOptions` holds one or more of
@@ -1358,7 +1358,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > Four spellings are not built, each a whole statement through `execute`:
 > `TEMPORARY` / `UNLOGGED` and `SET { LOGGED | UNLOGGED }` are persistence
-> choices of the kind `[spec:pgorm:req:sql.scope+11]` rules out for tables;
+> choices of the kind `[spec:pgorm:req:sql.scope]` rules out for tables;
 > `OWNER TO` is a role change, ruled out with privileges; and `SET SCHEMA` has
 > no table counterpart in the builder either.
 
@@ -1370,7 +1370,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > relation, so it is named as a table is — any `IntoTableName`, a bare name or
 > a `(schema, name)` pair, rendered as quoted, dot-joined identifiers — and its
 > body is a `SelectStatement` the constructor takes by value, as every
-> embedder takes what it embeds (`[spec:pgorm:req:sql.ddl.create-table+16]`),
+> embedder takes what it embeds (`[spec:pgorm:req:sql.ddl.create-table]`),
 > and checks as it takes it.
 > Name and body are constructor arguments with no setter, because `CREATE
 > VIEW  AS` and a view without a query are syntax errors, so neither husk
@@ -1386,15 +1386,15 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >   <name>...][ CASCADE | RESTRICT]`. `View::drop` takes the first name and
 >   `name()` appends, so the list is non-empty, and `cascade()` and
 >   `restrict()` share one `DropBehavior` slot
->   (`[spec:pgorm:req:sql.ddl.alter-table+12]`), the last call winning.
+>   (`[spec:pgorm:req:sql.ddl.alter-table]`), the last call winning.
 >   `names()` reads the list back.
 >
 > The body is the caller's query with its values inlined. PostgreSQL stores a
 > view's definition as SQL text, so a definition takes no bind parameter, and
 > the body renders through the value-inlining sink every DDL statement
-> renders through (`[spec:pgorm:req:sql.ddl+9]`): each value an escaped
+> renders through (`[spec:pgorm:req:sql.ddl]`): each value an escaped
 > literal, a string with a quote or a backslash in its `E''` form
-> (`[spec:pgorm:req:sql.render.string-escape+1]`). The live suite reads the
+> (`[spec:pgorm:req:sql.render.string-escape]`). The live suite reads the
 > stored definition back with the value in it.
 >
 > `create` and `create_recursive` MUST refuse a body whose tie limit
@@ -1494,7 +1494,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > Two spellings are not built, each a whole statement through `execute`:
 >
 > - `TEMPORARY` views, a persistence choice of the kind
->   `[spec:pgorm:req:sql.scope+17]` rules out for tables.
+>   `[spec:pgorm:req:sql.scope]` rules out for tables.
 > - `ALTER VIEW`. A view's definition and options change through `OR
 >   REPLACE`. Its name, its columns' names and the default an insert through
 >   it takes change through `Table::rename`, `Table::rename_column` and
@@ -1509,7 +1509,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `create(name, body)`, `refresh(name)` and `drop(name)`. Each names the view
 > as a table is named, and the create takes its body by value, refuses the
 > bodies a view's constructor refuses, returning a `Result`, and writes it
-> with its values inlined, as a view does (`[spec:pgorm:req:sql.ddl.view+1]`).
+> with its values inlined, as a view does (`[spec:pgorm:req:sql.ddl.view]`).
 >
 > - `MaterializedViewCreateStatement` MUST render `CREATE MATERIALIZED VIEW
 >   [IF NOT EXISTS ]<name>[ (<columns>)] AS <query>[ WITH NO DATA]`.
@@ -1546,7 +1546,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > live suite holds each refusal: a unique index on the view over plain
 > columns with no `WHERE` (`55000` without one), which `Index::create`
 > builds over the view's name, and a view already populated (`0A000`).
-> Unlike `CREATE INDEX CONCURRENTLY` (`[spec:pgorm:req:sql.ddl.index-create+11]`),
+> Unlike `CREATE INDEX CONCURRENTLY` (`[spec:pgorm:req:sql.ddl.index-create]`),
 > a concurrent refresh runs inside a transaction block, and the live suite
 > runs one there.
 >
@@ -1560,7 +1560,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > Two spellings are not built:
 >
 > - `USING <access method>`, `WITH (<storage options>)` and `TABLESPACE`,
->   storage choices `[spec:pgorm:req:sql.scope+17]` rules out for tables.
+>   storage choices `[spec:pgorm:req:sql.scope]` rules out for tables.
 > - `ALTER MATERIALIZED VIEW`, whose rename and column rename
 >   `Table::rename` and `Table::rename_column` reach, as for a view.
 
@@ -1576,8 +1576,8 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > back; more than the query has are refused (`42601`). The name and the body
 > are constructor arguments, and the body is taken by value, refused when a
 > view's constructor refuses it, so `create_as` returns a `Result`
-> (`[spec:pgorm:req:sql.ddl.view+1]`), and written with its values inlined,
-> as every DDL statement writes a value (`[spec:pgorm:req:sql.ddl+9]`).
+> (`[spec:pgorm:req:sql.ddl.view]`), and written with its values inlined,
+> as every DDL statement writes a value (`[spec:pgorm:req:sql.ddl]`).
 > `if_not_exists()` leaves an existing relation alone, its rows with it.
 >
 > From then on it is a table like any other, which the live suite holds: its
@@ -1590,7 +1590,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > - `TEMPORARY` and `UNLOGGED`, `ON COMMIT`, `USING`, `WITH (<storage
 >   options>)` and `TABLESPACE`, ruled out for tables by
->   `[spec:pgorm:req:sql.scope+17]`.
+>   `[spec:pgorm:req:sql.scope]`.
 > - `SELECT ... INTO`, another spelling of this same statement.
 > - `CREATE TABLE ... AS EXECUTE`, which names a prepared statement that no
 >   builder makes.
@@ -1613,7 +1613,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >   MUST NOT offer one (`[dec:pgorm:invalid-states-unrepresentable]`).
 >
 > Every statement renders through `Display` alone: a schema statement carries
-> names and nothing to bind (`[spec:pgorm:req:sql.ddl+10]`). A schema is
+> names and nothing to bind (`[spec:pgorm:req:sql.ddl]`). A schema is
 > created inside a transaction and undone with it, as the rest of the DDL is.
 >
 > What the server refuses, no builder value can see, and the live suite holds
@@ -1629,7 +1629,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > `schema_name` names that schema reads and writes its table there.
 >
 > Three spellings are not built. `AUTHORIZATION` and `ALTER SCHEMA … OWNER
-> TO` name a role, which `[spec:pgorm:req:sql.scope+18]` rules out with
+> TO` name a role, which `[spec:pgorm:req:sql.scope]` rules out with
 > privileges. The schema-element list — `CREATE SCHEMA s CREATE TABLE …` —
 > creates objects every builder here already creates qualified by the
 > schema's name, and PostgreSQL refuses it beside `IF NOT EXISTS` (`0A000`),
@@ -1689,7 +1689,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > the value tested and anywhere else as a column named `value`.
 >
 > Every statement renders through `Display` alone, a default and the values a
-> check compares with inlined (`[spec:pgorm:req:sql.ddl+11]`), and is undone
+> check compares with inlined (`[spec:pgorm:req:sql.ddl]`), and is undone
 > with the transaction it runs in. A column whose type is a domain is
 > `ColumnType::Domain` (`sql.types.column-type`), which renders the domain's
 > name through `TypeName`'s part policy alone, as an array's element and as
@@ -1741,7 +1741,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 >
 > Three spellings are not built. `ALTER DOMAIN … SET SCHEMA` the builder has
 > for no table, sequence or type either, and `OWNER TO` is a role change,
-> which `[spec:pgorm:req:sql.scope+21]` rules out with privileges. A named
+> which `[spec:pgorm:req:sql.scope]` rules out with privileges. A named
 > `NOT NULL` — `CONSTRAINT <name> NOT NULL`, or one added with `ADD
 > CONSTRAINT` — adds nothing a caller needs: `not_null()` and
 > `set_not_null()` write the same constraint, which PostgreSQL names
@@ -1766,7 +1766,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > version stays a `String`, because the grammar puts a string literal there
 > and text is what it is. None of the three is written verbatim: name and
 > schema render as quoted identifiers and version as a quoted string literal
-> (`[spec:pgorm:sem:sql.render.ddl.extension+3]`). On drop, `CASCADE` and
+> (`[spec:pgorm:sem:sql.render.ddl.extension]`). On drop, `CASCADE` and
 > `RESTRICT` share one `ExtensionDropOpt` slot that `cascade()`/`restrict()`
 > overwrite, so the pair PostgreSQL rejects does not construct; a drop carries
 > no schema or version, because it renders neither.
@@ -1782,7 +1782,7 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > The last edge was the empty `TableAlterStatement`, which panicked with
 > `No alter option found`; it is closed by construction rather than converted to
 > an error, because a statement with no action is not a statement
-> (`[spec:pgorm:req:sql.ddl.alter-table+4]`). It MUST NOT come back, in that
+> (`[spec:pgorm:req:sql.ddl.alter-table]`). It MUST NOT come back, in that
 > form or as a `Result`.
 >
 > Column type and auto-increment shape were panics of their own, and MUST NOT
@@ -1792,14 +1792,14 @@ behaviour, including the leftovers from the multi-backend ancestry.
 > serial substitution is likewise total: `auto_increment()` on a type outside
 > the integer trio renders the declared type rather than panicking with
 > `... doesn't support auto increment`
-> (`[spec:pgorm:req:sql.ddl.column-def+4]`). Neither guard is a `Result`; both
+> (`[spec:pgorm:req:sql.ddl.column-def]`). Neither guard is a `Result`; both
 > are closed by making the renderer's match exhaustive over spellings that
 > exist.
 >
 > Table reference shape was the third, and MUST NOT come back
 > either. Table statements (`create`/`alter`/`rename`/`drop`/`truncate`), index
 > and foreign-key targets and comment targets take a `TableName`
-> (`[spec:pgorm:def:sql.types.table-ref+7]`), which has no form the renderer
+> (`[spec:pgorm:def:sql.types.table-ref]`), which has no form the renderer
 > could refuse. The five `Not supported` panics and the `TableRef with values
 > is not support` panic that guarded these positions are gone, and a caller
 > cannot reintroduce them: binding an alias makes a reference a `NamedTable`,

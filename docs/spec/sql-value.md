@@ -22,7 +22,7 @@ including panic semantics and quirks inherited from sea-query.
 > `Decimal(Box<Decimal>)`, `Array(ArrayType, Option<Box<Vec<Value>>>)`,
 > `Vector(Box<pgvector::Vector>)`, `IpNetwork(Box<IpNetwork>)`,
 > `MacAddress(Box<MacAddress>)`, and the two range carriers of
-> `[spec:pgorm:def:sql.value.range+4]`,
+> `[spec:pgorm:def:sql.value.range]`,
 > `Range(RangeType, Option<Box<Range<Value>>>)` and
 > `Multirange(RangeType, Option<Box<Multirange<Value>>>)`, which carry their
 > range type beside the payload as `Array` carries its element type.
@@ -72,7 +72,7 @@ including panic semantics and quirks inherited from sea-query.
 >
 > The divergence is observable where a `Value` is a map key over live column
 > data — `LoaderTrait`'s `HashMap<ValueTuple, _>`
-> (`[spec:pgorm:sem:query.loader.regroup+6]`) — because the server and the map
+> (`[spec:pgorm:sem:query.loader.regroup]`) — because the server and the map
 > then disagree about `-0.0`: a row PostgreSQL matched on `a.k = b.k` can fail
 > to find its bucket, surfacing as the unmatched-key error rather than as a
 > wrong answer. A float is a poor relation key for that reason, and this rule
@@ -99,7 +99,7 @@ including panic semantics and quirks inherited from sea-query.
 > `From<Option<T>>` exists for any `T: Into<Value> + Nullable`: `Some(v)`
 > converts `v`, `None` produces the typed null `T::null()`. There is no
 > `From<Vec<u8>> for Value::Array` — `u8` vectors always become `Bytes` (see
-> `[spec:pgorm:def:sql.value.array+6]`).
+> `[spec:pgorm:def:sql.value.array]`).
 
 > [spec:pgorm:def:sql.value.value-type+3]
 > `ValueType` is the extraction/reflection trait implemented by every Rust type
@@ -280,12 +280,12 @@ including panic semantics and quirks inherited from sea-query.
 > range can. It MUST mean no bound, everywhere: that is how PostgreSQL's
 > range constructors read a `NULL` argument (`int4range(NULL, 5)` is
 > `(,5)`), so the literal rendering
-> (`[spec:pgorm:sem:sql.value.render+2]`), the binding
+> (`[spec:pgorm:sem:sql.value.render]`), the binding
 > (`[spec:pgorm:req:exec.cursor.binding-range]`) and `ValueType`'s
 > extraction all read it so and the two renderings of one value agree.
 >
 > A range type created by `CREATE TYPE ... AS RANGE`
-> (`[spec:pgorm:req:sql.ddl.type-range+2]`) has a name only its schema knows,
+> (`[spec:pgorm:req:sql.ddl.type-range]`) has a name only its schema knows,
 > so `RangeType` has no variant for it: a value of one is its text form cast
 > to the type by name, and a column of one is `ColumnType::CreatedRange`
 > (`[spec:pgorm:def:sql.value.created-range]`). A `Value::Range` of a
@@ -314,7 +314,7 @@ including panic semantics and quirks inherited from sea-query.
 > as `null`, so that form would read `[0,Infinity)` back as `[0,)`, where
 > this one fails to deserialize it. The newtype codegen generates for a range
 > type a schema created derives the same serde traits under `with_serde`
-> (`[spec:pgorm:def:codegen.entity.serde+1]`), a newtype struct, which JSON
+> (`[spec:pgorm:def:codegen.entity.serde]`), a newtype struct, which JSON
 > writes as the range it holds.
 >
 > Both language bindings carry the six and their multiranges, and the range
@@ -327,7 +327,7 @@ including panic semantics and quirks inherited from sea-query.
 
 > [spec:pgorm:def:sql.value.created-range+4]
 > A range type a schema creates with `CREATE TYPE ... AS RANGE`
-> (`[spec:pgorm:req:sql.ddl.type-range+2]`) is named by that schema, so no
+> (`[spec:pgorm:req:sql.ddl.type-range]`) is named by that schema, so no
 > `RangeType` variant can carry it, and `Value` does not: it stays one pointer
 > of payload wide. A value of one travels as its *text form* cast to the type
 > by name. The Rust side names the type once, in a newtype over `Range<T>`
@@ -373,7 +373,7 @@ including panic semantics and quirks inherited from sea-query.
 > `Expr::as_range(type_name)` is the cast. It writes a `Value::Range` or
 > `Value::Multirange` operand as its text — a `NULL` staying `NULL` — and
 > casts the operand to the `TypeName`, quoted and schema-qualifiable as every
-> type name is (`[spec:pgorm:def:sql.types.type-name+8]`); any other operand,
+> type name is (`[spec:pgorm:def:sql.types.type-name]`); any other operand,
 > such as the text the newtype converts into, is cast as it is. There is no
 > cast between two range types (`CAST(int4range(1, 5) AS slot)` is `42846`),
 > so text is the one form every range type reads. A text operand is a bound
@@ -381,7 +381,7 @@ including panic semantics and quirks inherited from sea-query.
 > input function reads it, every spelling the type takes; a bare `$1` there is
 > typed as the range, and a `String` bound to it is read by pgorm instead,
 > through the subtype's Rust parsing
-> (`[spec:pgorm:req:exec.cursor.binding-range+3]`). Inline it is an escaped
+> (`[spec:pgorm:req:exec.cursor.binding-range]`). Inline it is an escaped
 > string literal, and the two renderings are one value. A bound holding the
 > literal's syntax, a quote or a placeholder is read back as the text it is.
 >
@@ -389,7 +389,7 @@ including panic semantics and quirks inherited from sea-query.
 > DDL writes the name, schema-qualified and quoted where needed, and the
 > subtype is the `ColumnType` of what the bounds are, which no name says and
 > codegen reads. `ColumnTrait::save_as` on such a column is `as_range` to its
-> type (`[spec:pgorm:sem:entity.traits.column.enum-cast+6]`), so an insert, an
+> type (`[spec:pgorm:sem:entity.traits.column.enum-cast]`), so an insert, an
 > update and every value predicate write the text cast to the type. That is
 > what turns the `to_string()` of a built-in `Range<i32>` written to a column
 > of a range type over `int4` from a constructor call PostgreSQL refuses —
@@ -397,14 +397,14 @@ including panic semantics and quirks inherited from sea-query.
 > A row decodes from the range's binary form: tokio-postgres reports a created
 > range as a range over its subtype, so `Range<T>` decodes for every
 > `RangeSubtype` and refuses one over another subtype
-> (`[spec:pgorm:def:exec.decode.range+3]`), and the newtype decodes through it.
+> (`[spec:pgorm:def:exec.decode.range]`), and the newtype decodes through it.
 > Where a column is read into `Value`s, as a binary COPY reads one, a range
 > type a schema created over a `RangeSubtype` reads as the `String` of its
 > text form, the value its newtype converts into, and so does the multirange
 > beside it (`conn.copy.rows`).
 >
 > pgorm cannot author the C function a canonical function is
-> (`[spec:pgorm:req:sql.ddl.type-range+2]`), so a range type a schema creates
+> (`[spec:pgorm:req:sql.ddl.type-range]`), so a range type a schema creates
 > through it is continuous whatever its subtype: one over `int4` keeps `[1,5]`
 > and `(1,5]` as written where `int4range` moves them, and `[5,5)` is still
 > `empty`. The server refuses, with its own code on both renderings, inverted
@@ -468,8 +468,8 @@ including panic semantics and quirks inherited from sea-query.
 > values here where PostgreSQL's `=` on `interval` calls them equal.
 >
 > `Value::Interval(Option<Box<Interval>>)` carries one, beside the variants
-> `[spec:pgorm:def:sql.value+3]` lists, and `ArrayType::Interval` tags an
-> `interval[]`, beside the tags of `[spec:pgorm:def:sql.value.array+6]`. The
+> `[spec:pgorm:def:sql.value]` lists, and `ArrayType::Interval` tags an
+> `interval[]`, beside the tags of `[spec:pgorm:def:sql.value.array]`. The
 > payload is boxed though it holds no pointer: inline, its sixteen bytes and
 > the `Option` around them would widen every `Value` from 24 bytes to 32.
 > `From<Interval>`, `Nullable` and `ValueType` give the variant, its typed
@@ -477,10 +477,10 @@ including panic semantics and quirks inherited from sea-query.
 > `ArrayType::Interval`, `column_type` `ColumnType::Interval(IntervalSpec::Any(None))`,
 > the unqualified `interval` — and `Interval` is `NotU8`, so `Vec<Interval>` is
 > an `interval[]`. `is_interval` and `as_ref_interval` are its accessor pair,
-> and neither panics (`[spec:pgorm:sem:sql.value.accessor-panics+2]`).
+> and neither panics (`[spec:pgorm:sem:sql.value.accessor-panics]`).
 > `source_type_name` is `interval`, so a cast operand's placeholder is pinned
 > `$1::interval` and an array's `$1::interval[]`
-> (`[spec:pgorm:req:sql.render.cast-param-type+4]`), and an empty array's
+> (`[spec:pgorm:req:sql.render.cast-param-type]`), and an empty array's
 > literal is `ARRAY []::interval[]`.
 >
 > The binary form is `interval_send`'s: the microseconds, the days and then
@@ -488,7 +488,7 @@ including panic semantics and quirks inherited from sea-query.
 > writes it, and `Interval` implements `postgres_types::FromSql`, which reads
 > it from `interval` or a domain over it and refuses any other length. The
 > codec sits on the type, unlike a range's
-> (`[spec:pgorm:def:exec.decode.range+3]`), because pgorm, pgorm-python and
+> (`[spec:pgorm:def:exec.decode.range]`), because pgorm, pgorm-python and
 > pgorm-napi all decode an interval through it, and `postgres-types` is
 > already a dependency of pgorm-query, so no detached workspace locks a new
 > crate. There is no `ToSql`: its signature names `bytes`' `BytesMut`, which
@@ -506,8 +506,8 @@ including panic semantics and quirks inherited from sea-query.
 > the ones the Python binding's snapshot writes (`[spec:pgorm:req:python.value-tags]`),
 > each value the number it is rather than the decimal text a snapshot writes
 > for every integer. A Model deriving serde over an `Interval` field —
-> `ActiveModelTrait::from_json`'s (`[spec:pgorm:req:entity.active-model.json+3]`),
-> or one codegen generates (`[spec:pgorm:def:codegen.entity.serde+1]`) — so
+> `ActiveModelTrait::from_json`'s (`[spec:pgorm:req:entity.active-model.json]`),
+> or one codegen generates (`[spec:pgorm:def:codegen.entity.serde]`) — so
 > compiles and round-trips.
 >
 > Both language bindings carry it as their `Interval` (`bindings.values`),
@@ -533,7 +533,7 @@ including panic semantics and quirks inherited from sea-query.
 > as fields also read back as the infinities, but the words do not depend on
 > that.
 >
-> The literal rendering (`[spec:pgorm:sem:sql.value.render+2]`) writes that
+> The literal rendering (`[spec:pgorm:sem:sql.value.render]`) writes that
 > text single-quoted through `write_string_quoted` and cast,
 > `'+1 months -2 days +3000004 microseconds'::interval`, and a `None` payload
 > as `NULL`. Unlike the temporal literals it carries its cast: an untyped
@@ -570,7 +570,7 @@ including panic semantics and quirks inherited from sea-query.
 > spelling, which is what makes the derived `PartialEq`, `Eq` and `Hash` lawful
 > by construction: a key built from a Rust pair and one gathered from an
 > iterator of the same two values ARE equal and hash alike, so a
-> `HashMap<ValueTuple, _>` (`[spec:pgorm:sem:query.loader.regroup+6]`) cannot
+> `HashMap<ValueTuple, _>` (`[spec:pgorm:sem:query.loader.regroup]`) cannot
 > split one logical key across two buckets. Under an arity-tagged
 > representation that agreement rested on every producer picking the same tag;
 > here the divergent spelling cannot be constructed.
@@ -621,7 +621,7 @@ including panic semantics and quirks inherited from sea-query.
 > alone, a ninth digit would be rounded by the server on the literal path and
 > discarded by the encoder on the bound one, so the same value would mean two
 > different things depending on how it travelled
-> (`[spec:pgorm:def:exec.cursor.binding+6]`).
+> (`[spec:pgorm:def:exec.cursor.binding]`).
 >
 > `Uuid`, `IpNetwork` and `MacAddress` render as
 > quoted display strings. `Array` renders as `ARRAY [elem,...]` recursively
@@ -744,7 +744,7 @@ including panic semantics and quirks inherited from sea-query.
 > name wherever it names a table, and a bare name answering `Some` maps to
 > `SchemaTable` of that schema (a `Name::runtime`) and the name, erased to a
 > `Name` first or not. An entity is such a name
-> (`[spec:pgorm:req:entity.traits.entity-name+3]`). The schema qualifies the
+> (`[spec:pgorm:req:entity.traits.entity-name]`). The schema qualifies the
 > table and nothing else: a column of it is still qualified by the table
 > name alone, which the qualified table exposes. `TableName::table()`
 > returns the table name; `TableName::schema()` returns the schema name when
@@ -782,7 +782,7 @@ including panic semantics and quirks inherited from sea-query.
 >
 > `Template` is how SQL this crate did not build stands where a relation
 > stands, and it is template-class rather than raw: its payload is a
-> `SqlTemplate` (`[spec:pgorm:req:sql.render.custom-expr+3]`), so the
+> `SqlTemplate` (`[spec:pgorm:req:sql.render.custom-expr]`), so the
 > fragment arrives already paired with the values its `$N` markers number
 > and a fragment whose markers and values disagree is unconstructible. There
 > is no `&'static str` sibling in this position: relation-position fragments
@@ -799,7 +799,7 @@ including panic semantics and quirks inherited from sea-query.
 > list or function call in a DDL or DML position is a type error rather than a
 > render-time panic or a statement PostgreSQL rejects; an alias in a DDL
 > position is a type error for the same reason
-> (`[spec:pgorm:sem:sql.ddl.panics+4]`).
+> (`[spec:pgorm:sem:sql.ddl.panics]`).
 
 > [spec:pgorm:def:sql.types.opers+6]
 > `UnOper` has the single variant `Not`. `BinOper` enumerates the binary
@@ -927,7 +927,7 @@ including panic semantics and quirks inherited from sea-query.
 > codegen respells a named type from it, and no writer puts it into a
 > statement. The
 > pipeline's `select_sources` read cast renders through `to_sql_string`
-> like every other cast (`[spec:pgorm:sem:pipeline.select-sources+4]`).
+> like every other cast (`[spec:pgorm:sem:pipeline.select-sources]`).
 > `Function::Named` names render under the same policy at their own
 > position, and so does `IndexType::Named`'s access method. Both reach
 > `prepare_part` directly because each is a single name rather than a
@@ -973,11 +973,11 @@ including panic semantics and quirks inherited from sea-query.
 > names the type can qualify),
 > `Array(Arc<ColumnType>)`, `Vector(Option<u32>)`, `Cidr`, `Inet`, `MacAddr`,
 > `LTree`, `Range(RangeType)` and `Multirange(RangeType)`, PostgreSQL's
-> built-in range and multirange types (`[spec:pgorm:def:sql.value.range+4]`),
+> built-in range and multirange types (`[spec:pgorm:def:sql.value.range]`),
 > `CreatedRange { name, schema, subtype }`, a range type a schema created,
 > named in full as an enum type is and carrying the `ColumnType` of its
 > subtype, `CreatedMultirange { name, schema, subtype }`, the multirange
-> created beside one (`[spec:pgorm:def:sql.value.created-range+1]`), and
+> created beside one (`[spec:pgorm:def:sql.value.created-range]`), and
 > `Domain { name, schema, base }`, a domain (`sql.ddl.domain`), named in full
 > and carrying the `ColumnType` of its base. `Domain` is the one spelling of a
 > column whose type is a domain: `Named` renders the same DDL but says nothing
@@ -985,7 +985,7 @@ including panic semantics and quirks inherited from sea-query.
 > as and what codegen generates the field from.
 > `ColumnType::serial_spelling` reports the serial form of the
 > integer trio and `None` for everything else
-> (`[spec:pgorm:req:sql.ddl.column-def+4]`).
+> (`[spec:pgorm:req:sql.ddl.column-def]`).
 >
 > The vocabulary carries no MySQL-era spelling and no variant that renders
 > something other than what it names, and MUST NOT reacquire one. `Year` had

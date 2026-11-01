@@ -56,7 +56,7 @@ specified under [Schema from DDL text](#schema-from-ddl-text).
 > a name, so the read cannot fail and the
 > `TransformError("Table name should not be empty")` that stood in for the
 > nameless case is gone with the state it guarded
-> (`[spec:pgorm:req:sql.ddl.create-table+8]`), and MUST NOT come back.
+> (`[spec:pgorm:req:sql.ddl.create-table]`), and MUST NOT come back.
 >
 > Identity is what every lookup keys on: the entity map, the per-target
 > counters behind `num_suffix`, the `self_referencing` test, and the inverse
@@ -193,7 +193,7 @@ specified under [Schema from DDL text](#schema-from-ddl-text).
 > names a referenced table, so that read cannot fail and the
 > ``TransformError("... referenced table should not be empty")`` that stood in
 > for the tableless case is gone with the state it guarded
-> (`[spec:pgorm:req:sql.ddl.foreign-key+5]`), and MUST NOT come back: the
+> (`[spec:pgorm:req:sql.ddl.foreign-key]`), and MUST NOT come back: the
 > conversion is `From<&TableForeignKey> for Relation`, not a `TryFrom`.
 >
 > A foreign key PostgreSQL cannot implement is refused with them: one
@@ -424,7 +424,7 @@ specified under [Schema from DDL text](#schema-from-ddl-text).
 > (`macros.derive.entity-model.column-def`), so it is generated *program
 > text*, and the names it uses — `Arc`, `ColumnType`, `Name`, `IntervalSpec`,
 > `PgInterval`, `IntervalPrecision` — resolve through the prelude glob the
-> entity file imports (`[spec:pgorm:def:entity.prelude+8]`), as an enum a
+> entity file imports (`[spec:pgorm:def:entity.prelude]`), as an enum a
 > domain is over resolves through the import of it. Every part of it
 > but the named type's and a domain's names is fixed by this rule —
 > `Decimal`'s precision and scale are integers, and an interval's qualifier
@@ -530,7 +530,7 @@ specified under [Schema from DDL text](#schema-from-ddl-text).
 > | `Range(t)` / `Multirange(t)` | `Range<E>` / `Multirange<E>`, `E` being `i32`, `i64`, `Decimal`, `Date`, `DateTime` or `DateTimeWithTimeZone` for `Int4` through `TimestampTz` |
 > | `CreatedRange { name, .. }` / `CreatedMultirange { name, .. }` | UpperCamelCase of `name`, the newtype over `Range<E>` / `Multirange<E>` that `pgorm_range_types.rs` declares |
 > | `Domain { base, .. }` | `T(base)` (recursive): a domain's values are its base type's |
-> | `Date`, `Time`, `Timestamp`, `TimestampWithTimeZone` | per `codegen.entity.types.datetime+1` |
+> | `Date`, `Time`, `Timestamp`, `TimestampWithTimeZone` | per `codegen.entity.types.datetime` |
 >
 > No row produces an unsigned Rust integer: Postgres has no unsigned integer
 > type, so a generated field MUST NOT claim one.
@@ -631,7 +631,7 @@ specified under [Schema from DDL text](#schema-from-ddl-text).
 > `timestamp` is; mapping it to the instant type would claim a time zone the
 > column does not carry, and would disagree with the inference table's
 > `DateTime`→`Timestamp` direction
-> (`[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`).
+> (`[spec:pgorm:sem:macros.derive.entity-model.column-def]`).
 >
 > There is no option selecting between date/time crates, and codegen MUST NOT
 > offer one. jiff is the single temporal crate pgorm models PostgreSQL with,
@@ -654,7 +654,7 @@ specified under [Schema from DDL text](#schema-from-ddl-text).
 > element types are checked recursively, so an array of an unsupported
 > element type is itself unsupported. An array of ranges or multiranges is
 > supported as its element is — `int4range[]` is `Vec<Range<i32>>`
-> (`[spec:pgorm:def:sql.value.array+6]`) — the compact writer stating no
+> (`[spec:pgorm:def:sql.value.array]`) — the compact writer stating no
 > `column_type` for it, as for a range. So is an array of intervals, its
 > element's qualifier with it: `interval YEAR TO MONTH[]` is `Vec<Interval>`,
 > and no `IntervalSpec` is refused. A range type a schema created, and
@@ -714,8 +714,8 @@ specified under [Schema from DDL text](#schema-from-ddl-text).
 > The output compiles under every variant whatever the columns, because
 > every type a generated field can hold serializes under pgorm's `with-json`
 > feature: `Interval`, `Range` and `Multirange` through pgorm-query's `serde`
-> feature (`[spec:pgorm:def:sql.value.interval+2]`,
-> `[spec:pgorm:def:sql.value.range+5]`), and `Decimal` and the jiff and uuid
+> feature (`[spec:pgorm:def:sql.value.interval]`,
+> `[spec:pgorm:def:sql.value.range]`), and `Decimal` and the jiff and uuid
 > types through their own crates'. `tests/serde_values_tests.rs` holds this
 > with an entity of interval, built-in range, multirange and created range
 > columns — nullable, qualified and as arrays — generated and compiled under
@@ -1264,7 +1264,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > modifier``.
 >
 > The map is close to a bijection because the forward contract
-> (`[spec:pgorm:req:sql.ddl.column-types+5]`) no longer spells one Postgres
+> (`[spec:pgorm:req:sql.ddl.column-types]`) no longer spells one Postgres
 > type under several names: `bytea`, `timestamp`, `smallint` and `money` each
 > have exactly one `ColumnType` to come back to, so `Bytea`, `Timestamp`,
 > `SmallInteger` and `Money` are recovered rather than chosen from a set. Where
@@ -1327,7 +1327,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > holds (`codegen.ddl.unsupported`).
 >
 > A column's `COLLATE` clause becomes the column's collation
-> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def+12]`), bare or
+> (`ColumnDef::collate`, `[spec:pgorm:req:sql.ddl.column-def]`), bare or
 > schema-qualified as written; a catalog-qualified name is a named rejection,
 > as a table's is. It rides on the statement and does not reach the generated
 > entity, as a column comment does not (`codegen.ddl.objects`): the entity
@@ -1341,7 +1341,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 >
 > A column's `NOT NULL` is PostgreSQL 18's catalog constraint, and its name
 > and `NO INHERIT` become the column's (`ColumnDef::not_null_named`,
-> `not_null_no_inherit`, `[spec:pgorm:req:sql.ddl.column-def+12]`), whether
+> `not_null_no_inherit`, `[spec:pgorm:req:sql.ddl.column-def]`), whether
 > the column's clause declares them or a table-level `[CONSTRAINT n] NOT NULL
 > c [NO INHERIT]` does: the server creates the same constraint from either,
 > and `sql.ddl.column-def` gives the column the one spelling. They ride on the
@@ -1364,7 +1364,7 @@ compiling the C parser falls on people generating entities and on nobody else.
 > its columns, referenced table and referenced columns, and both forms keep the
 > constraint name. A foreign key whose two column lists differ in length is a
 > named rejection rather than a truncated key — the pairs are what the bridged
-> statement is built from (`[spec:pgorm:req:sql.ddl.foreign-key+5]`), and
+> statement is built from (`[spec:pgorm:req:sql.ddl.foreign-key]`), and
 > Postgres itself rejects the mismatch at parse analysis. An explicit
 > `ENFORCED` on a column's `REFERENCES` becomes the foreign key's
 > `Enforcement::Enforced`, riding on the statement as said; the entity is the

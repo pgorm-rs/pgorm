@@ -64,7 +64,7 @@ known limitations.
 > identifier-quoting `cast_as` instead would spell `CAST(_ AS "BIT(8)")`, a name
 > PostgreSQL has no type for. The verbatim rendering is sound exactly because the
 > text is a compile-time literal in the caller's source, unreachable from data;
-> `[spec:pgorm:def:sql.types.type-name+8]` is where that text rides — the
+> `[spec:pgorm:def:sql.types.type-name]` is where that text rides — the
 > `verbatim` flag of the ordinary cast node, not a shape of its own
 > (`[spec:pgorm:req:sql.ast.cast-shape]`) — and it keeps every
 > *identifier*-borne type name quoted
@@ -75,7 +75,7 @@ known limitations.
 > `Copy, Clone, Default, Debug, DeriveEntity` together with a hand-rolled `EntityName`
 > impl returning the `table_name`, optional `schema_name`, and optional `comment`; and
 > (4) a `PrimaryKey` enum deriving `Copy, Clone, Debug, EnumIter, DerivePrimaryKey` with
-> a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key+6]`).
+> a `PrimaryKeyTrait` impl (see `[spec:pgorm:sem:macros.derive.entity-model.primary-key]`).
 >
 > The `json_key()` arm is the one place the derive reads an attribute outside the
 > `#[pgorm(...)]` namespace: the key is the field's own name, put through
@@ -85,7 +85,7 @@ known limitations.
 > parameter is stepped over unread. Column naming does not take part in either
 > direction — `#[pgorm(column_name)]` and `#[pgorm(enum_name)]` move the SQL name and
 > the variant, not the key — which is the point of the two namespaces being separate
-> (`[spec:pgorm:def:entity.traits.column+6]`).
+> (`[spec:pgorm:def:entity.traits.column]`).
 
 > [spec:pgorm:req:macros.derive.entity-model.reject+1]
 > `DeriveEntityModel` input MUST be a struct named exactly `Model`; any other identifier
@@ -174,7 +174,7 @@ known limitations.
 > (`&'a str` becoming `&'astr`), and the fallback MUST NOT be able to fail to re-parse.
 > `u8` and `u16` are deliberately absent from
 > the table: they fall through to that `ValueType` path and, since neither
-> implements `ValueType` (see `[spec:pgorm:def:sql.value.conversions+1]`), a `u8`
+> implements `ValueType` (see `[spec:pgorm:def:sql.value.conversions]`), a `u8`
 > or `u16` field is a compile error rather than a column type that panics when
 > bound.
 >
@@ -200,7 +200,7 @@ known limitations.
 > written in the entity's own module, so it names the row's columns as `Column`
 > variants: `generated_stored = "Expr::col(Column::Price).mul(Expr::col(Column::Quantity))"`.
 > The kind is in the key's name and has no default, for the reason the builder's
-> `generated` takes it as an argument (`[spec:pgorm:req:sql.ddl.column-def+12]`).
+> `generated` takes it as an argument (`[spec:pgorm:req:sql.ddl.column-def]`).
 > Each combination PostgreSQL refuses for a generated column MUST be a compile error
 > spanned at the field's generated key: both keys, or one twice ("a column is generated
 > one way"); a generated key beside `identity` or `identity_by_default` ("both identity
@@ -216,7 +216,7 @@ known limitations.
 > (42P17).
 >
 > The parallel `ArrayType` table that `DeriveValueType` reads
-> (`[spec:pgorm:sem:macros.derive.value-type+3]`) is matched the same way and carries the
+> (`[spec:pgorm:sem:macros.derive.value-type]`) is matched the same way and carries the
 > same rows mapped to their `ArrayType` counterparts, with two divergences. `Vec<u8>`
 > it does not carry at all. And the timezone-aware datetime row splits:
 > `DateTimeUtc`→`ChronoDateTimeUtc`, `DateTimeLocal`→`ChronoDateTimeLocal`,
@@ -297,7 +297,7 @@ known limitations.
 > via struct-level `#[pgorm(model = Ident, active_model = Ident, column = Ident,
 > primary_key = Ident, relation = Ident)]` — plus `SqlName` and `StaticName` impls that
 > render `EntityName::table_name`, the `SqlName` answering `EntityName::schema_name` as
-> its `table_schema` (`[spec:pgorm:def:sql.types.table-ref+7]`). An `EntityName` impl (with optional `schema_name`)
+> its `table_schema` (`[spec:pgorm:def:sql.types.table-ref]`). An `EntityName` impl (with optional `schema_name`)
 > is generated only when a `table_name` attribute is present; the `DeriveEntityModel`
 > path omits it because the composite writes its own `EntityName` impl.
 
@@ -319,7 +319,7 @@ known limitations.
 > impls. `FromQueryResult`: each field is read with
 > `row.try_get(pre, Column::<Variant>.as_str())`, where the variant name follows the
 > same trim/UpperCamelCase/keyword-escape/`enum_name` rules as
-> `[spec:pgorm:sem:macros.derive.entity-model.casing+1]`; `#[pgorm(ignore)]` fields are
+> `[spec:pgorm:sem:macros.derive.entity-model.casing]`; `#[pgorm(ignore)]` fields are
 > filled with `Default::default()` instead. `expected_columns` reports the same
 > column names, each paired with its field type's spelling and that type's
 > `TryGetable::accepts`, so an entity model can be checked against a raw statement
@@ -469,7 +469,7 @@ known limitations.
 > or outside `from_col`/`from_expr`/`skip` at the field level, is
 > "unknown pgorm attribute `<key>`" spanned at the key. `skip` is accepted and unread
 > here because `FromQueryResult`, which reads it, is routinely derived on the same
-> struct (`[spec:pgorm:sem:macros.derive.from-query-result+2]`).
+> struct (`[spec:pgorm:sem:macros.derive.from-query-result]`).
 
 > [spec:pgorm:sem:macros.derive.from-query-result+2]
 > `FromQueryResult` (named-field structs only; generics supported) implements
@@ -481,7 +481,7 @@ known limitations.
 > is the compile error "unknown pgorm attribute `<key>`" spanned at the key; the latter
 > two are accepted and unread because `DerivePartialModel`, which reads them, is
 > routinely derived on the same struct
-> (`[spec:pgorm:sem:macros.derive.partial-model+3]`).
+> (`[spec:pgorm:sem:macros.derive.partial-model]`).
 >
 > It also implements `expected_columns`, reporting one `ExpectedColumn` per read field
 > in declaration order: the same un-rawed identifier, the field type as written (with
@@ -512,7 +512,7 @@ known limitations.
 > attributes `column_type = "..."` and
 > `array_type = "..."` override the inferred `ColumnType`/`ArrayType`, which otherwise
 > use the same Rust-type tables (and `Option<T>` unwrapping) as
-> `[spec:pgorm:sem:macros.derive.entity-model.column-def+7]`, falling back to
+> `[spec:pgorm:sem:macros.derive.entity-model.column-def]`, falling back to
 > `<T as ValueType>::column_type()`/`array_type()` — and inheriting that rule's refusal
 > of `i8`, `u32`, `u64` and `char` on the `ColumnType` side. Attribute errors propagate: a
 > non-string value for either key, and any other key in the `#[pgorm(...)]` list, is a
@@ -522,7 +522,7 @@ known limitations.
 
 > [spec:pgorm:sem:macros.derive.created-range+1]
 > `DeriveCreatedRange` names a range type a schema created, or the
-> multirange created beside one (`[spec:pgorm:def:sql.value.created-range+1]`),
+> multirange created beside one (`[spec:pgorm:def:sql.value.created-range]`),
 > on a tuple struct holding one field: written `Range<T>` under `range_name =
 > "..."`, `Multirange<T>` under `multirange_name = "..."` — the last path
 > segment, however qualified, with one type argument, `T` the subtype. Exactly
@@ -630,7 +630,7 @@ known limitations.
 > string literal and nothing else. While the calling crate is being compiled, the
 > literal's text is handed to `pg_query::parse` — the Rust binding to libpg_query, the
 > PostgreSQL server's own parser, at the same revision the render oracle uses and for
-> the same reason (`[spec:pgorm:req:sql.render.oracle+4]`), so a literal is held to
+> the same reason (`[spec:pgorm:req:sql.render.oracle]`), so a literal is held to
 > PostgreSQL 18's grammar: a statement only 18 parses, such as a `VIRTUAL` generated
 > column, compiles. A literal the grammar
 > accepts expands to itself, byte for byte, as a `&'static str` usable in const
@@ -642,9 +642,9 @@ known limitations.
 > crate is a plain dependent and re-exports both as `pgorm::sql` and `pgorm::prql`,
 > unconditionally: the retired `sql-macro` feature only decided whether the name was in
 > scope — never whether anything was compiled, since `pg_query` is a plain dependency
-> of `pgorm` itself (`[spec:pgorm:sem:exec.paginator.raw+6]` parses raw statements at
+> of `pgorm` itself (`[spec:pgorm:sem:exec.paginator.raw]` parses raw statements at
 > runtime) and prqlc is a plain dependency by the same permanence posture
-> (`[spec:pgorm:def:pipeline.adapter+2]`) — and a gate that guards nothing is surface
+> (`[spec:pgorm:def:pipeline.adapter]`) — and a gate that guards nothing is surface
 > without a state.
 >
 > The call sites are the escape hatches that take SQL as text, and documentation
@@ -652,14 +652,14 @@ known limitations.
 > list this rule used to carry named four of them while ten existed, which is
 > worse than no list, because an auditor who trusts it audits a quarter of the
 > surface. On a connection the rule is the `SqlText` bound
-> (`[spec:pgorm:def:conn.sql-text+2]`): every `ConnectionTrait` method taking
+> (`[spec:pgorm:def:conn.sql-text]`): every `ConnectionTrait` method taking
 > `&T where T: SqlText` — `execute`, `execute_raw`, `query_one`, `query_opt`,
 > `query_all`, `query_raw` — plus `batch_execute`, which takes its `&str`
 > directly because it runs a script through the simple-query protocol. Away from
 > a connection a raw statement is SQL text paired with its values, and the entry
 > points are `Select::from_raw_sql`, the three `SelectorRaw` constructors and the
 > three `DecodeRaw` methods on a `(sql, values)` pair
-> (`[spec:pgorm:sem:exec.crud.selector-entry+2]`), and
+> (`[spec:pgorm:sem:exec.crud.selector-entry]`), and
 > `FromQueryResult::find_by_statement`. Migration bodies are the last of them.
 
 > [spec:pgorm:req:macros.sql.reject]
@@ -742,7 +742,7 @@ build-time checking of the finished statement.
 > and a crate split would buy a second build unit and nothing else. The proc-macro
 > crate carries its own `prqlc` dependency on the fork, `default-features = false` — the
 > same pinned revision as the root crate's runtime pipeline, the one sanctioned exception to the
-> adapter's confinement rule (`[spec:pgorm:def:pipeline.adapter+2]`) — and the two
+> adapter's confinement rule (`[spec:pgorm:def:pipeline.adapter]`) — and the two
 > pins MUST move in lockstep so the text macro and the typed pipeline emit through one
 > compiler.
 

@@ -15,11 +15,11 @@ bound parameter is held to.
 > limit, optional `before`/`after` boundary `ValueTuple`s, a `sort_asc`
 > flag (default ascending), and a list of secondary order columns. `K` is
 > the boundary shape the order columns fix — the `IntoKey::ValueType`
-> of `[spec:pgorm:def:entity.relation.def+10]` — and defaults to
+> of `[spec:pgorm:def:entity.relation.def]` — and defaults to
 > `ValueTuple`. The boundaries are set by `before`/`after`, whose arity `K`
 > fixes, or by `before_with`/`after_with`, which take the cursor's whole
 > sort key including its secondary order columns and so cannot be typed by
-> `K` (`[spec:pgorm:sem:exec.cursor.keyset+5]`). Cursors are created via
+> `K` (`[spec:pgorm:sem:exec.cursor.keyset]`). Cursors are created via
 > `Select::cursor_by` (order columns on the entity's table) and, for joined
 > reads, `SelectGraph::cursor_by` / `cursor_by_on`
 > (`[spec:pgorm:sem:query.graph.cursor]`: order columns on the root or on a
@@ -40,7 +40,7 @@ bound parameter is held to.
 > A cursor's *keyset* is the column list its rows are totally ordered by:
 > the order columns, qualified with the cursor's table, followed by each
 > unary secondary order entry qualified with its own table
-> (`[spec:pgorm:sem:exec.cursor.order+4]`). `ORDER BY` and the boundary
+> (`[spec:pgorm:sem:exec.cursor.order]`). `ORDER BY` and the boundary
 > comparison MUST both be built from that one list, so the row order and
 > the predicate that resumes it cannot disagree about where a page ends.
 >
@@ -58,7 +58,7 @@ bound parameter is held to.
 > (`entity.traits.column.enum-cast`), captured while the typed column is in
 > hand — an order column's from the typed column set at `cursor_by` time, a
 > graph's tiebreak's from the source's primary-key column as the graph
-> installs it (`[spec:pgorm:sem:query.graph.cursor+3]`), and a caller's
+> installs it (`[spec:pgorm:sem:query.graph.cursor]`), and a caller's
 > secondary entry's from the column `add_secondary_order_by(table, column)`
 > takes — the keyset itself being type-erased identifiers, so the cast
 > cannot be recovered later. A keyset column whose domain is over an enum
@@ -148,9 +148,9 @@ bound parameter is held to.
 > table, in declared order, then its secondary order entries qualified with
 > theirs — all using the single resolved direction of
 > `exec.cursor.window`. This is the same list the boundary comparison of
-> `[spec:pgorm:sem:exec.cursor.keyset+5]` is built from. Only
+> `[spec:pgorm:sem:exec.cursor.keyset]` is built from. Only
 > unary secondary entries take part — those whose `Key` has arity 1
-> (`[spec:pgorm:def:entity.relation.def+10]`), a length now read rather than
+> (`[spec:pgorm:def:entity.relation.def]`), a length now read rather than
 > matched on; composite secondary keys are silently ignored, in the
 > ordering and in the boundary alike. A joined read installs those entries from its declaration rather
 > than from a call site (`[spec:pgorm:sem:query.graph.cursor]`), so a joined
@@ -165,7 +165,7 @@ bound parameter is held to.
 > `Bool` to the primitive `bool` impl; the integer variants
 > (`TinyInt`/`SmallInt`/`Int`/`BigInt`/`Unsigned`/`BigUnsigned`) and the
 > float variants (`Float`/`Double`) through the numeric coercion of
-> `[spec:pgorm:req:exec.cursor.binding-coerce+2]`, which also covers the
+> `[spec:pgorm:req:exec.cursor.binding-coerce]`, which also covers the
 > `oid` and `"char"` targets the corresponding primitive impls define —
 > `BigUnsigned` (u64) reaching all of them through a checked conversion to
 > `i64`; `Char` is stringified; `String`, `Bytes`, `Json`, `Date`, `Time`,
@@ -219,7 +219,7 @@ bound parameter is held to.
 > is per-variant, so it lives where the variant is in hand: `to_sql`, which
 > `to_sql_checked!` reaches and which runs client-side while the bind
 > message is being encoded, before anything is sent. What it accepts is
-> `[spec:pgorm:req:exec.cursor.binding-accepts+1]`.
+> `[spec:pgorm:req:exec.cursor.binding-accepts]`.
 
 > [spec:pgorm:req:exec.cursor.binding-coerce+2]
 > When the Postgres type inferred for a placeholder is in the numeric
@@ -254,7 +254,7 @@ bound parameter is held to.
 > and a `TinyInt` bound against `"char"` keep the encodings those impls
 > define while a value that does not fit is an error instead of a
 > reinterpretation. Every *other* inferred type is refused by
-> `[spec:pgorm:req:exec.cursor.binding-accepts+1]`: an integer or a float has
+> `[spec:pgorm:req:exec.cursor.binding-accepts]`: an integer or a float has
 > no representation `bytea`, `text`, `bool` or `uuid` could receive, and
 > writing one anyway is what let a mismatch through. Because `Value::Array`
 > binds through `Vec<ValueHolder>`, which hands each element the array's
@@ -270,16 +270,16 @@ bound parameter is held to.
 > no arm may `panic!`, `unimplemented!` or `todo!`, and no arm may reach a
 > panic in a delegate. The former panicking arms are gone.
 > `Value::TinyUnsigned` (u8) and `Value::SmallUnsigned` (u16) no longer
-> exist as variants at all (see `[spec:pgorm:def:sql.value+3]`), so passing
+> exist as variants at all (see `[spec:pgorm:def:sql.value]`), so passing
 > a `u8` or `u16` is a compile error rather than a runtime panic;
 > `Value::Vector`, `Value::IpNetwork` and `Value::MacAddress` bind per
-> `[spec:pgorm:def:exec.cursor.binding+4]`.
+> `[spec:pgorm:def:exec.cursor.binding]`.
 >
 > The `Array` arm is where the delegate clause bites: `Vec<T>`'s own
 > `to_sql` reads its member type out of `Kind::Array` and `panic!`s on
 > anything else, so the arm MUST establish that the target is an array
 > itself and raise the refusal of
-> `[spec:pgorm:req:exec.cursor.binding-accepts+1]` when it is not. A
+> `[spec:pgorm:req:exec.cursor.binding-accepts]` when it is not. A
 > `Value::Array` against a scalar placeholder is reachable — an active
 > model whose column type is a scalar `jsonb` but whose Rust field is a
 > `Vec` produces exactly that when the JSON-flattening branch of
@@ -298,12 +298,12 @@ bound parameter is held to.
 > accepted by the server and read as 825373492, the integer those four
 > ASCII bytes spell. The same path serves predicates and writes, so a
 > mismatch selected and stored wrong values rather than erroring.
-> `[spec:pgorm:req:exec.cursor.binding-accepts+1]` closes it.
+> `[spec:pgorm:req:exec.cursor.binding-accepts]` closes it.
 >
 > `bits_tests` used to be the standing example of the gap, where saving an
 > integer into a `BIT(n)` column made Postgres infer `bit` for a parameter
 > the driver wrote as an `int8` (`22P03`). It is no longer one:
-> `[spec:pgorm:req:sql.render.cast-param-type+4]` pins a cast operand's
+> `[spec:pgorm:req:sql.render.cast-param-type]` pins a cast operand's
 > placeholder to the type the value is actually written as, and the test
 > runs unignored.
 
@@ -315,7 +315,7 @@ bound parameter is held to.
 > tokio-postgres surfaces while encoding the bind message, so the statement
 > never reaches the server. The failure arrives as an `Error::Postgres`
 > carrying no `DbError`, the same shape as any other encoding failure (see
-> `[spec:pgorm:sem:error.model.sql-class+3]`).
+> `[spec:pgorm:sem:error.model.sql-class]`).
 >
 > The question the check asks is about *representation*, not about meaning.
 > A type is accepted when the bytes this variant writes are the bytes that
@@ -339,9 +339,9 @@ bound parameter is held to.
 > | `Value` variant | accepted Postgres types |
 > | --- | --- |
 > | `Bool` | `bool` |
-> | `TinyInt`, `SmallInt`, `Int`, `BigInt`, `Unsigned`, `BigUnsigned` | `int2`, `int4`, `int8`, `oid`, `"char"`, `float4`, `float8`, `numeric` — converted per `[spec:pgorm:req:exec.cursor.binding-coerce+2]` |
+> | `TinyInt`, `SmallInt`, `Int`, `BigInt`, `Unsigned`, `BigUnsigned` | `int2`, `int4`, `int8`, `oid`, `"char"`, `float4`, `float8`, `numeric` — converted per `[spec:pgorm:req:exec.cursor.binding-coerce]` |
 > | `Float`, `Double` | `float4`, `float8`, `numeric`; `int2`/`int4`/`int8` are a distinct "without loss" refusal rather than a representation mismatch |
-> | `String`, `Char` | `text`, `varchar`, `bpchar`, `name`, `xml`, `unknown`; every enum (a label is sent as its own text); and `citext`, `ltree`, `lquery`, `ltxtquery` — the text-backed extension types `postgres-types` itself names. A `String` also binds against a range type a schema created, and against a multirange type a schema created whose kind a COPY's description completed, as the range or multirange its text spells (`[spec:pgorm:req:exec.cursor.binding-range+3]`) |
+> | `String`, `Char` | `text`, `varchar`, `bpchar`, `name`, `xml`, `unknown`; every enum (a label is sent as its own text); and `citext`, `ltree`, `lquery`, `ltxtquery` — the text-backed extension types `postgres-types` itself names. A `String` also binds against a range type a schema created, and against a multirange type a schema created whose kind a COPY's description completed, as the range or multirange its text spells (`[spec:pgorm:req:exec.cursor.binding-range]`) |
 > | `Bytes` | `bytea` |
 > | `Json` | `json`, `jsonb` |
 > | `ChronoDate` | `date` |
@@ -379,7 +379,7 @@ bound parameter is held to.
 > [spec:pgorm:req:exec.cursor.binding-interval]
 > `ValueHolder` binds a `Value::Interval` against a placeholder whose type is
 > `interval`, or a domain over it, unwrapped as every binding decision is
-> (`[spec:pgorm:req:exec.cursor.binding-accepts+1]`), writing the sixteen
+> (`[spec:pgorm:req:exec.cursor.binding-accepts]`), writing the sixteen
 > bytes of `Interval::to_binary` (`[spec:pgorm:def:sql.value.interval]`). Any
 > other type is refused before the statement is sent, with ``cannot bind a
 > `Interval` value to Postgres type `<type>` ``, and a `None` payload is
@@ -395,7 +395,7 @@ bound parameter is held to.
 > `Value::Multirange` against a multirange whose kind names its subtype: a
 > built-in one, or one a schema created whose kind a COPY's description
 > completed (`conn.copy.rows`); anything else is refused before the
-> statement is sent (`[spec:pgorm:req:exec.cursor.binding-accepts+3]`). A
+> statement is sent (`[spec:pgorm:req:exec.cursor.binding-accepts]`). A
 > `None` payload is `NULL`. The range is written through
 > `postgres_protocol::types::range_to_sql` — the empty range as its flag byte
 > alone, otherwise a flag byte saying which sides are inclusive or unbounded
@@ -404,16 +404,16 @@ bound parameter is held to.
 > and every encoding fix a scalar of its variant gets: an `int8` value
 > narrowed to an `int4range`'s subtype, a naive datetime at the ends of the
 > calendar, a zero `numeric` keeping its scale
-> (`[spec:pgorm:def:exec.cursor.binding+6]`), and a bound of the wrong variant
+> (`[spec:pgorm:def:exec.cursor.binding]`), and a bound of the wrong variant
 > refused by that bound's own rule. A `NULL` bound is written as no bound,
 > because that is what PostgreSQL's constructors read it as and what the
-> literal rendering writes (`[spec:pgorm:def:sql.value.range+4]`); sent as a
+> literal rendering writes (`[spec:pgorm:def:sql.value.range]`); sent as a
 > `NULL`, its length of -1 would be read by the range's receive function as
 > a length.
 >
 > A `Value::String` binds against a range type a schema created as the range
 > its text spells. Such a range's `Value` is its text form
-> (`[spec:pgorm:def:sql.value.created-range+4]`): the `Value` the newtype
+> (`[spec:pgorm:def:sql.value.created-range]`): the `Value` the newtype
 > naming it converts into and the one a binary COPY reads its column as
 > (`conn.copy.rows`). The text is read by `FromStr` on `Range<T>`, `T` the
 > `RangeSubtype` the subtype reads as, and the range is then written as a
@@ -435,7 +435,7 @@ bound parameter is held to.
 > *range* type, so the multirange arrives as a simple type with no subtype to
 > write the bounds in, and guessing one would send bytes the server could
 > read as another type. A value of one is written as its text cast to its
-> name instead (`[spec:pgorm:def:sql.value.created-range+4]`), and a
+> name instead (`[spec:pgorm:def:sql.value.created-range]`), and a
 > `Value::String` or a `Value::Multirange` against such a placeholder is
 > refused here as a mismatch. Only a COPY's columns, which pgorm describes
 > before the COPY starts, carry the subtype the catalogue completes.
@@ -460,14 +460,14 @@ bound parameter is held to.
 > infallibly and is implemented for exactly the sources whose statement
 > the builder produced and which therefore cannot fail to page:
 > `Selector<S>`, `Select<E>` (via `into_model`), and `SelectGraph<E, S>`
-> (via its own selector, `[spec:pgorm:sem:query.graph.terminals+1]`). The
+> (via its own selector, `[spec:pgorm:sem:query.graph.terminals]`). The
 > trait also provides `count`, defined as `paginate(db, 1).num_items()`.
 >
 > `SelectorRaw<S>` — whose statement is the caller's own text — MUST NOT
 > implement the trait, and paginates instead through its own inherent
 > `paginate(db, page_size) -> Result<Paginator, Error>` and
 > `count(db) -> Result<u64, Error>`
-> (`[spec:pgorm:sem:exec.paginator.raw+6]`). The distinction is carried by
+> (`[spec:pgorm:sem:exec.paginator.raw]`). The distinction is carried by
 > the type rather than by a `Result` on every call site: a builder-backed
 > caller has no failure to handle and is not made to write one, and a raw
 > caller cannot reach a page without having handled theirs.
@@ -526,8 +526,8 @@ bound parameter is held to.
 > Paginating a `SelectorRaw` MUST decide what the raw statement is by
 > parsing it with libpg_query — the PostgreSQL server's own parser, the
 > same `pg_query` revision, on PostgreSQL 18's grammar, that the render
-> oracle and `sql!` use (`[spec:pgorm:req:sql.render.oracle+4]`,
-> `[spec:pgorm:def:macros.sql+4]`) — and MUST NOT decide it by inspecting
+> oracle and `sql!` use (`[spec:pgorm:req:sql.render.oracle]`,
+> `[spec:pgorm:def:macros.sql]`) — and MUST NOT decide it by inspecting
 > the statement's text. The
 > statement is accepted only when it parses, holds exactly one statement,
 > and that statement is a `SelectStmt` carrying no `INTO` clause. A
@@ -546,17 +546,17 @@ bound parameter is held to.
 > does. A comment trailing the statement lies inside its extent and is
 > carried. The extent is then paired
 > with its bind values as a `SqlTemplate`
-> (`SqlTemplate::from_sql`, `[spec:pgorm:req:sql.render.custom-expr+3]`)
+> (`SqlTemplate::from_sql`, `[spec:pgorm:req:sql.render.custom-expr]`)
 > and placed in relation position as
 > `FromItem::Template(fragment, "sub_statement")`
-> (`[spec:pgorm:def:sql.types.table-ref+7]`). What the paginator holds is
+> (`[spec:pgorm:def:sql.types.table-ref]`). What the paginator holds is
 > then ONE shape — an ordinary `SelectStatement` — for a built source and
 > a raw one alike: the page clauses of `exec.paginator.fetch` and the
 > count wrapper of `exec.paginator.count` are the builder's, and the
 > paginator MUST NOT format SQL text of its own. The rendering, including
 > the newline before the closing parenthesis that keeps a trailing `--`
 > comment from swallowing it, belongs to
-> `[spec:pgorm:req:sql.render.subquery+5]`. Wrapping rather than splicing
+> `[spec:pgorm:req:sql.render.subquery]`. Wrapping rather than splicing
 > means `LIMIT` and `OFFSET` land outside the caller's own clauses instead
 > of colliding with them, so a raw statement that already carries
 > `ORDER BY` or `LIMIT` still pages correctly; PostgreSQL will not reorder
@@ -579,7 +579,7 @@ bound parameter is held to.
 > Which `$N` are markers is settled by the `sql.token` tokenizer, which
 > reads `--` and nested `/* */` comments as one `Space` token and
 > dollar-quoted bodies (tagged and untagged) and `E'…'` strings as one
-> `Quoted` token (`[spec:pgorm:sem:sql.token.limits+3]`) — the same
+> `Quoted` token (`[spec:pgorm:sem:sql.token.limits]`) — the same
 > opacity PostgreSQL's own scanner has, and the reason a second scan of
 > the text is no longer needed. Comment bodies, dollar-quoted strings,
 > single-quoted and E-string literals, and bracketed subscripts therefore
@@ -604,7 +604,7 @@ bound parameter is held to.
 > replay. `SelectorRaw`'s `paginate` therefore returns
 > `Result<Paginator, Error>` and its `count` returns `Result<u64, Error>`,
 > which is why `SelectorRaw` does not implement `PaginatorTrait`
-> (`[spec:pgorm:def:exec.paginator+3]`). The failure belongs to the caller
+> (`[spec:pgorm:def:exec.paginator]`). The failure belongs to the caller
 > who supplied the statement, at the call that supplied it: a paginator
 > handed back to that caller has already been proven to page, so
 > `fetch_page`, `fetch`, `num_items`, `num_pages` and `into_stream`
