@@ -946,6 +946,7 @@ assertions (
     {id binding-coverage-per-impl, kind @complete, author "brendan@necessary.nu", at 2026-10-30T14:18:38.065807Z}
     {id binding-describe-shapes, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:44.983153Z}
     {id binding-renames, kind @complete, author "brendan@necessary.nu", at 2026-10-30T14:35:54.859252Z}
+    {id binding-variant-coverage, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:45.333805Z}
     {id bindings-array-subquery, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:53:58.290968Z}
     {id bindings-copy-created-multiranges, kind @complete, author "brendan@necessary.nu", at 2026-10-26T10:21:29.151829Z}
     {id bindings-expression-gaps, kind @complete, author "brendan@necessary.nu", at 2026-10-26T17:15:31.190363Z}
@@ -1204,6 +1205,7 @@ assertions (
     {id python-json-table, kind @complete, author "brendan@necessary.nu", at 2026-10-08T23:34:09.315805Z}
     {id python-listen-header-duplicate, kind @complete, author "brendan@necessary.nu", at 2026-10-26T00:02:49.425118Z}
     {id python-merge-and-row-versions, kind @complete, author "brendan@necessary.nu", at 2026-10-08T16:16:36.872555Z}
+    {id python-model-created-multirange, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:45.807746Z}
     {id python-model-shapes, kind @complete, author "brendan@necessary.nu", at 2026-10-31T22:52:13.637711Z}
     {id python-ranges, kind @complete, author "brendan@necessary.nu", at 2026-10-07T11:19:17.720063Z}
     {id python-schema-refusal-test, kind @complete, author "brendan@necessary.nu", at 2026-10-25T23:20:32.030006Z}
@@ -2374,6 +2376,11 @@ impl_evidence (
         {impl_name main, rule sql.scope}
     ), rule_versions_seen (
         {id sql.scope, version 23}
+    )}
+    {id scalar-kinds-shared, covered_rules (
+        sql.value.kinds
+    ), covered_claims (
+        {impl_name main, rule sql.value.kinds}
     )}
     {id single-cast-node, covered_rules (
         sql.ast.cast-shape

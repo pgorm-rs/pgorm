@@ -296,6 +296,7 @@ fn table(item: &FromItem) -> Json {
 mod tests {
     use std::sync::Arc;
 
+    use pgorm::pgorm_query::tests_cfg::Variants;
     use pgorm::pgorm_query::{
         ColumnType, Condition, IntervalSpec, IntoName, Name, RangeType, StringLen, TableName,
     };
@@ -423,5 +424,16 @@ mod tests {
             Some(vec!["calm".to_owned(), "tense".to_owned()])
         );
         assert_eq!(key(&over("money", ColumnType::Money)), None);
+    }
+
+    // [spec:pgorm:req:bindings.entities+3/test]
+    #[test]
+    fn only_types_without_a_kind_have_no_tag() {
+        let untagged: Vec<&str> = ColumnType::variants()
+            .iter()
+            .filter(|ty| column_tag(ty).is_none())
+            .map(Variants::variant_name)
+            .collect();
+        assert_eq!(untagged, ["Bit", "VarBit", "Money", "Named", "LTree"]);
     }
 }

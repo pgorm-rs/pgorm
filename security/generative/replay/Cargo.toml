@@ -38,6 +38,11 @@ fallible-iterator = "0.2.0"
 postgres-protocol = "0.6.12"
 async-trait = "0.1.92"
 
+[dev-dependencies]
+# The variants of pgorm-query's open enums, behind its hidden tests-cfg
+# feature, which the harness's tests walk its encoder through.
+pgorm-query = { path = "../../../pgorm-query", default-features = false, features = ["tests-cfg"] }
+
 [lints.rust]
 unsafe_code = "forbid"
 missing_debug_implementations = "deny"

@@ -218,8 +218,12 @@ Supported scalar kinds match the native Record decoder: `bool`, `i8`, `i16`,
 and the range kinds `int4range` through `tstzrange` and `int4multirange` through
 `tstzmultirange`, whose values are `pgorm.Range` and `pgorm.Multirange`. A range
 type a schema created is a schema-qualified `CreatedRange`, since a decoded row
-names the type with its schema; its multirange, which the Record decoder cannot
-read, and arrays of either are refused.
+names the type with its schema, and its multirange a schema-qualified
+`CreatedMultirange`. The driver reports such a multirange with no subtype to
+read its binary form by, so a model projects its column cast to `text`, as
+pgorm's entities do, and reads that text as a `pgorm.Multirange` of the declared
+subtype: text the subtype does not read raises `DecodeError`. Arrays of either
+are refused.
 Here `i8` corresponds to PostgreSQL's internal `"char"` and `u32` to `oid`.
 `vector` requires the PostgreSQL vector extension. One-dimensional arrays use
 `array=True`; nullable elements retain native Value semantics. Enums require a

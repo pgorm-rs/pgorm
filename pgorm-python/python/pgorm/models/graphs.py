@@ -88,7 +88,9 @@ class State:
         """The graph's SELECT, its ordering, further conditions and window
         those given."""
         projection = [
-            table.model._column(field, table.qualifier).as_(name)
+            table.model._projected(
+                field, table.model._column(field, table.qualifier), name
+            )
             for table, source in zip(self.decoded(), self.sources())
             for field, name in zip(source.fields, source.names)
         ]

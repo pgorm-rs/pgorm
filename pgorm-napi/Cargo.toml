@@ -62,6 +62,11 @@ tokio-util = "0.7.20"
 # sections Neon collects its exports in are fixed when the library is linked,
 # before it is stripped. Panics still unwind: Neon turns one into a
 # JavaScript exception, where an abort would end the host process.
+[dev-dependencies]
+# The variants of pgorm-query's open enums, behind its hidden tests-cfg
+# feature, which the binding's tests walk its translations through.
+pgorm-query = { path = "../pgorm-query", default-features = false, features = ["tests-cfg"] }
+
 [profile.addon]
 inherits = "release"
 lto = "fat"

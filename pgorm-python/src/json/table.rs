@@ -29,6 +29,15 @@ pub enum PyJsonTableBehavior {
     Empty,
 }
 
+impl PyJsonTableBehavior {
+    pub(super) fn rust(&self) -> JsonTableBehavior {
+        match self {
+            Self::Error => JsonTableBehavior::Error,
+            Self::Empty => JsonTableBehavior::Empty,
+        }
+    }
+}
+
 #[pymethods]
 impl PyJsonTableBehavior {
     // [spec:pgorm:req:python.truth-testing+3]
@@ -234,10 +243,7 @@ pub(crate) fn json_table(
         table = table.path_name(PyIdentifier::new(name)?.name());
     }
     if let Some(behavior) = on_error {
-        table = table.on_error(match behavior {
-            PyJsonTableBehavior::Error => JsonTableBehavior::Error,
-            PyJsonTableBehavior::Empty => JsonTableBehavior::Empty,
-        });
+        table = table.on_error(behavior.rust());
     }
     Ok(PyFromItem {
         inner: table.alias(PyIdentifier::new(alias)?.name()),

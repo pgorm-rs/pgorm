@@ -18,9 +18,9 @@ fn quoted(name: &PyTypeName) -> String {
 
 impl Tag {
     // [spec:pgorm:req:bindings.models+4]
-    pub(crate) fn key(&self) -> PyResult<String> {
-        Ok(match self {
-            Self::Scalar(kind) => super::scalar_name(kind)?.to_owned(),
+    pub(crate) fn key(&self) -> String {
+        match self {
+            Self::Scalar(kind) => kind.kind_name().to_owned(),
             Self::Enum(name) => format!("enum {}", quoted(name)),
             Self::Created(kind) => format!(
                 "{} {} of {}",
@@ -30,17 +30,17 @@ impl Tag {
                     "range"
                 },
                 quoted(&kind.name),
-                super::scalar_name(&kind.subtype)?
+                kind.subtype.kind_name()
             ),
-            Self::Array(element) => format!("{}[]", element.key()?),
-        })
+            Self::Array(element) => format!("{}[]", element.key()),
+        }
     }
 }
 
 #[pymethods]
 impl PyValue {
     /// The value's kind as a description spells it.
-    fn _kind_key(&self) -> PyResult<String> {
+    fn _kind_key(&self) -> String {
         self.tag.key()
     }
 }
@@ -63,21 +63,21 @@ mod tests {
     // and an array's element followed by `[]`
     #[test]
     fn kinds_are_spelled_as_results_compare_them() -> PyResult<()> {
-        assert_eq!(Tag::Scalar(ArrayType::BigInt).key()?, "i64");
+        assert_eq!(Tag::Scalar(ArrayType::BigInt).key(), "i64");
         assert_eq!(
-            Tag::Scalar(ArrayType::Range(RangeType::Int4)).key()?,
+            Tag::Scalar(ArrayType::Range(RangeType::Int4)).key(),
             "int4range"
         );
         assert_eq!(
-            Tag::Array(Box::new(Tag::Scalar(ArrayType::String))).key()?,
+            Tag::Array(Box::new(Tag::Scalar(ArrayType::String))).key(),
             "text[]"
         );
         assert_eq!(
-            Tag::Enum(name("mood", Some("app"))).key()?,
+            Tag::Enum(name("mood", Some("app"))).key(),
             "enum \"app\".\"mood\""
         );
         assert_eq!(
-            Tag::Array(Box::new(Tag::Enum(name("a\"b", None)))).key()?,
+            Tag::Array(Box::new(Tag::Enum(name("a\"b", None)))).key(),
             "enum \"a\"\"b\"[]"
         );
         let created = |multirange| CreatedKind {
@@ -86,11 +86,11 @@ mod tests {
             multirange,
         };
         assert_eq!(
-            Tag::Created(created(false)).key()?,
+            Tag::Created(created(false)).key(),
             "range \"app\".\"floatrange\" of f64"
         );
         assert_eq!(
-            Tag::Created(created(true)).key()?,
+            Tag::Created(created(true)).key(),
             "multirange \"app\".\"floatrange\" of f64"
         );
         Ok(())

@@ -10,6 +10,8 @@ mod query;
 mod table;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod variants;
 
 use pgorm::pgorm_query::{ColumnType, JsonInput, Name};
 use pyo3::{prelude::*, types::PyDict};

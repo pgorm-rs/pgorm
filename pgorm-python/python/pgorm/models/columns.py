@@ -73,7 +73,7 @@ def _labels(values: object) -> tuple[str, ...]:
 # [spec:pgorm:req:bindings.models+4]
 @dataclass(frozen=True, slots=True)
 class Column:
-    kind: str | p.TypeName | p.CreatedRange
+    kind: str | p.TypeName | p.CreatedRange | p.CreatedMultirange
     name: str | None = None
     nullable: bool = False
     primary_key: bool = False
@@ -99,21 +99,17 @@ class Column:
                 )
         if self.name is not None:
             object.__setattr__(self, "name", p.Identifier(self.name).name)
-        if isinstance(self.kind, p.CreatedMultirange):
-            raise p.UnsupportedCapabilityError(
-                "the native Record decoder does not read a created multirange"
-            )
-        if isinstance(self.kind, (p.TypeName, p.CreatedRange)):
+        if isinstance(self.kind, (p.TypeName, p.CreatedRange, p.CreatedMultirange)):
             # A decoded row names an enum or a created range with its schema.
             if self.kind.schema is None:
                 raise p.ConstructionError(
                     "an enum or created range column names its type's schema"
                 )
-        elif type(self.kind) is not str and not isinstance(self.kind, p.CreatedMultirange):
+        elif type(self.kind) is not str:
             raise TypeError(
                 "a column's kind is a kind name, a TypeName, a CreatedRange or a CreatedMultirange"
             )
-        elif isinstance(self.kind, p.CreatedMultirange) or self.kind not in MODEL_KINDS:
+        elif self.kind not in MODEL_KINDS:
             raise p.UnsupportedCapabilityError(
                 "column kind is not supported by the native Record decoder"
             )
@@ -124,8 +120,10 @@ class Column:
         kind = self.kind
         if not self.array:
             null = p.Value.null(kind)
-        elif isinstance(kind, p.CreatedRange):
-            raise p.ConstructionError("arrays of a created range type are not supported")
+        elif isinstance(kind, (p.CreatedRange, p.CreatedMultirange)):
+            raise p.ConstructionError(
+                "arrays of a created range or multirange type are not supported"
+            )
         else:
             null = p.Value.array(kind, None)
         object.__setattr__(self, "_null", null)
@@ -160,11 +158,34 @@ class Column:
         kind = self.kind
         if isinstance(data, p.Value):
             result = data
-        elif self.array and not isinstance(kind, p.CreatedRange):
+        elif self.array and not isinstance(kind, (p.CreatedRange, p.CreatedMultirange)):
             result = p.Value.array(kind, data)
         else:
             result = p.Value(data, kind)
         return self._validate(result)
+
+    @property
+    def _read_as_text(self) -> bool:
+        """Whether the column is projected as its text: a created multirange
+        is, since the driver reports one with no subtype to read its binary
+        form by, so it is read cast to ``text`` as pgorm's
+        ``ColumnTrait::select_as`` reads an entity's."""
+        return isinstance(self.kind, p.CreatedMultirange)
+
+    def _decoded(self, value: p.Value) -> p.Value:
+        """``value``, the column as its projection read it, as the declared
+        kind and validated: a created multirange's text is read as the
+        multirange of its declared subtype it spells."""
+        if self._read_as_text and value.kind == "text":
+            try:
+                value = (
+                    p.Value.null(self.kind)
+                    if value.is_null
+                    else p.Value(value.value, self.kind)
+                )
+            except p.ConstructionError as error:
+                raise p.DecodeError(str(error)) from error
+        return self._validate(value, decoding=True)
 
 
 # [spec:pgorm:req:bindings.model-columns+1]

@@ -12,60 +12,25 @@ use pyo3::prelude::*;
 
 use super::{
     classes::{PyMultirange, PyRange},
-    convert, types,
+    convert,
 };
 use crate::errors::ConstructionError;
-
-const RANGE_TYPES: [RangeType; 6] = [
-    RangeType::Int4,
-    RangeType::Int8,
-    RangeType::Numeric,
-    RangeType::Date,
-    RangeType::Timestamp,
-    RangeType::TimestampTz,
-];
 
 /// The kinds of the six range types and their multiranges, named as
 /// PostgreSQL names them.
 pub(crate) fn kind_names() -> impl Iterator<Item = &'static str> {
-    RANGE_TYPES
-        .into_iter()
-        .flat_map(|range| [range.range_type_name(), range.multirange_type_name()])
-}
-
-/// The kind `name` names, when it is a range or multirange type.
-pub(super) fn parse(name: &str) -> Option<ArrayType> {
-    RANGE_TYPES.into_iter().find_map(|range| {
-        if name == range.range_type_name() {
-            Some(ArrayType::Range(range))
-        } else if name == range.multirange_type_name() {
-            Some(ArrayType::Multirange(range))
-        } else {
-            None
-        }
-    })
+    ArrayType::kinds()
+        .filter(|kind| matches!(kind, ArrayType::Range(_) | ArrayType::Multirange(_)))
+        .map(|kind| kind.kind_name())
 }
 
 /// The column type a schema declares for the range or multirange kind
 /// `name`.
 pub(crate) fn column_type(name: &str) -> Option<ColumnType> {
-    Some(match parse(name)? {
+    Some(match ArrayType::from_kind_name(name)? {
         ArrayType::Range(range) => ColumnType::Range(range),
         ArrayType::Multirange(range) => ColumnType::Multirange(range),
         _ => return None,
-    })
-}
-
-/// The scalar kind a range type's bounds are.
-pub(super) fn element(range: RangeType) -> PyResult<ArrayType> {
-    Ok(match range {
-        RangeType::Int4 => ArrayType::Int,
-        RangeType::Int8 => ArrayType::BigInt,
-        RangeType::Numeric => ArrayType::Decimal,
-        RangeType::Date => ArrayType::Date,
-        RangeType::Timestamp => ArrayType::DateTime,
-        RangeType::TimestampTz => ArrayType::DateTimeWithTimeZone,
-        _ => return Err(types::unrepresented()),
     })
 }
 
@@ -74,7 +39,7 @@ pub(super) fn multirange_from_python(data: &Bound<'_, PyAny>, range: RangeType) 
     let multirange = data
         .cast_exact::<PyMultirange>()
         .map_err(|_| ConstructionError::new_err("expected pgorm.Multirange"))?;
-    let element = element(range)?;
+    let element = range.element_type();
     let ranges = multirange
         .get()
         .ranges
@@ -131,14 +96,10 @@ pub(super) fn multirange_to_python(
 pub(super) fn write(py: Python<'_>, range: &Range<Value>) -> PyResult<PyRange> {
     let side = |bound: &ops::Bound<Value>| -> PyResult<(Option<Py<PyAny>>, bool)> {
         Ok(match bound {
-            ops::Bound::Included(value) | ops::Bound::Excluded(value)
-                if !types::is_null(value)? =>
-            {
-                (
-                    Some(convert::to_python(py, value)?),
-                    matches!(bound, ops::Bound::Included(_)),
-                )
-            }
+            ops::Bound::Included(value) | ops::Bound::Excluded(value) if !value.is_null() => (
+                Some(convert::to_python(py, value)?),
+                matches!(bound, ops::Bound::Included(_)),
+            ),
             _ => (None, false),
         })
     };

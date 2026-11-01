@@ -129,10 +129,7 @@ pub(super) fn from_python(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult
         }
         ArrayType::Range(range) => Value::Range(
             *range,
-            Some(Box::new(ranges::read_bounds(
-                data,
-                &ranges::element(*range)?,
-            )?)),
+            Some(Box::new(ranges::read_bounds(data, &range.element_type())?)),
         ),
         ArrayType::Multirange(range) => ranges::multirange_from_python(data, *range)?,
         ArrayType::Interval => Value::from(
@@ -141,7 +138,11 @@ pub(super) fn from_python(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult
                 .get()
                 .0,
         ),
-        _ => temporal::from_python(data, kind)?,
+        ArrayType::Date
+        | ArrayType::Time
+        | ArrayType::DateTime
+        | ArrayType::DateTimeWithTimeZone => temporal::from_python(data, kind)?,
+        _ => return Err(super::unrepresented()),
     };
     Ok(value)
 }
@@ -270,7 +271,10 @@ pub(super) fn to_python(py: Python<'_>, value: &Value) -> PyResult<Py<PyAny>> {
             .as_deref()
             .map(|interval| Ok(Py::new(py, PyInterval(*interval))?.into_any()))
             .transpose(),
-        _ => temporal::to_python(py, value),
+        Value::Date(_) | Value::Time(_) | Value::DateTime(_) | Value::DateTimeWithTimeZone(_) => {
+            temporal::to_python(py, value)
+        }
+        _ => return Err(super::unrepresented()),
     };
     result
         .map(|value| value.unwrap_or_else(|| py.None()))

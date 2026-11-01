@@ -60,66 +60,14 @@ impl PyTypeName {
     }
 }
 
-macro_rules! scalar_kinds {
-    ($( $variant:ident => $name:literal ),+ $(,)?) => {
-        pub const SCALAR_NAMES: &[&str] = &[$($name),+];
-
-        pub fn scalar_name(kind: &ArrayType) -> PyResult<&'static str> {
-            Ok(match kind {
-                $(ArrayType::$variant => $name,)+
-                ArrayType::Range(ty) => ty.range_type_name(),
-                ArrayType::Multirange(ty) => ty.multirange_type_name(),
-                _ => return Err(unrepresented()),
-            })
-        }
-
-        pub fn parse_scalar(name: &str) -> PyResult<ArrayType> {
-            match name {
-                $($name => Ok(ArrayType::$variant),)+
-                _ => super::ranges::parse(name)
-                    .ok_or_else(|| ConstructionError::new_err("unknown scalar value kind")),
-            }
-        }
-
-        pub fn scalar_null(kind: &ArrayType) -> PyResult<Value> {
-            Ok(match kind {
-                $(ArrayType::$variant => Value::$variant(None),)+
-                ArrayType::Range(ty) => Value::Range(*ty, None),
-                ArrayType::Multirange(ty) => Value::Multirange(*ty, None),
-                _ => return Err(unrepresented()),
-            })
-        }
-
-        pub fn rust_tag(value: &Value) -> PyResult<Tag> {
-            Ok(match value {
-                $(Value::$variant(_) => Tag::Scalar(ArrayType::$variant),)+
-                Value::Array(kind, _) => Tag::Array(Box::new(Tag::Scalar(kind.clone()))),
-                Value::Range(ty, _) => Tag::Scalar(ArrayType::Range(*ty)),
-                Value::Multirange(ty, _) => Tag::Scalar(ArrayType::Multirange(*ty)),
-                _ => return Err(unrepresented()),
-            })
-        }
-
-        pub fn is_null(value: &Value) -> PyResult<bool> {
-            Ok(match value {
-                $(Value::$variant(value) => value.is_none(),)+
-                Value::Array(_, value) => value.is_none(),
-                Value::Range(_, value) => value.is_none(),
-                Value::Multirange(_, value) => value.is_none(),
-                _ => return Err(unrepresented()),
-            })
-        }
-    };
-}
-
-scalar_kinds! {
-    Bool => "bool", TinyInt => "i8", SmallInt => "i16", Int => "i32",
-    BigInt => "i64", Unsigned => "u32", BigUnsigned => "u64",
-    Float => "f32", Double => "f64", String => "text", Char => "char",
-    Bytes => "bytes", Json => "json", Decimal => "decimal", Uuid => "uuid",
-    Date => "date", Time => "time", DateTime => "datetime",
-    DateTimeWithTimeZone => "datetime_utc", IpNetwork => "ipnetwork",
-    MacAddress => "mac_address", Vector => "vector", Interval => "interval",
+/// The kind a pgorm value declares itself.
+pub fn rust_tag(value: &Value) -> Tag {
+    let kind = Tag::Scalar(value.array_type());
+    if value.is_array() {
+        Tag::Array(Box::new(kind))
+    } else {
+        kind
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -138,17 +86,19 @@ impl Tag {
         } else if let Some(kind) = super::created::extract(value) {
             Ok(Self::Created(kind))
         } else {
-            Ok(Self::Scalar(parse_scalar(value.extract::<&str>()?)?))
+            ArrayType::from_kind_name(value.extract::<&str>()?)
+                .map(Self::Scalar)
+                .ok_or_else(|| ConstructionError::new_err("unknown scalar value kind"))
         }
     }
 
-    pub fn name(&self) -> PyResult<&'static str> {
-        Ok(match self {
-            Self::Scalar(kind) => scalar_name(kind)?,
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Scalar(kind) => kind.kind_name(),
             Self::Enum(_) => "enum",
             Self::Created(kind) => kind.kind_name(),
             Self::Array(_) => "array",
-        })
+        }
     }
 
     pub fn array_type(&self) -> PyResult<ArrayType> {
@@ -165,7 +115,7 @@ impl Tag {
         match self {
             Self::Enum(name) => Ok(Py::new(py, name.clone())?.into_any()),
             Self::Created(kind) => kind.to_python(py),
-            _ => Ok(self.name()?.into_pyobject(py)?.into_any().unbind()),
+            _ => Ok(self.name().into_pyobject(py)?.into_any().unbind()),
         }
     }
 }

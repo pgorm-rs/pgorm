@@ -8,10 +8,16 @@ use pgorm::pgorm_query::{Func, JsonTableBehavior, JsonTableColumn};
 
 use super::{
     Node,
-    args::{absent, arg, choice, items, name_at, node, optional_name, refuse},
+    args::{absent, arg, items, name_at, node, optional_name, pick, refuse},
     data_type,
-    json::{input, path, query_behavior, shaping, value_behavior, variables},
+    json::{EXISTS_BEHAVIORS, input, path, query_behavior, shaping, value_behavior, variables},
 };
+
+/// `JSON_TABLE`'s `ON ERROR` behaviours by the names JavaScript spells them.
+pub(super) const TABLE_BEHAVIORS: &[(&str, JsonTableBehavior)] = &[
+    ("error", JsonTableBehavior::Error),
+    ("empty", JsonTableBehavior::Empty),
+];
 
 pub(super) const EXPORTS: &[(&str, super::Build)] = &[
     ("jsonTable", json_table),
@@ -116,19 +122,12 @@ fn exists_column(cx: &mut FunctionContext) -> NeonResult<Node> {
     }
     let behavior = arg(cx, 3);
     if !absent(cx, behavior) {
-        column = column.on_error(
-            match choice(
-                cx,
-                3,
-                "an EXISTS column's behaviour",
-                &["true", "false", "unknown", "error"],
-            )? {
-                "true" => pgorm::pgorm_query::JsonExistsBehavior::True,
-                "false" => pgorm::pgorm_query::JsonExistsBehavior::False,
-                "unknown" => pgorm::pgorm_query::JsonExistsBehavior::Unknown,
-                _ => pgorm::pgorm_query::JsonExistsBehavior::Error,
-            },
-        );
+        column = column.on_error(pick(
+            cx,
+            behavior,
+            "an EXISTS column's behaviour",
+            EXISTS_BEHAVIORS,
+        )?);
     }
     Ok(Node::JsonTableColumn(column.into()))
 }
@@ -181,12 +180,12 @@ fn json_table(cx: &mut FunctionContext) -> NeonResult<Node> {
     }
     let behavior = arg(cx, 6);
     if !absent(cx, behavior) {
-        table = table.on_error(
-            match choice(cx, 6, "JSON_TABLE's behaviour", &["error", "empty"])? {
-                "error" => JsonTableBehavior::Error,
-                _ => JsonTableBehavior::Empty,
-            },
-        );
+        table = table.on_error(pick(
+            cx,
+            behavior,
+            "JSON_TABLE's behaviour",
+            TABLE_BEHAVIORS,
+        )?);
     }
     Ok(Node::FromItem(table.alias(alias)))
 }

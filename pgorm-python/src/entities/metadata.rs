@@ -1,4 +1,4 @@
-use pgorm::pgorm_query::{ColumnType, Value};
+use pgorm::pgorm_query::{ArrayType, ColumnType, Value};
 use pgorm::{
     ColumnTrait, EntityTrait, FromQueryResult, Iterable, PrimaryKeyToColumn, PrimaryKeyTrait,
     StaticName,
@@ -9,7 +9,7 @@ use serde_json::{Value as Json, json};
 use crate::{
     errors::{ConstructionError, DecodeError},
     identifiers::validate_name,
-    values::{CreatedKind, PyTypeName, PyValue, Tag, parse_scalar},
+    values::{CreatedKind, PyTypeName, PyValue, Tag},
 };
 
 #[derive(Clone, Debug)]
@@ -22,7 +22,7 @@ pub(crate) enum InputKind {
 }
 
 impl InputKind {
-    fn from_column(ty: &ColumnType) -> Self {
+    pub(super) fn from_column(ty: &ColumnType) -> Self {
         if let Some(kind) = CreatedKind::from_column(ty) {
             return Self::Created(kind);
         }
@@ -132,12 +132,7 @@ impl InputKind {
                 )),
             },
             Self::Array(member) => match member.as_ref() {
-                Self::Enum(name)
-                    if matches!(
-                        value,
-                        Value::Array(pgorm::pgorm_query::ArrayType::String, _)
-                    ) =>
-                {
+                Self::Enum(name) if matches!(value, Value::Array(ArrayType::String, _)) => {
                     Ok(PyValue::from_enum(value, name.clone(), true))
                 }
                 Self::Enum(_) => Err(DecodeError::new_err(
@@ -156,7 +151,10 @@ impl InputKind {
     /// takes an explicit `Value`, an array of one included.
     fn tag(&self) -> PyResult<Option<Tag>> {
         Ok(Some(match self {
-            Self::Scalar(name) => Tag::Scalar(parse_scalar(name)?),
+            Self::Scalar(name) => Tag::Scalar(
+                ArrayType::from_kind_name(name)
+                    .ok_or_else(|| ConstructionError::new_err("unknown scalar value kind"))?,
+            ),
             Self::Enum(name) => Tag::Enum(name.clone()),
             Self::Created(kind) => Tag::Created(kind.clone()),
             Self::Array(member) => match member.tag()? {
@@ -170,7 +168,7 @@ impl InputKind {
     /// The kind as `describe()` spells it.
     // [spec:pgorm:req:bindings.entities+3]
     fn key(&self) -> PyResult<Option<String>> {
-        self.tag()?.map(|tag| tag.key()).transpose()
+        Ok(self.tag()?.map(|tag| tag.key()))
     }
 }
 

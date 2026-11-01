@@ -250,7 +250,7 @@ def updated(model: Model, values: Mapping[str, Any]) -> ModelUpdate:
 
 
 # [spec:pgorm:req:bindings.model-writes+1]
-def versions(model: Model) -> tuple[list[p.Aliased], tuple[Source, Source]]:
+def versions(model: Model) -> tuple[list[p.Expr | p.Aliased], tuple[Source, Source]]:
     """Every field of both versions for a ``RETURNING WITH (OLD AS
     pgorm_old, NEW AS pgorm_new)`` list, the old under ``o_`` and the new
     under ``n_``, and the sources each decodes as."""
@@ -261,7 +261,10 @@ def versions(model: Model) -> tuple[list[p.Aliased], tuple[Source, Source]]:
     for row, prefix in ((OLD, "o_"), (NEW, "n_")):
         names = tuple(p._model_result_names(prefix, columns))
         sources.append(Source(model, fields, names, optional=row == OLD))
-        items += [p.col(column, table=row).as_(name) for column, name in zip(columns, names)]
+        items += [
+            model._projected(field, p.col(column, table=row), name)
+            for field, column, name in zip(fields, columns, names)
+        ]
     return items, (sources[0], sources[1])
 
 

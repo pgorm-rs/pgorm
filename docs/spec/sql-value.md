@@ -186,6 +186,34 @@ including panic semantics and quirks inherited from sea-query.
 > (`[spec:pgorm:req:sql.ast.expr.eq-any]`) and, unlike `From<Vec<T>>`, needs no
 > `NotU8` bound, the caller having already named the element type.
 
+## Value kinds
+
+> [spec:pgorm:def:sql.value.kinds]
+> Each `ArrayType` is a kind of value, and each kind has one name, the one
+> pgorm's language bindings name it by (`[spec:pgorm:req:bindings.values]`)
+> and the generative campaign's wire format carries. `ArrayType::kind_name`
+> answers `bool`, `i8`, `i16`, `i32`, `i64`, `u32`, `u64`, `f32`, `f64`,
+> `text`, `char`, `bytes`, `json`, `decimal`, `uuid`, `date`, `time`,
+> `datetime`, `datetime_utc`, `ipnetwork`, `mac_address`, `vector` and
+> `interval` for the scalar tags, and a range's or a multirange's catalogue
+> name for `Range` and `Multirange` (`int4range`, `tstzmultirange`).
+> `ArrayType::from_kind_name` reads a name back exactly, `None` for any other
+> text, and `ArrayType::kinds` yields every kind once: the scalar tags, then
+> each built-in range type's range followed by its multirange.
+>
+> `ArrayType::null` is SQL NULL of a kind, `Value::array_type` the kind a
+> value is, an array's being the tag its elements carry (`Value::is_array`
+> tells the two apart), and `Value::is_null` whether a value is SQL NULL:
+> JSON's `null` and an empty array are present values.
+> `RangeType::element_type` is the kind a built-in range's bounds are, `Int`
+> for `int4range`.
+>
+> Every one of these is total. Inside pgorm-query `ArrayType`, `Value` and
+> `RangeType` are matched without a wildcard arm, so a variant one of them
+> gains is named here before the crate builds, and a binding reading a kind
+> through these never meets one it cannot name. The bindings and the replay
+> harness take their kinds from here rather than from tables of their own.
+
 ## Ranges
 
 > [spec:pgorm:def:sql.value.range+5]

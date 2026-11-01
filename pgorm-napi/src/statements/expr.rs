@@ -239,7 +239,7 @@ fn unquantifiable<T>(cx: &mut FunctionContext, operator: &str) -> NeonResult<T> 
 }
 
 // [spec:pgorm:req:bindings.ranges]
-const BINARY: [(&str, BinOper); 26] = [
+pub(super) const BINARY: [(&str, BinOper); 26] = [
     ("eq", BinOper::Equal),
     ("ne", BinOper::NotEqual),
     ("lt", BinOper::SmallerThan),

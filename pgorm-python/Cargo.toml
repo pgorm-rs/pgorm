@@ -48,6 +48,11 @@ tokio-postgres-rustls = "0.14.0"
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 rustls-native-certs = "0.8.4"
 
+[dev-dependencies]
+# The variants of pgorm-query's open enums, behind its hidden tests-cfg
+# feature, which the binding's tests walk its translations through.
+pgorm-query = { path = "../pgorm-query", default-features = false, features = ["tests-cfg"] }
+
 [build-dependencies]
 toml = "1.1"
 

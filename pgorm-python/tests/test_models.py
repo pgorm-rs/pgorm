@@ -561,5 +561,64 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
             p.Column(p.CreatedRange("floatrange", "f64"))
         with self.assertRaises(p.ConstructionError):
             p.Column(floatrange, array=True)
-        with self.assertRaises(p.UnsupportedCapabilityError):
-            p.Column(p.CreatedMultirange("floatmultirange", "f64", schema="python_models"))
+
+    # [spec:pgorm:req:bindings.models+4/test]
+    # [spec:pgorm:req:bindings.model-records/test]
+    # [spec:pgorm:req:bindings.created-ranges/test]
+    async def test_created_multirange_columns_read_and_write(self):
+        await self.pool.execute(
+            p.RawSQL(
+                "CREATE TYPE python_models.floatrange AS RANGE "
+                "(SUBTYPE = float8, MULTIRANGE_TYPE_NAME = python_models.floatmultirange)"
+            )
+        )
+        await self.pool.execute(
+            p.RawSQL(
+                "CREATE TABLE python_models.slots "
+                "(id integer PRIMARY KEY, open python_models.floatmultirange)"
+            )
+        )
+        kind = p.CreatedMultirange("floatmultirange", "f64", schema="python_models")
+        slots = p.Model(
+            "slots",
+            {"id": p.Column("i32", primary_key=True), "open": p.Column(kind, nullable=True)},
+            schema="python_models",
+        )
+        hours = p.Multirange([p.Range(9.0, 12.5), p.Range(13.5, 17.0)])
+        written = await slots.insert({"id": 1, "open": hours}).returning().one(self.pool)
+        self.assertEqual(written["open"], hours)
+        self.assertEqual(written.tagged("open"), p.Value(hours, kind))
+        await slots.insert({"id": 2, "open": None}).execute(self.pool)
+        # The text is read through the declared subtype, so text that subtype
+        # does not read is a DecodeError, never a value of another type.
+        wrong = p.Model(
+            "slots",
+            {
+                "id": p.Column("i32", primary_key=True),
+                "open": p.Column(
+                    p.CreatedMultirange("floatmultirange", "i64", schema="python_models"),
+                    nullable=True,
+                ),
+            },
+            schema="python_models",
+        )
+        with self.assertRaises(p.DecodeError):
+            await wrong.find_by_key({"id": 1}).one(self.pool)
+        found = await slots.find().where(slots.col("open") == hours).one(self.pool)
+        self.assertEqual((found["id"], found["open"]), (1, hours))
+        self.assertIsNone((await slots.find_by_key({"id": 2}).one(self.pool))["open"])
+        later = p.Multirange([p.Range(18.0, None)])
+        change = await (
+            slots.update({"open": later}).where(slots.col("id") == 1).returning_change(self.pool)
+        )
+        self.assertEqual((change.old["open"], change.new["open"]), (hours, later))
+        (row,) = await slots.graph().where(slots.col("id") == 1).all(self.pool)
+        self.assertEqual(row["open"], later)
+        self.assertEqual(
+            slots.describe()["fields"]["open"]["kind"],
+            'multirange "python_models"."floatmultirange" of f64',
+        )
+        with self.assertRaises(p.ConstructionError):
+            p.Column(p.CreatedMultirange("floatmultirange", "f64"))
+        with self.assertRaises(p.ConstructionError):
+            p.Column(kind, array=True)
