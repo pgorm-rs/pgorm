@@ -3600,6 +3600,14 @@ children (
                         kind @status
                         text "Doing → Done (nplan complete)"
                     }
+
+                    {
+                        at 2026-11-01T01:36:09.013973Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-read after sql.ast.expr.eq-any moved to +1 (2026-11-01): its paragraph on quantifiers now lists every operator PostgreSQL reads ANY/SOME/ALL after, as bindings.quantifiers established on PostgreSQL 18 (quantifier-beyond-comparisons), rather than the comparisons alone; Func::any and Func::all say the same. eq_any's and ne_all's own behaviour is unchanged, and every reference is pinned at +1."
+                        after_done true
+                    }
                 )
             }
 

@@ -963,7 +963,7 @@ today, including panicking edges and deliberate failsafes.
 > `in_subquery`/`not_in_subquery` MUST build `IN (SELECT ...)` /
 > `NOT IN (SELECT ...)` from a `SelectStatement`.
 
-> [spec:pgorm:req:sql.ast.expr.eq-any]
+> [spec:pgorm:req:sql.ast.expr.eq-any+1]
 > `eq_any`/`ne_all` MUST build the same membership tests over a *single array
 > parameter*: `eq_any` the comparison `= ANY(<array>)` and `ne_all` its
 > complement `<> ALL(<array>)`, with the operand collection gathered into one
@@ -994,9 +994,12 @@ today, including panicking edges and deliberate failsafes.
 > `sql.ast.expr.in`'s two constant fall-backs exist to reproduce. The statement
 > text is therefore identical at every cardinality, including zero.
 >
-> `ANY`/`SOME`/`ALL` are quantifiers over the right operand of a comparison, not
-> functions: `Func::any`/`some`/`all` render SQL only in that position, and are
-> the escape hatch for the operators these two do not name.
+> `ANY`/`SOME`/`ALL` are quantifiers over the right operand of a binary operator
+> PostgreSQL reads one after — a comparison, LIKE and ILIKE and their negations,
+> the regular-expression matches, containment and overlap, the range positions,
+> `@@` and `@?` (`bindings.quantifiers` lists them) — not functions:
+> `Func::any`/`some`/`all` render SQL only in that position, and are the escape
+> hatch for the operators these two do not name.
 
 > [spec:pgorm:req:sql.ast.expr.json+2]
 > `Expr` MUST provide the JSON *operator* vocabulary as typed combinators:

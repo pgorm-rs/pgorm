@@ -33,7 +33,7 @@ async fn seed(db: &impl ConnectionTrait) -> Vec<i32> {
     ids
 }
 
-// [spec:pgorm:req:sql.ast.expr.eq-any/test]    against a live server:
+// [spec:pgorm:req:sql.ast.expr.eq-any+1/test]    against a live server:
 // a three-element list and an empty one are the same statement with different
 // parameter payloads, and both select what the predicate says they should
 // [spec:pgorm:def:entity.traits.column+6/test]
@@ -82,7 +82,7 @@ pub async fn eq_any_round_trips_one_array_parameter() {
     ctx.delete().await;
 }
 
-// [spec:pgorm:req:sql.ast.expr.eq-any/test]    against a live server:
+// [spec:pgorm:req:sql.ast.expr.eq-any+1/test]    against a live server:
 // `<> ALL` is the complement of `= ANY`, and an empty list is vacuously true —
 // the asymmetry `is_in` / `is_not_in` need two different constants to express
 #[pgorm_macros::test]
