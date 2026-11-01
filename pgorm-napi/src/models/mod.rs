@@ -18,7 +18,7 @@ use crate::{
     codec::Codec,
     errors::{Failure, throw},
     statements::{self, Node},
-    values::{Tag, TypeName, read, scalar_name},
+    values::{Tag, TypeName, read},
 };
 
 pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
@@ -36,7 +36,7 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
 // [spec:pgorm:req:bindings.model-records]
 pub(crate) fn kind_key(tag: &Tag) -> Result<String, Failure> {
     Ok(match tag {
-        Tag::Scalar(kind) => crate::values::scalar_name(kind)?.to_owned(),
+        Tag::Scalar(kind) => kind.kind_name().to_owned(),
         Tag::Enum(name) => format!("enum {}", quoted(name)),
         Tag::Created(kind) => format!(
             "{} {} of {}",
@@ -46,7 +46,7 @@ pub(crate) fn kind_key(tag: &Tag) -> Result<String, Failure> {
                 "range"
             },
             quoted(&kind.name),
-            scalar_name(&kind.subtype)?
+            kind.subtype.kind_name()
         ),
         Tag::Array(element) => format!("{}[]", kind_key(element)?),
     })

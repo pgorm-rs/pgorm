@@ -32,9 +32,7 @@ pub(crate) fn n(name: &str) -> Name {
 /// A value as the golden file writes it: its kind, and a text the JavaScript
 /// suite writes the same way from the `Value` it inspects.
 fn canonical(value: &Value) -> [String; 2] {
-    let tag = value_tag(value).and_then(|tag| tag.name());
-    let name = tag.unwrap_or_else(|failure| panic!("{}", failure.message()));
-    [name.to_owned(), text(value)]
+    [value_tag(value).name().to_owned(), text(value)]
 }
 
 fn text(value: &Value) -> String {
@@ -66,7 +64,7 @@ fn text(value: &Value) -> String {
             let ranges: Vec<String> = ranges.iter().map(range_text).collect();
             format!("{{{}}}", ranges.join(","))
         }
-        other if crate::values::value_is_null(other) == Ok(true) => "null".to_owned(),
+        other if other.is_null() => "null".to_owned(),
         other => panic!("no canonical text for {other:?}"),
     }
 }

@@ -158,7 +158,7 @@ impl InputKind {
             Self::Enum(name) => json!({"kind": "enum", "name": name.name, "schema": name.schema}),
             Self::Created(kind) => json!({
                 "kind": kind.kind_name(), "name": kind.name.name, "schema": kind.name.schema,
-                "subtype": crate::values::scalar_name(&kind.subtype)?,
+                "subtype": kind.subtype.kind_name(),
             }),
             Self::Array(member) => json!({"kind": "array", "element": member.describe()?}),
             Self::Explicit => json!({"kind": "explicit_value_required"}),

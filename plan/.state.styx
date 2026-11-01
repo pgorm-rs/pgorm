@@ -1340,6 +1340,8 @@ assertions (
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id view-check-dedup, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:16:21.425085Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
+    {id binding-variant-coverage, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:45.333805Z}
+    {id python-model-created-multirange, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:45.807746Z}
 )
 
 impl_evidence (
@@ -2826,6 +2828,11 @@ impl_evidence (
         {impl_name main, rule testing.isolation}
     ), rule_versions_seen (
         {id testing.isolation, version 0}
+    )}
+    {id scalar-kinds-shared, covered_rules (
+        sql.value.kinds
+    ), covered_claims (
+        {impl_name main, rule sql.value.kinds}
     )}
 )
 

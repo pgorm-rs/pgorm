@@ -13,7 +13,7 @@ use super::{
 };
 use crate::{
     codec::Codec,
-    values::{RANGE_TYPES, Tag, read},
+    values::{Tag, read},
 };
 
 pub(super) const EXPORTS: &[(&str, super::Build)] = &[
@@ -92,18 +92,11 @@ fn builtin(
         "macaddr" => ColumnType::MacAddr,
         "ltree" => ColumnType::LTree,
         _ => {
-            return RANGE_TYPES
-                .into_iter()
-                .find_map(|range| {
-                    if name == range.range_type_name() {
-                        Some(ColumnType::Range(range))
-                    } else if name == range.multirange_type_name() {
-                        Some(ColumnType::Multirange(range))
-                    } else {
-                        None
-                    }
-                })
-                .ok_or_else(|| format!("{name:?} is no built-in type a DataType names"));
+            return match ArrayType::from_kind_name(name) {
+                Some(ArrayType::Range(range)) => Ok(ColumnType::Range(range)),
+                Some(ArrayType::Multirange(range)) => Ok(ColumnType::Multirange(range)),
+                _ => Err(format!("{name:?} is no built-in type a DataType names")),
+            };
         }
     })
 }

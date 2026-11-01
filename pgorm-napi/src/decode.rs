@@ -119,7 +119,7 @@ fn decode(ty: &Type, raw: Option<&[u8]>) -> Result<Tagged, CodecError> {
     }
     let tag = Tag::Array(Box::new(element.clone()));
     let Some(raw) = raw else {
-        return Ok(Tagged::null(tag)?);
+        return Ok(Tagged::null(tag));
     };
     let array = wire::array_from_sql(raw)?;
     let dimensions = array.dimensions().collect::<Vec<_>>()?;
@@ -251,7 +251,7 @@ fn scalar(ty: &Type, raw: Option<&[u8]>) -> Result<Tagged, CodecError> {
     let ty = base_type(ty);
     let tag = tag(ty)?;
     let Some(raw) = raw else {
-        return Ok(Tagged::null(tag)?);
+        return Ok(Tagged::null(tag));
     };
     let datum = match &tag {
         // The server sends only the type's labels, and the client's copy of
@@ -301,14 +301,14 @@ fn value(ty: &Type, kind: &ArrayType, raw: &[u8]) -> Result<Value, CodecError> {
             let Kind::Range(subtype) = ty.kind() else {
                 return Err("expected a range".into());
             };
-            let element = crate::values::range_element(*range)?;
+            let element = range.element_type();
             Value::Range(*range, Some(Box::new(read_range(subtype, raw, &element)?)))
         }
         ArrayType::Multirange(range) => {
             let Kind::Multirange(subtype) = ty.kind() else {
                 return Err("expected a multirange".into());
             };
-            let element = crate::values::range_element(*range)?;
+            let element = range.element_type();
             Value::Multirange(
                 *range,
                 Some(Box::new(Multirange::from(read_multirange(

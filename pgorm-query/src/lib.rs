@@ -686,6 +686,7 @@ pub mod value;
 mod value_domain;
 mod value_identity;
 mod value_interval;
+mod value_kind;
 mod value_range;
 mod value_range_text;
 mod view;

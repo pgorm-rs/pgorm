@@ -21,7 +21,7 @@ use crate::{
 type TestResult = Result<(), Box<dyn Error + Send + Sync>>;
 
 fn encoded(value: Value) -> Result<Json, Box<dyn Error + Send + Sync>> {
-    Ok(Tagged::from_value(value)?.encode_checked()?)
+    Ok(Tagged::from_value(value).encode_checked()?)
 }
 
 fn text(value: &str) -> Value {
@@ -401,9 +401,9 @@ fn validation_accepts_the_canonical_spellings() -> TestResult {
 
 #[test]
 fn a_tag_names_its_kind() -> TestResult {
-    assert_eq!(Tag::Scalar(ArrayType::Decimal).name()?, "decimal");
-    assert_eq!(Tag::Enum(TypeName::new("mood")).name()?, "enum");
-    assert_eq!(Tag::Scalar(ArrayType::Int).array().name()?, "array");
+    assert_eq!(Tag::Scalar(ArrayType::Decimal).name(), "decimal");
+    assert_eq!(Tag::Enum(TypeName::new("mood")).name(), "enum");
+    assert_eq!(Tag::Scalar(ArrayType::Int).array().name(), "array");
     Ok(())
 }
 

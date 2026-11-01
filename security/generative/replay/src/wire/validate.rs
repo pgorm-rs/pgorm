@@ -10,13 +10,11 @@
 //! time validation sees it, so that case is caught earlier — at decode, by the
 //! `ExactJson` codec — rather than here.
 
-use pgorm::pgorm_query::IpNetwork;
+use pgorm::pgorm_query::{ArrayType, IpNetwork};
 use serde_json::{Map, Value as Json};
 use uuid::Uuid;
 
-use super::{
-    RANGES, SCALAR_NAMES, parse_date, parse_datetime_utc, parse_naive_datetime, parse_time,
-};
+use super::{parse_date, parse_datetime_utc, parse_naive_datetime, parse_time};
 use crate::FormatError;
 
 const TEXT_BYTES: usize = 65_536;
@@ -81,10 +79,16 @@ pub fn validate(value: &Json) -> Result<(), FormatError> {
 
 /// The scalar kind of a range type's bounds, if `kind` names a range type.
 fn range_bounds(kind: &str) -> Option<&'static str> {
-    RANGES
-        .iter()
-        .find(|(ty, _)| ty.range_type_name() == kind)
-        .map(|(_, bounds)| *bounds)
+    match ArrayType::from_kind_name(kind)? {
+        ArrayType::Range(range) => Some(range.element_type().kind_name()),
+        _ => None,
+    }
+}
+
+/// Whether `kind` names a scalar kind, as `wire.SCALARS` does less `enum`.
+fn scalar_kind(kind: &str) -> bool {
+    ArrayType::from_kind_name(kind)
+        .is_some_and(|kind| !matches!(kind, ArrayType::Range(_) | ArrayType::Multirange(_)))
 }
 
 /// The empty range, or two bounds of the range's scalar kind, either absent;
@@ -152,7 +156,7 @@ fn type_tag(tag: &Json) -> Result<&str, FormatError> {
         .get("kind")
         .and_then(Json::as_str)
         .ok_or_else(|| FormatError::new("a type tag requires a kind"))?;
-    if SCALAR_NAMES.contains(&kind) || range_bounds(kind).is_some() {
+    if scalar_kind(kind) || range_bounds(kind).is_some() {
         fields(tag, &["kind"], &[])?;
     } else if kind == "enum" {
         fields(tag, &["kind", "name", "schema"], &[])?;

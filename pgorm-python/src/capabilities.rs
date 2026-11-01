@@ -1,3 +1,4 @@
+use pgorm::pgorm_query::ArrayType;
 use pyo3::prelude::*;
 use serde_json::{Value, json};
 
@@ -106,7 +107,7 @@ fn manifest() -> Value {
             "model.cursor": {"rust_api": "pgorm::Cursor", "features": [], "python_convenience": true},
             "model.paginate": {"rust_api": "pgorm::Paginator", "features": [], "python_convenience": true}
         },
-        "value_types": crate::values::SCALAR_NAMES.iter().copied().chain(crate::values::range_kind_names()).chain(["enum", "created_range", "created_multirange", "array"]).collect::<Vec<_>>(),
+        "value_types": ArrayType::kinds().map(|kind| kind.kind_name()).chain(["enum", "created_range", "created_multirange", "array"]).collect::<Vec<_>>(),
         "value_policy": {
             "inferred_integer": "i64", "inferred_float": "f64", "array_dimensions": 1,
             "float32": "exact conversion only", "decimal": "96-bit coefficient, scale 0–28",

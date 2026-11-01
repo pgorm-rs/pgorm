@@ -129,10 +129,7 @@ pub(super) fn from_python(data: &Bound<'_, PyAny>, kind: &ArrayType) -> PyResult
         }
         ArrayType::Range(range) => Value::Range(
             *range,
-            Some(Box::new(ranges::read_bounds(
-                data,
-                &ranges::element(*range)?,
-            )?)),
+            Some(Box::new(ranges::read_bounds(data, &range.element_type())?)),
         ),
         ArrayType::Multirange(range) => ranges::multirange_from_python(data, *range)?,
         ArrayType::Interval => Value::from(

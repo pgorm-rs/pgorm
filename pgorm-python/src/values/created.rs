@@ -20,11 +20,7 @@ use pyo3::{prelude::*, types::PyString};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use super::{
-    classes::PyMultirange,
-    ranges,
-    types::{PyTypeName, parse_scalar, scalar_name},
-};
+use super::{classes::PyMultirange, ranges, types::PyTypeName};
 use crate::errors::{ConstructionError, DecodeError};
 
 /// The value kinds a created range can range over: `RangeSubtype`'s twelve.
@@ -79,8 +75,7 @@ impl CreatedKind {
         schema: Option<&Bound<'_, PyAny>>,
         multirange: bool,
     ) -> PyResult<Self> {
-        let subtype = parse_scalar(subtype)
-            .ok()
+        let subtype = ArrayType::from_kind_name(subtype)
             .filter(|kind| SUBTYPES.contains(kind))
             .ok_or_else(|| {
                 ConstructionError::new_err(
@@ -197,7 +192,7 @@ impl CreatedKind {
                     return Err(ConstructionError::new_err(format!(
                         "text is no {} over {}",
                         self.kind_name(),
-                        scalar_name(&self.subtype)?
+                        self.subtype.kind_name()
                     )));
                 }
             }
@@ -332,28 +327,28 @@ macro_rules! created_kind_methods {
             }
 
             #[getter]
-            fn subtype(&self) -> PyResult<&'static str> {
-                scalar_name(&self.0.subtype)
+            fn subtype(&self) -> &'static str {
+                self.0.subtype.kind_name()
             }
 
-            fn __hash__(&self) -> PyResult<u64> {
+            fn __hash__(&self) -> u64 {
                 use std::hash::{Hash, Hasher};
                 let mut hasher = std::collections::hash_map::DefaultHasher::new();
-                (&self.0.name.name, &self.0.name.schema, self.subtype()?).hash(&mut hasher);
-                Ok(hasher.finish())
+                (&self.0.name.name, &self.0.name.schema, self.subtype()).hash(&mut hasher);
+                hasher.finish()
             }
 
-            fn __repr__(&self) -> PyResult<String> {
+            fn __repr__(&self) -> String {
                 let schema = match &self.0.name.schema {
                     Some(schema) => format!(", schema={schema:?}"),
                     None => String::new(),
                 };
-                Ok(format!(
+                format!(
                     concat!($label, "({:?}, {:?}{})"),
                     self.0.name.name,
-                    self.subtype()?,
+                    self.subtype(),
                     schema
-                ))
+                )
             }
         }
     };

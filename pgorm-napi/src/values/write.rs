@@ -6,11 +6,8 @@ use std::ops::Bound;
 use neon::{prelude::*, types::JsBigInt};
 use pgorm::pgorm_query::{Range, Value};
 
-use super::{Tag, Tagged, created, value_is_null};
-use crate::{
-    codec::Codec,
-    errors::{Failure, throw},
-};
+use super::{Tag, Tagged, created};
+use crate::{codec::Codec, errors::Failure};
 
 /// Throw a `DecodeError`: a value has no form in the JavaScript type its kind
 /// declares.
@@ -55,14 +52,10 @@ fn range<'cx>(cx: &mut Cx<'cx>, codec: Codec<'cx>, range: &Range<Value>) -> JsRe
     let side =
         |cx: &mut Cx<'cx>, bound: &Bound<Value>| -> NeonResult<(Handle<'cx, JsValue>, bool)> {
             Ok(match bound {
-                Bound::Included(value) | Bound::Excluded(value)
-                    if !value_is_null(value).or_else(|failure| throw(cx, failure))? =>
-                {
-                    (
-                        self::value(cx, codec, value)?,
-                        matches!(bound, Bound::Included(_)),
-                    )
-                }
+                Bound::Included(value) | Bound::Excluded(value) if !value.is_null() => (
+                    self::value(cx, codec, value)?,
+                    matches!(bound, Bound::Included(_)),
+                ),
                 _ => (cx.null().upcast(), false),
             })
         };
@@ -101,7 +94,7 @@ pub(crate) fn value<'cx>(
     codec: Codec<'cx>,
     value: &Value,
 ) -> JsResult<'cx, JsValue> {
-    if value_is_null(value).or_else(|failure| throw(cx, failure))? {
+    if value.is_null() {
         return Ok(cx.null().upcast());
     }
     Ok(match value {
