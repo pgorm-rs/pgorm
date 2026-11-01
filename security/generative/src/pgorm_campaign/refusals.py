@@ -17,7 +17,7 @@ UNQUOTABLE = (
 # pgorm-python STATEMENTS.md: "An insert with no rows raises an error;
 # `default_values()` explicitly requests one default row." An empty batch is
 # refused at compilation, before any statement reaches the server.
-EMPTY_INSERT = "insert requires rows or explicit default_values"
+EMPTY_INSERT = "insert requires rows, a select or explicit default_values"
 
 # pgorm-python errors.rs: a value tokio-postgres cannot encode while building
 # the bind message is a ConstructionError carrying the driver's own top-level
