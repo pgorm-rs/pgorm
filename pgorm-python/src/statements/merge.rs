@@ -8,6 +8,7 @@ use pyo3::{prelude::*, types::PyTuple};
 
 use super::{
     common,
+    from_item::from_item,
     merge_action::{matched, not_matched},
     table::PyTable,
     with::PyWith,
@@ -17,7 +18,7 @@ use crate::{errors::ConstructionError, expressions::Compiled};
 type Arg<'a, 'py> = &'a Bound<'py, PyAny>;
 type Opt<'a, 'py> = Option<&'a Bound<'py, PyAny>>;
 
-// [spec:pgorm:req:bindings.merge]
+// [spec:pgorm:req:bindings.merge+1]
 /// `MERGE INTO target USING source ON condition` before its first WHEN arm.
 #[pyclass(name = "PendingMerge", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -25,18 +26,20 @@ pub struct PyPendingMerge {
     inner: PendingMerge,
 }
 
-/// Begin a MERGE. A source that is a query is a common table expression the
-/// statement names in `with_`, read here as a table.
+// [spec:pgorm:req:bindings.from-subqueries]
+// [spec:pgorm:req:bindings.merge-sources]
+/// Begin a MERGE. Its source is a `Table` or any FROM item, a query made one
+/// by `Select.as_` among them.
 #[pyfunction]
 pub(crate) fn merge(
     target: PyRef<'_, PyTable>,
-    source: PyRef<'_, PyTable>,
+    source: &Bound<'_, PyAny>,
     on: &Bound<'_, PyAny>,
 ) -> PyResult<PyPendingMerge> {
     Ok(PyPendingMerge {
         inner: Query::merge(
             target.inner.clone(),
-            source.inner.clone(),
+            from_item(source)?,
             common::condition(on)?,
         ),
     })
@@ -163,10 +166,11 @@ impl PyMerge {
         next
     }
 
-    fn with_(&self, clause: PyRef<'_, PyWith>) -> Self {
+    // [spec:pgorm:req:bindings.cte-options]
+    fn with_(&self, clause: PyRef<'_, PyWith>) -> PyResult<Self> {
         let mut next = self.clone();
-        next.inner.with(clause.inner.clone());
-        next
+        next.inner.with(clause.plain()?);
+        Ok(next)
     }
 
     fn only(&self) -> Self {

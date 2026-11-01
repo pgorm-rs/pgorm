@@ -6,9 +6,12 @@ mod conflict;
 mod from_item;
 mod grouping;
 mod insert;
+mod lock;
 mod merge;
 mod merge_action;
 mod raw;
+#[cfg(test)]
+mod read_tests;
 mod select;
 mod subquery;
 mod table;
@@ -19,6 +22,8 @@ mod tests;
 mod window;
 mod with;
 mod write;
+#[cfg(test)]
+mod write_tests;
 
 pub(crate) use capabilities::operations as capabilities;
 pub(crate) use common::condition;
@@ -27,6 +32,7 @@ pub use conflict::{PyConflict, PyConflictTarget, PyConflictUpdate};
 pub use from_item::PyFromItem;
 pub use grouping::PyGroupingElement;
 pub use insert::PyInsert;
+pub use lock::{PyLockStrength, PyLockWait};
 pub use merge::{PyMerge, PyPendingMerge};
 pub use merge_action::{
     PyMatchedAction, PyMergeInsert, PyMergeUpdate, PyNotMatchedAction, PyOverriding,
@@ -44,7 +50,7 @@ pub use window::{
     PyExtendedWindow, PyFrame, PyFrameCurrentRow, PyFrameExclusion, PyFrameFollowing,
     PyFramePreceding, PyFrameType, PyWindow, PyWindowFunction, PyWindowed,
 };
-pub use with::{PyReturningRow, PyWith};
+pub use with::{PyCycle, PyReturningRow, PySearch, PySearchOrder, PyWith};
 pub use write::{PyDelete, PyUpdate};
 
 /// Prepare the same validated builder state exposed by Python's inspection API.
@@ -105,6 +111,8 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(subquery::quantified_any, module)?)?;
     module.add_function(wrap_pyfunction!(subquery::quantified_all, module)?)?;
     module.add_class::<Join>()?;
+    module.add_class::<PyLockStrength>()?;
+    module.add_class::<PyLockWait>()?;
     module.add_class::<PyInsert>()?;
     module.add_class::<PyUpdate>()?;
     module.add_class::<PyDelete>()?;
@@ -120,6 +128,9 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyNotMatchedAction>()?;
     module.add_class::<PyOverriding>()?;
     module.add_class::<PyWith>()?;
+    module.add_class::<PySearchOrder>()?;
+    module.add_class::<PySearch>()?;
+    module.add_class::<PyCycle>()?;
     module.add_class::<PyReturningRow>()?;
     module.add_function(wrap_pyfunction!(merge::merge, module)?)?;
     Ok(())

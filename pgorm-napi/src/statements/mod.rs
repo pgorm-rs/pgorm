@@ -28,6 +28,8 @@ mod returning;
 mod schema;
 mod select;
 mod table;
+#[cfg(test)]
+mod variants;
 mod window;
 mod with;
 mod write;
@@ -40,7 +42,7 @@ use pgorm::pgorm_query::{
     Values, WindowStatement,
 };
 
-use crate::{codec::Codec, errors::throw, rows, values::Tagged};
+use crate::{codec::Codec, rows, values::Tagged};
 use args::refuse;
 pub(crate) use args::select as embedded_select;
 pub(crate) use args::{node, pick};
@@ -73,7 +75,7 @@ pub(crate) enum Node {
     /// expression yet: PostgreSQL's grammar requires a `WHEN`.
     CaseOperand(SimpleExpr),
     /// `ANY (..)` or `ALL (..)`, which PostgreSQL's grammar reads only as the
-    /// right operand of a comparison, so no other operator takes it.
+    /// right operand of an operator, so no other position takes it.
     Quantified(SimpleExpr),
     Table(NamedTable),
     FromItem(FromItem),
@@ -289,7 +291,7 @@ fn inspect(mut cx: FunctionContext) -> JsResult<JsArray> {
     let codec = Codec::get(&mut cx)?;
     let list = JsArray::new(&mut cx, values.0.len());
     for (at, value) in values.0.into_iter().enumerate() {
-        let value = Tagged::value(value).or_else(|failure| throw(&mut cx, failure))?;
+        let value = Tagged::value(value);
         let value = rows::value(&mut cx, codec, value, true)?;
         list.set(&mut cx, u32::try_from(at).unwrap_or(u32::MAX), value)?;
     }

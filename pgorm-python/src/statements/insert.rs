@@ -3,22 +3,47 @@ use std::collections::HashSet;
 use pgorm::pgorm_query::{InsertStatement, Query};
 use pyo3::{prelude::*, types::PyTuple};
 
-use super::{common, conflict, table::PyTable};
+use super::{
+    common, conflict, merge_action::PyOverriding, select::PySelect, table::PyTable, with::PyWith,
+};
 use crate::{
     errors::ConstructionError,
     expressions::{Compiled, coerce},
     identifiers::PyIdentifier,
 };
 
-// [spec:pgorm:req:bindings.writes]
+/// Where an INSERT's rows come from: none yet, `values` rows, one `Select`,
+/// or one row of defaults; each excludes the others.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Rows {
+    None,
+    Values(usize),
+    Select,
+    Defaults,
+}
+
+// [spec:pgorm:req:bindings.writes+1]
 /// A runtime INSERT with explicit columns, row arity and default-row state.
 #[pyclass(name = "Insert", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyInsert {
     pub inner: InsertStatement,
     columns: Vec<String>,
-    rows: usize,
-    defaults: bool,
+    rows: Rows,
+}
+
+impl PyInsert {
+    // [spec:pgorm:req:bindings.writes+1]
+    /// Refuse an INSERT with no rows, whether it is inspected, run or read
+    /// into a WITH clause.
+    pub(crate) fn check(&self) -> PyResult<()> {
+        if self.rows == Rows::None {
+            return Err(ConstructionError::new_err(
+                "insert requires rows, a select or explicit default_values",
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[pymethods]
@@ -28,14 +53,13 @@ impl PyInsert {
         Self {
             inner: Query::insert().into_table(table.inner.clone()).to_owned(),
             columns: Vec::new(),
-            rows: 0,
-            defaults: false,
+            rows: Rows::None,
         }
     }
 
     #[pyo3(signature = (*columns))]
     fn columns(&self, columns: &Bound<'_, PyTuple>) -> PyResult<Self> {
-        if self.rows > 0 || self.defaults {
+        if self.rows != Rows::None {
             return Err(ConstructionError::new_err(
                 "insert columns must be chosen before rows",
             ));
@@ -64,7 +88,16 @@ impl PyInsert {
 
     #[pyo3(signature = (*values))]
     fn values(&self, values: &Bound<'_, PyTuple>) -> PyResult<Self> {
-        if self.defaults || self.columns.is_empty() {
+        let written = match self.rows {
+            Rows::None => 0,
+            Rows::Values(written) => written,
+            Rows::Select | Rows::Defaults => {
+                return Err(ConstructionError::new_err(
+                    "values mix with neither select nor default_values",
+                ));
+            }
+        };
+        if self.columns.is_empty() {
             return Err(ConstructionError::new_err(
                 "choose insert columns before values",
             ));
@@ -77,20 +110,47 @@ impl PyInsert {
         next.inner
             .values(values)
             .map_err(|error| ConstructionError::new_err(error.to_string()))?;
-        next.rows += 1;
+        next.rows = Rows::Values(written + 1);
+        Ok(next)
+    }
+
+    // [spec:pgorm:req:bindings.write-sources]
+    /// The rows `query` yields, as many columns as the INSERT names; they are
+    /// its only rows. The query is final once read, so its tie limit and
+    /// windows are checked here.
+    fn select(&self, query: PyRef<'_, PySelect>) -> PyResult<Self> {
+        if self.columns.is_empty() || self.rows != Rows::None {
+            return Err(ConstructionError::new_err(
+                "select follows columns, and is an insert's only rows",
+            ));
+        }
+        let mut next = self.clone();
+        next.inner
+            .select_from(query.embedded()?)
+            .map_err(|error| ConstructionError::new_err(error.to_string()))?;
+        next.rows = Rows::Select;
         Ok(next)
     }
 
     fn default_values(&self) -> PyResult<Self> {
-        if self.rows > 0 || !self.columns.is_empty() {
+        if self.rows != Rows::None || !self.columns.is_empty() {
             return Err(ConstructionError::new_err(
                 "default values cannot be mixed with insert columns or rows",
             ));
         }
         let mut next = self.clone();
         next.inner.or_default_values();
-        next.defaults = true;
+        next.rows = Rows::Defaults;
         Ok(next)
+    }
+
+    // [spec:pgorm:req:bindings.write-sources]
+    /// `OVERRIDING SYSTEM VALUE` or `OVERRIDING USER VALUE`, for identity
+    /// columns; the last call wins.
+    fn overriding(&self, overriding: PyOverriding) -> Self {
+        let mut next = self.clone();
+        next.inner.overriding(overriding.rust());
+        next
     }
 
     fn on_conflict(&self, action: &Bound<'_, PyAny>) -> PyResult<Self> {
@@ -112,12 +172,16 @@ impl PyInsert {
         Ok(next)
     }
 
+    // [spec:pgorm:req:bindings.write-ctes]
+    /// Prefix a WITH clause; the last call wins.
+    fn with_(&self, clause: PyRef<'_, PyWith>) -> Self {
+        let mut next = self.clone();
+        next.inner.with(clause.inner.clone());
+        next
+    }
+
     pub fn inspect(&self) -> PyResult<Compiled> {
-        if self.rows == 0 && !self.defaults {
-            return Err(ConstructionError::new_err(
-                "insert requires rows or explicit default_values",
-            ));
-        }
+        self.check()?;
         common::compiled(self.inner.build())
     }
 
@@ -127,6 +191,6 @@ impl PyInsert {
         ))
     }
     fn __repr__(&self) -> String {
-        format!("Insert(rows={}, defaults={})", self.rows, self.defaults)
+        format!("Insert(rows={:?})", self.rows)
     }
 }

@@ -3600,6 +3600,14 @@ children (
                         kind @status
                         text "Doing → Done (nplan complete)"
                     }
+
+                    {
+                        at 2026-11-01T01:36:09.013973Z
+                        author "brendan@necessary.nu"
+                        kind @note
+                        text "Re-read after sql.ast.expr.eq-any moved to +1 (2026-11-01): its paragraph on quantifiers now lists every operator PostgreSQL reads ANY/SOME/ALL after, as bindings.quantifiers established on PostgreSQL 18 (quantifier-beyond-comparisons), rather than the comparisons alone; Func::any and Func::all say the same. eq_any's and ne_all's own behaviour is unchanged, and every reference is pinned at +1."
+                        after_done true
+                    }
                 )
             }
 
@@ -14551,6 +14559,14 @@ children (
                 kind @note
                 text "binding-spec-consolidation gave this node bindings.case (docs/spec/bindings.md), which requires CASE of both bindings: case_when(condition, result) and case_of(operand).when(..), each CASE taking further when arms and one else, an expression only once it has an arm. JavaScript has it (caseWhen, caseOf, SearchedCase, SimpleCase, CaseOperand); the Python names are listed under python.gaps in docs/spec/bindings-surface.json with this node, to remove as they land."
             }
+
+            {
+                at 2026-10-31T23:54:15.504269Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Done 2026-11-01 (0eda1e2e). SearchedCase and SimpleCase are native subclasses of Expr (extends = PyExpr, the CASE held in the base's SimpleExpr), not constructor functions returning a plain Expr: the shared surface gives each every Expr method plus when and else, so a CASE keeps taking arms after it is already an expression. else_ returns a plain Expr, as JavaScript's else does; CaseOperand is no Expr. A CASE whose results are all bound values is typed text by the server, so a non-text one needs a typed result (documented in EXPRESSIONS.md)."
+                after_done true
+            }
         )
     }
 
@@ -14658,6 +14674,14 @@ children (
                 text "Reads done after binding-coverage-per-impl (2026-10-30): bindings.quantifiers still states today's behaviour, which both bindings cover. The work starts spec-first: bump bindings.quantifiers to the operators PostgreSQL reads a quantifier after (established against the server and pgorm-query's renderer), which leaves both bindings' annotations stale and the node open until both land."
                 after_done true
             }
+
+            {
+                at 2026-10-31T23:54:15.23845Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Done 2026-11-01 (46c24ea8 spec, a05fddac feat). Established on PostgreSQL 18 (pgorm-test): ANY/ALL follow = <> < <= > >=, LIKE / NOT LIKE / ILIKE / NOT ILIKE (no ESCAPE after the quantifier: 42601), ~ !~ ~* !~*, @> <@ &&, << >> &< &> -|-, @@ and @? (whose array the server types jsonpath[], so a bound text array is a ConstructionError as it runs and one cast to jsonpath[] is sent); SIMILAR TO, IS [NOT] DISTINCT FROM, BETWEEN and IN are 42601; + - * / % and || are 42809. pgorm-query renders binary(op, Func::any/Expr::any) bare for each, so it needed no change. bindings.argument-errors' example \"any(..) and all(..) outside a comparison\" now reads \"where no operator takes one (bindings.quantifiers)\" without a bump: no argument-errors site changes behaviour, and a bump would re-pin about 28 sites the sibling branches also touch. Left for a follow-up: pgorm-query's Func::any / some / all docs and sql-ast.md's eq-any paragraph still say a quantifier renders only after a comparison."
+                after_done true
+            }
         )
     }
 
@@ -14666,12 +14690,34 @@ children (
         title "Each binding's tests prove it handles every variant of the open enums it translates"
         kind @test
         deps (public-enums-non-exhaustive)
+        sealed true
         log (
             {
                 at 2026-10-26T18:06:31.299236Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by public-enums-non-exhaustive (81eeeac8). Marking pgorm-query's open enums #[non_exhaustive] means a variant added later no longer breaks the bindings' builds: their wildcard arms compile, and the missing spelling shows only at run time as an unsupported error. non_exhaustive_omitted_patterns, the lint that would catch it, is still unstable on Rust 1.99. Give each binding (and the generative replay harness) a test that walks every variant of each open enum it translates (BinOper, Value kinds, ColumnType, the JSON behaviours and so on: whichever each binding matches over) and fails if one reaches the wildcard arm. pgorm-query needs a way to enumerate the variants (an ALL constant, or a test-only iterator); choose the one that does not make the enums' variant lists a second public API to keep in sync, and say why."
+            }
+
+            {
+                at 2026-10-31T22:54:45.333805Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-11-01T01:22:41.069947Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "The enumeration is pgorm-query's tests_cfg::Variants, behind the hidden tests-cfg feature that sql.surface already keeps out of the surface: variants() gives one value of each variant (payloads a binding translates, never SQL NULL), variant_name() names it, and missing_from(&[Self]) names the variants a binding's spellings leave out. Each impl is generated by one macro from one list, and variant_name's match over the list is exhaustive inside pgorm-query, so a list missing a variant does not build and one naming a variant twice trips unreachable_patterns. A public ALL constant was rejected: it would be a second spelling of each open enum that callers could depend on, maintained by hand and growing as a semver surface with every variant; a derive was rejected because a generic payload (an empty name, a ColumnType subtype of Char) would not reach the arm a binding translates a real one through. The bindings and the replay harness take pgorm-query as a dev-dependency with tests-cfg. Covered: Python and JavaScript walk ArrayType (every kind), Value, ColumnType (the set a registered column has no kind for is pinned to Bit, VarBit, Money, Named, LTree), the four SQL/JSON behaviours and BinOper (spelled, or named as left out); JavaScript also round-trips every kind through Value in its live suite via a native valueKinds export; the replay harness encodes every Value. Not walked: wildcards that select one shape (SimpleExpr::FunctionCall in FROM, SqlJson aggregates before OVER, FromItem::Table in a relation's describe, ColumnSpec refusals in ALTER), pgorm::Error's classification (its default class is the rule), and the enums the bindings only construct from spellings other than BinOper and the JSON behaviours."
+            }
+
+            {
+                at 2026-11-01T03:02:50.884953Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -14680,6 +14726,9 @@ children (
         id scalar-kinds-shared
         title "The bindings and the replay harness share one scalar_kinds table"
         kind @refactor
+        implements {
+            main ([spec:pgorm:def:sql.value.kinds])
+        }
         deps (public-enums-non-exhaustive)
         log (
             {
@@ -14777,6 +14826,11 @@ children (
                 [spec:pgorm:req:bindings.operands]
                 [spec:pgorm:req:bindings.row-count]
                 [spec:pgorm:req:napi.pipeline-table-names]
+                [spec:pgorm:req:bindings.write-sources]
+                [spec:pgorm:req:bindings.conflict-arbiters]
+                [spec:pgorm:req:bindings.merge-sources]
+                [spec:pgorm:req:bindings.write-ctes]
+                [spec:pgorm:req:bindings.cte-options]
             )
             main ([spec:pgorm:req:bindings.connections] [spec:pgorm:req:bindings.pipeline] [spec:pgorm:req:bindings.pipeline-expressions])
             python (
@@ -14899,6 +14953,21 @@ children (
                 kind @decision
                 text "Operator 2026-10-31: \"do all those things\", on three shapes under decision (7). (A) Python's one ModelWrite becomes ModelInsert, ModelUpdate and ModelDelete as JavaScript's are, each with only its own methods, and ModelWrite is deleted. (B) Column.validate and Column.value become private, and Column.describe and EntityColumn.describe are deleted, a column's details read through Model.describe() and Entity.describe() as JavaScript reads them. (C) Python's DDL builders are made only by their factory functions (create_table, alter_table and the rest), as JavaScript's are and as Python's Expr is made only by col() and bind(); the classes stay for annotations and isinstance but cannot be called."
             }
+
+            {
+                at 2026-11-01T01:19:24.94103Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-read after bindings.argument-errors moved to +1 (python-case-expressions merge, 82bebaed): its example of a misplaced quantifier now defers to bindings.quantifiers, as JavaScript's quantified operators do; every reference is pinned at +1."
+                after_done true
+            }
+
+            {
+                at 2026-11-01T02:30:37.202501Z
+                author "brendan@necessary.nu"
+                kind @decision
+                text "Operator 2026-11-01: \"yes to both\", on two more shapes under decision (7), proposed by python-statement-gaps. (D) Conflict targets: Python names an inference target with Conflict.on(*targets) as JavaScript's Conflict.on does, ConflictTarget is no longer constructible (decision C: builders only by their factories), and ConflictUpdate.update takes several columns as JavaScript's does. (E) MERGE actions: Python takes JavaScript's MergeAction factories (update, insert, delete, do_nothing, insert_defaults), MatchedAction and NotMatchedAction are deleted, MergeUpdate and MergeInsert are no longer constructible, and an action on the wrong kind of arm is the ConstructionError bindings.merge already requires, the stubs keeping the update and insert arms' types apart. Search and Cycle (With.recursive's options) stay Python's own, a language difference: JavaScript passes options objects, Python one keyword argument each."
+            }
         )
     }
 
@@ -14907,7 +14976,16 @@ children (
         title "Python's writes, MERGE and WITH clauses take what JavaScript's do"
         kind @feat
         implements {
-            python ([spec:pgorm:req:bindings.merge] [spec:pgorm:req:bindings.with] [spec:pgorm:req:bindings.writes])
+            python (
+                [spec:pgorm:req:bindings.merge]
+                [spec:pgorm:req:bindings.with]
+                [spec:pgorm:req:bindings.writes]
+                [spec:pgorm:req:bindings.write-sources]
+                [spec:pgorm:req:bindings.conflict-arbiters]
+                [spec:pgorm:req:bindings.merge-sources]
+                [spec:pgorm:req:bindings.write-ctes]
+                [spec:pgorm:req:bindings.cte-options]
+            )
         }
         deps (binding-renames)
         log (
@@ -14924,6 +15002,13 @@ children (
                 kind @note
                 text "Reads done after binding-coverage-per-impl (2026-10-30) though nothing is built: Python's code annotates bindings.writes, bindings.merge and bindings.with for the parts it has, so the python claims are covered. The work starts spec-first: split what Python lacks (listed above) out of those rules into rules of their own, annotate JavaScript's code that already does it, and claim the python side here, so the node is open until Python's code lands."
                 after_done true
+            }
+
+            {
+                at 2026-10-31T23:47:42.173888Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Spec split 2026-11-01: bindings.writes+1 keeps values / default_values, a column arbiter with its partial-index predicate, the assignment and guard refusals and RETURNING; bindings.merge+1 keeps a table source; bindings.with+1 keeps named CTEs in call order with Select and MERGE bodies, on SELECT and MERGE. The parts Python lacked are five rules of their own: bindings.write-sources (INSERT .. SELECT, OVERRIDING, UPDATE .. FROM, DELETE .. USING), bindings.conflict-arbiters (index expressions beside columns, on_constraint(name) taking no predicate), bindings.merge-sources (any FROM item as a MERGE's source), bindings.write-ctes (WITH on INSERT, UPDATE and DELETE, and a write with RETURNING as a CTE body) and bindings.cte-options (column lists, MATERIALIZED, WITH RECURSIVE with SEARCH and CYCLE, a second CTE in a recursive clause and a recursive clause before a MERGE refused). Python claims the five here; JavaScript's side (pgorm-napi src/statements write.rs, conflict.rs, merge.rs, with.rs, lib writes/conflicts/merge/select and their tests and parity files) is claimed by binding-spec-consolidation. Python spells SEARCH and CYCLE as Search(order, by, set) and Cycle(by, set, using) with the closed choice SearchOrder, the values of With.recursive's search= and cycle= options, where JavaScript passes options objects; the three are python.only in bindings-surface.json."
             }
         )
     }
@@ -15175,12 +15260,27 @@ children (
         id python-hook-refusal-class
         title "Python reports an application hook's refusal as a ConstructionError, as bindings.entity-writes and JavaScript do"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-10-31T17:06:51.520168Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-binding-decisions (merged 70cbc894). pgorm's Error::Custom, which an ActiveModelBehavior hook's refusal arrives as, still maps to DatabaseError in pgorm-python/src/errors.rs, while bindings.entity-writes says a hook's refusal is a ConstructionError and JavaScript's entity_failure maps it so. Python's transaction task uses the same Custom variant internally, so mapping every Custom to ConstructionError would misreport those; give the internal uses a variant or a typed error of their own first, then map the hook's refusal, with a live test of each."
+            }
+
+            {
+                at 2026-10-31T22:54:44.640722Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-11-01T03:02:51.173922Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -15189,12 +15289,34 @@ children (
         id python-model-created-multirange
         title "Python's declared models decode a created multirange column, as bindings.models lists it"
         kind @feat
+        sealed true
         log (
             {
                 at 2026-10-31T17:06:51.690259Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-model-gaps (merged 0d1442b5). bindings.models lists a CreatedMultirange as a column kind, but a Python model column of one is refused with UnsupportedCapabilityError: Python's record decoder refuses created multiranges, which the existing created-range tests require. JavaScript's models decode them. Teach the record decoder a created multirange (its type and the range's subtype, as a created range is), lift the refusal, and add live tests of a model reading and writing one."
+            }
+
+            {
+                at 2026-10-31T22:54:45.807746Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-11-01T01:22:41.527168Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Checked against the code (2026-11-01): JavaScript's models do not decode a created multirange either. A model declaring CreatedMultirange(\"floatmultirange\", \"f64\") writes one, but insert(..).returning().one() and find().all() both throw DecodeError \"column \\\"spans\\\" of type `app.floatmultirange` cannot be decoded: the type is not supported\", because the driver reports the column as a simple type and nothing casts it. Python's fix projects such a column cast to text, as pgorm's ColumnTrait::select_as does for an entity, and reads the text into the declared kind; JavaScript needs the same and has no node for it."
+            }
+
+            {
+                at 2026-11-01T03:02:51.396983Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -15411,6 +15533,7 @@ children (
         id python-model-shapes
         title "Python's model writes are ModelInsert, ModelUpdate and ModelDelete, and a column's conversion and description are no public methods of its own, as JavaScript's are"
         kind @refactor
+        sealed true
         log (
             {
                 at 2026-10-31T20:00:20.040537Z
@@ -15425,6 +15548,13 @@ children (
                 kind @note
                 text "Built (A) and (B). pgorm-python/python/pgorm/models/writes.py holds ModelInsert (statement Insert | None, an insert of no rows having none), ModelUpdate and ModelDelete over two private bases: _Write (model, statement, returning, execute, the refusing __bool__) and _Guarded (where, all_rows, inspect) for update and delete, so mypy types each write's statement exactly and reports another kind's method as attr-defined; an insert's inspect(terminal=) takes the upsert terminals and an update's the change terminals, any other a TypeError (a closed choice), where a wrong-kind terminal was UnsupportedCapabilityError. Column.validate/value became _validate/_value; Column.describe and the native EntityColumn.describe are gone, Model.describe() reporting the same per-column keys as before and Entity.describe()[\"columns\"] what EntityColumn.describe gave. Rules: bindings.models+3 (a Column has no method, Value(data, kind) the public conversion, what Model.describe() reports), bindings.model-writes+1 (the three kinds, each only its own methods), bindings.column-operators+1 (neither column describes itself); both bindings' annotations re-pinned, JavaScript's code unchanged. bindings-surface.json lists ModelInsert/ModelUpdate/ModelDelete as shared and drops the five undecided Python names and three JavaScript ones, the shapes question no longer naming model writes or column helpers. test_truth_testing.py lists the two bases in BASES (never built; each sampled through a write). Campaign: effects.py and the emitted reproducer's _execute test the three classes; dispatch_models.py and emit_python.py refuse an insert carrying a predicate as a ConstructionError, as they refuse a delete carrying assignments, since an insert no longer has where (the grammar never builds one)."
             }
+
+            {
+                at 2026-10-31T22:52:13.637711Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
         )
     }
 
@@ -15432,12 +15562,20 @@ children (
         id python-ddl-factories
         title "Python's DDL builders are made only by their factory functions, as JavaScript's are"
         kind @refactor
+        sealed true
         log (
             {
                 at 2026-10-31T20:00:25.282718Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Decision (C) of the operator's 2026-10-31 answer (binding-spec-consolidation). pgorm-python's DDL builder classes (CreateTable, CreateIndex, CreateType, CreateDomain, CreateSequence, CreateView, CreateRecursiveView, CreateMaterializedView, CreateTableAs and the rest) are constructible through #[new], and each factory is the class under a second name (create_table = CreateTable in pgorm-python/python/pgorm/schema/__init__.py). Make the factories real functions and the only way to build, and the classes non-constructible from Python, as pgorm-napi's are and as Python's Expr is (col() / bind()); the classes stay exported for annotations and isinstance. The stubs say so (a class's __init__ taking a Never, as Expr's does), the signature test and typing rejection cases cover it, and the shared schema rule states it for both bindings."
+            }
+
+            {
+                at 2026-10-31T22:52:13.77853Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -15447,12 +15585,105 @@ children (
         title "A model's and a registered entity's describe() report the same keys in both bindings, and the surface test holds them to it"
         kind @refactor
         deps (python-model-shapes)
+        sealed true
         log (
             {
                 at 2026-10-31T21:23:40.495769Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Operator 2026-10-31: \"make that node\". Found merging python-model-shapes (b48f9869): Python's Model.describe() reports {schema, table, alias, columns: {field: {column, type, nullable, primary_key, default, generated, values}}, primary_key, path} where JavaScript's ModelDescription is {schema, table, alias, primaryKey, fields: {field: {column, kind, nullable, primaryKey, default, generated, values}}}: \"columns\" against \"fields\", \"type\" (a value snapshot's type) against \"kind\" (the string a result spells a column's kind as: i64, text[], enum \"app\".\"mood\"), and a Python-only \"path\". A registered entity's describe() differs the same way (pgorm-python/src/entities/metadata.rs: columns with an input_hint, against pgorm-napi's columns with sqlType, rustType and kind, and the relations' fields). Under decision (6) each key takes one name, spelled by each binding's naming rule; settle the set, change the side that differs (mostly Python, as decision (6) went), and state it in bindings.models and bindings.entities. bindings-surface.json checks callables only, so data shapes drift unseen: declare each describe() key set there and have each binding's surface test compare a live describe() against it, as it compares names."
+            }
+
+            {
+                at 2026-10-31T22:54:44.983153Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-11-01T00:38:32.024406Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Delivered in 21575750. Model: {schema, table, alias, primary_key, fields: {field: {column, kind, nullable, primary_key, default, generated, values}}}. Entity: {name, schema, table, columns: [{name, json_key, sql_type, rust_type, nullable, primary_key, kind, values}], primary_key, primary_key_without_overlaps, relations: [{name, type, from, to, columns, period, condition_type, on_condition, enforcement, deferrability}], rust: {entity, model, active_model, column}}. json_key kept as a shared key (JavaScript gained jsonKey) because Python's code generator falls back to it for a column name that is no identifier; Python's terminals, active_states and hooks dropped as constants JavaScript never reported. Left as they were, outside this node: a registered graph's describe() (Python {name, rust_shape, sources, terminals, aliases, cursor} against JavaScript {name, rustShape, sources}) and a source tuple's (Python {name, rust_shape, entities, terminals, result} against JavaScript {name, rustShape, entities}) still differ, and bindings-surface.json's descriptions do not declare them."
+            }
+
+            {
+                at 2026-11-01T03:02:51.587914Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
+            }
+        )
+    }
+
+    {
+        id python-conflict-merge-shapes
+        title "Python names conflict targets with Conflict.on and MERGE actions with MergeAction, as JavaScript does"
+        kind @refactor
+        log (
+            {
+                at 2026-11-01T02:30:55.365373Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Decisions (D) and (E) of the operator's 2026-11-01 answer (binding-spec-consolidation). (D) In pgorm-python: Conflict.on(*targets) names an inference target of columns and index expressions, as pgorm-napi's Conflict.on does; ConflictTarget stays exported for annotations but is not constructible; ConflictUpdate.update(*columns) takes several, as JavaScript's update(...columns). (E) MergeAction.update(column, value), .insert(column, value), .delete(), .do_nothing() and .insert_defaults() as pgorm-napi's MergeAction factories; MatchedAction and NotMatchedAction deleted; MergeUpdate and MergeInsert not constructible; an action given to the wrong kind of arm is a ConstructionError, as bindings.merge requires (Python raises TypeError today, breaking it); the stubs keep the matched and not-matched arms' types apart so mypy still refuses a wrong pairing. Update python.naming (it still says ConflictTarget(columns)), the shared rules, bindings-surface.json's shapes entries, docs, typing cases and the generative campaign."
+            }
+        )
+    }
+
+    {
+        id binding-statement-defects
+        title "A JavaScript write read into a WITH clause is checked as it would be run, pgorm-query writes AS MATERIALIZED with one space, and Python's Insert.columns refuses a second call as JavaScript's does"
+        kind @fix
+        log (
+            {
+                at 2026-11-01T02:30:55.565366Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by python-select-gaps / python-statement-gaps (merged 4896da7e). (1) pgorm-napi's src/statements/with.rs takes an INSERT, UPDATE or DELETE body without that write's built() checks, so a write that could not run (no rows, nothing set, no where / all_rows) sits in a CTE and fails only at the server, against bindings.statements; Python refuses it as the clause reads it. (2) pgorm-query renders a CTE's materialization as `AS  MATERIALIZED` with two spaces; fix the renderer and its goldens. (3) pgorm-python's Insert.columns called twice appends to the Rust column list, where pgorm-napi refuses a second call; refuse it in Python as a ConstructionError, as JavaScript does, with a test in each."
+            }
+        )
+    }
+
+    {
+        id binding-graph-describe-shapes
+        title "A registered graph's and a source tuple's describe() report the same keys in both bindings, held by the surface test"
+        kind @refactor
+        log (
+            {
+                at 2026-11-01T02:30:55.824297Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by binding-describe-shapes (merged 61f70c15), which settled a model's and an entity's describe() keys: a registered graph's describe() and a source tuple's still differ between the bindings, Python's carrying keys JavaScript's lack (terminals, aliases, cursor, result). Settle one key set each under decision (6), change the side that differs, state them in bindings.entity-graphs and bindings.pipeline-sources, and declare them under bindings-surface.json's descriptions so each surface test holds them, run against the application modules as the entity descriptions are."
+            }
+        )
+    }
+
+    {
+        id napi-model-created-multirange
+        title "JavaScript's declared models decode a created multirange column, as Python's now do"
+        kind @feat
+        log (
+            {
+                at 2026-11-01T02:30:56.040028Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by python-model-created-multirange (scalar-kinds-shared branch): the filing note was wrong that JavaScript's models decode a created multirange. A probe shows an insert succeeds but returning().one() and find().all() throw DecodeError \"the type is not supported\". Give pgorm-napi's model decode what Python's got: project the column cast to text as ColumnTrait::select_as does, read it back as a Multirange of the declared subtype (DecodeError for text it cannot parse), with live tests of insert-returning, NULL, a filter, find_by_key, a change terminal and a graph read."
+            }
+        )
+    }
+
+    {
+        id python-value-from-rust-infallible
+        title "PyValue::from_rust returns its value, not a result that can no longer fail"
+        kind @refactor
+        deps (scalar-kinds-shared)
+        log (
+            {
+                at 2026-11-01T02:30:56.444023Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by scalar-kinds-shared: once every Value kind has a name in pgorm-query's table, pgorm-python's PyValue::from_rust can no longer fail, but it still returns a PyResult, kept to avoid touching its 62 call sites (pgorm-napi's and the replay harness's equivalents became infallible). A result that cannot be an error tells every caller to handle a failure that does not exist; make it return the value and drop the error handling at each call site."
             }
         )
     }

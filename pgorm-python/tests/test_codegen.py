@@ -91,54 +91,31 @@ class CodegenTests(unittest.TestCase):
             ("Option<pgorm::pgorm_query::Interval>", "p.Interval | None", "interval"),
         ]
         for rust, annotation, kind in cases:
-            mapped = field_type(
-                {
-                    "rust_decode_type": rust,
-                    "input_hint": {"kind": "scalar", "tag": "i64"},
-                }
-            )
+            mapped = field_type({"rust_type": rust, "kind": "i64"})
             with self.subTest(rust=rust):
                 self.assertEqual(
                     (mapped.annotation, mapped.kind), (annotation, repr(kind))
                 )
         for rust in (None, "ApplicationAlias", "Vec<ApplicationAlias>"):
-            mapped = field_type(
-                {
-                    "rust_decode_type": rust,
-                    "input_hint": {"kind": "scalar", "tag": "i32"},
-                }
-            )
+            mapped = field_type({"rust_type": rust, "kind": "i32"})
             self.assertEqual(mapped.annotation, "Any")
-        array = field_type(
-            {
-                "rust_decode_type": "Option<Vec<Option<i32>>>",
-                "input_hint": {
-                    "kind": "array",
-                    "element": {"kind": "scalar", "tag": "i32"},
-                },
-            }
-        )
+        array = field_type({"rust_type": "Option<Vec<Option<i32>>>", "kind": "i32[]"})
         self.assertEqual(array.annotation, "list[int | None] | None")
         self.assertIn("Value.array('i32'", array.binding())
         intervals = field_type(
-            {
-                "rust_decode_type": "Option < Vec < Interval > >",
-                "input_hint": {
-                    "kind": "array",
-                    "element": {"kind": "scalar", "tag": "interval"},
-                },
-            }
+            {"rust_type": "Option < Vec < Interval > >", "kind": "interval[]"}
         )
         self.assertEqual(intervals.annotation, "list[p.Interval] | None")
         self.assertIn("Value.array('interval'", intervals.binding())
-        enum = field_type(
-            {
-                "rust_decode_type": "Mood",
-                "input_hint": {"kind": "enum", "name": "Mood", "schema": 'a"b'},
-            }
-        )
+        enum = field_type({"rust_type": "Mood", "kind": 'enum "a""b"."Mo.od"'})
         self.assertEqual(enum.annotation, "str")
-        self.assertIn("schema='a\"b'", enum.binding())
+        self.assertIn("p.TypeName('Mo.od', schema='a\"b')", enum.binding())
+        bare = field_type({"rust_type": "Vec<Mood>", "kind": 'enum "Mood"[]'})
+        self.assertEqual(bare.annotation, "list[str]")
+        self.assertIn("p.TypeName('Mood', schema=None)", bare.binding())
+        for kind in ('enum Mood', 'enum "a"."b"."c"', 'enum "a"b'):
+            with self.subTest(kind=kind), self.assertRaises(CodegenError):
+                field_type({"rust_type": "Mood", "kind": kind})
 
     # [spec:pgorm:req:bindings.codegen/test]
     def test_field_aliases_resolve_real_column_names(self):
@@ -146,8 +123,8 @@ class CodegenTests(unittest.TestCase):
             {
                 "name": "display name",
                 "json_key": "displayName",
-                "rust_decode_type": "String",
-                "input_hint": {"kind": "scalar", "tag": "text"},
+                "rust_type": "String",
+                "kind": "text",
             }
         ]
         entry = {"name": "app.Entity", "python": "Thing", "fields": {}}

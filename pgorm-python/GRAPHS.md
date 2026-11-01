@@ -92,9 +92,9 @@ of these on its `relations` (see [ENTITIES.md](ENTITIES.md)).
 `inspect()` returns Rust-built SQL and tagged parameters for `all`.
 `inspect(terminal="optional")` includes that terminal's limit. Execution uses
 the same owned `SelectGraph` builder state and calls its actual Rust terminal.
-Graph reads use acquired connections and native asyncio awaitables, with the
-same loop ownership, busy-connection rejection and cancellation/discard policy
-as entity reads.
+Graph reads run on a pool, an acquired connection or a transaction and return
+native asyncio awaitables, with the same loop ownership, busy-connection
+rejection and cancellation/discard policy as entity reads.
 
 ## Keyset cursors
 

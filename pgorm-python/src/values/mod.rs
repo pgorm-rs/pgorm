@@ -5,10 +5,13 @@ mod convert;
 mod created;
 mod interval;
 mod json;
+mod key;
 mod ranges;
 mod snapshot;
 mod temporal;
 mod types;
+#[cfg(test)]
+mod variants;
 
 use pgorm::pgorm_query::{ArrayType, Expr, SimpleExpr, Value};
 use pyo3::{
@@ -23,8 +26,7 @@ pub use created::{PyCreatedMultirange, PyCreatedRange};
 pub use interval::PyInterval;
 pub(crate) use ranges::{column_type as range_column_type, kind_names as range_kind_names};
 pub use types::PyTypeName;
-use types::Tag;
-pub(crate) use types::{SCALAR_NAMES, scalar_name, unrepresented};
+pub(crate) use types::{Tag, unrepresented};
 
 // [spec:pgorm:req:bindings.value-tags]
 /// Immutable owned Rust value plus qualified enum/array identity.
@@ -39,7 +41,7 @@ impl PyValue {
     /// Wrap a Rust value without changing its variant or payload.
     pub fn from_rust(inner: Value) -> PyResult<Self> {
         Ok(Self {
-            tag: types::rust_tag(&inner)?,
+            tag: types::rust_tag(&inner),
             inner,
         })
     }
@@ -156,7 +158,7 @@ impl PyValue {
         }
         let kind = tag.array_type()?;
         let inner = if data.is_none() {
-            types::scalar_null(&kind)?
+            kind.null()
         } else if let Tag::Created(created) = &tag {
             Value::String(Some(Box::new(created.text(data)?)))
         } else {
@@ -191,7 +193,7 @@ impl PyValue {
     fn null(kind: &Bound<'_, PyAny>) -> PyResult<Self> {
         let tag = Tag::parse(kind)?;
         Ok(Self {
-            inner: types::scalar_null(&tag.array_type()?)?,
+            inner: tag.array_type()?.null(),
             tag,
         })
     }
@@ -216,13 +218,13 @@ impl PyValue {
     }
 
     #[getter]
-    fn kind(&self) -> PyResult<&'static str> {
+    fn kind(&self) -> &'static str {
         self.tag.name()
     }
 
     #[getter]
-    fn is_null(&self) -> PyResult<bool> {
-        types::is_null(&self.inner)
+    fn is_null(&self) -> bool {
+        self.inner.is_null()
     }
 
     #[getter]
@@ -279,8 +281,8 @@ impl PyValue {
     fn __repr__(&self) -> PyResult<String> {
         Ok(format!(
             "Value(kind={:?}, is_null={})",
-            self.kind()?,
-            self.is_null()?
+            self.kind(),
+            self.is_null()
         ))
     }
 }

@@ -999,10 +999,12 @@ impl Func {
 
     /// `ANY` over an array. Postgres only.
     ///
-    /// A quantifier, not a function: it is SQL only as the right operand of a
-    /// comparison, and PostgreSQL rejects it anywhere else. Reach for
-    /// [`Expr::eq_any`] for the equality case, which is the one worth a name;
-    /// this is the escape hatch for the other operators.
+    /// A quantifier, not a function: it is SQL only as the right operand of an
+    /// operator PostgreSQL reads one after — a comparison, LIKE and ILIKE and
+    /// their negations, the regular-expression matches, containment and
+    /// overlap, the range positions, `@@` and `@?` — and PostgreSQL rejects it
+    /// anywhere else. Reach for [`Expr::eq_any`] for the equality case, which is
+    /// the one worth a name; this is the escape hatch for the other operators.
     ///
     /// # Examples
     ///
@@ -1053,8 +1055,9 @@ impl Func {
         FunctionCall::new(Function::Some).arg(expr)
     }
 
-    /// `ALL` over an array. Postgres only, and likewise valid only after a
-    /// comparison operator. Reach for [`Expr::ne_all`] for the inequality case.
+    /// `ALL` over an array. Postgres only, and likewise valid only after an
+    /// operator PostgreSQL reads a quantifier after, as [`Func::any`] lists.
+    /// Reach for [`Expr::ne_all`] for the inequality case.
     ///
     /// # Examples
     ///

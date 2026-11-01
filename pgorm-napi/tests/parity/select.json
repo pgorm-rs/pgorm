@@ -35,6 +35,10 @@
     "sql": "SELECT * FROM \"t\" WHERE \"body\" @@ $1 AND \"doc\" @@ CAST($2::text AS jsonpath) AND \"id\" = ANY($3) AND \"id\" <> ALL(ARRAY(SELECT \"id\" FROM \"u\")) AND \"score\" > ALL(SELECT \"id\" FROM \"v\") AND \"id\" <= ANY(SELECT \"id\" FROM \"w\") AND \"a\" >= ANY(\"b\")",
     "values": [["text","fat & rat"], ["text","$.a == 1"], ["array","[1,2]"]]
   },
+  "quantifiers-beyond-comparisons": {
+    "sql": "SELECT * FROM \"t\" WHERE \"a\" LIKE ANY($1) AND \"a\" NOT ILIKE ALL(SELECT \"p\" FROM \"u\") AND \"a\" ~* ANY(\"b\") AND \"span\" <@ ANY(\"spans\") AND \"span\" -|- ALL(SELECT \"p\" FROM \"u\") AND \"doc\" @? ANY(\"paths\") AND \"body\" @@ ALL(\"queries\")",
+    "values": [["array","[x%,y%]"]]
+  },
   "casts-collations-subscripts": {
     "sql": "SELECT CAST(\"a\" AS integer), CAST(\"b\" AS app.\"Mood\"[]), CAST($1::text AS interval), (\"c\" COLLATE \"C\"), (\"d\" COLLATE \"pg_catalog\".\"de-x-icu\"), \"e\"[$2], \"f\"[$3][$4], \"g\"[$5:$6], \"h\"[:$7], \"i\"[$8:], \"j\"[:]",
     "values": [["text","1 day"], ["i64","1"], ["i64","1"], ["i32","2"], ["i64","2"], ["i64","3"], ["i64","3"], ["i64","2"]]

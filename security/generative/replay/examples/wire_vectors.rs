@@ -28,10 +28,7 @@
 
 use jiff::{civil::time, tz::TimeZone};
 use pgorm::pgorm_query::{ArrayType, Interval, MacAddress, Value, Vector};
-use pgorm_generative_replay::{
-    FormatError,
-    wire::{Tagged, TypeName, validate},
-};
+use pgorm_generative_replay::wire::{Tagged, TypeName, validate};
 use rust_decimal::Decimal;
 use serde_json::{Value as Json, json};
 
@@ -50,7 +47,7 @@ fn main() {
     let naive = jiff::civil::datetime(2024, 1, 2, 3, 4, 5, 123_456_000);
     let instant = TimeZone::UTC.to_timestamp(naive).unwrap();
 
-    let encoded: Vec<(&str, Result<Tagged, FormatError>)> = vec![
+    let encoded: Vec<(&str, Tagged)> = vec![
         ("null-i32", Tagged::from_value(Value::Int(None))),
         (
             "null-array",
@@ -221,23 +218,23 @@ fn main() {
         ),
         (
             "enum",
-            Ok(Tagged::from_enum(
+            Tagged::from_enum(
                 Value::String(Some(Box::new("O'Brien 雪".to_owned()))),
                 TypeName::new("State\" 雪").in_schema("fixture"),
                 false,
-            )),
+            ),
         ),
         (
             "enum-unqualified",
-            Ok(Tagged::from_enum(
+            Tagged::from_enum(
                 Value::String(Some(Box::new("calm".to_owned()))),
                 TypeName::new("mood"),
                 false,
-            )),
+            ),
         ),
         (
             "enum-array",
-            Ok(Tagged::from_enum(
+            Tagged::from_enum(
                 Value::Array(
                     ArrayType::String,
                     Some(Box::new(vec![
@@ -247,11 +244,11 @@ fn main() {
                 ),
                 TypeName::new("State\" 雪").in_schema("fixture"),
                 true,
-            )),
+            ),
         ),
     ];
     for (label, value) in encoded {
-        emit(label, &value.unwrap().encode().unwrap());
+        emit(label, &value.encode().unwrap());
     }
 
     // Hand-written documents around the format's edges. Some are valid — the

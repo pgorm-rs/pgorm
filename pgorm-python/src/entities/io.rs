@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     errors::{ConstructionError, InternalError},
-    execution::Target,
+    execution::Executor,
     transactions::work::{Output, Work},
 };
 
@@ -17,7 +17,7 @@ pub(crate) fn select<'py>(
     query: Select,
     terminal: Terminal,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let target = Target::extract(py, connection)?;
+    let target = Executor::extract(py, connection)?;
     if query.compile(terminal).1.0.len() > 65535 {
         return Err(ConstructionError::new_err(
             "PostgreSQL supports at most 65535 query parameters",
@@ -53,7 +53,7 @@ pub(crate) fn write<'py>(
     active: Active,
     write: Write,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let target = Target::extract(py, connection)?;
+    let target = Executor::extract(py, connection)?;
     future_into_py(py, async move {
         let Output::Written(result) = target.run(Work::Write(active, write)).await? else {
             return Err(InternalError::new_err("unexpected model write result"));

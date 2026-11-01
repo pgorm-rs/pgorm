@@ -53,7 +53,8 @@ impl Action {
 
 /// `mergeNew(target, source, on)`: `MERGE INTO target USING source ON ..`,
 /// pending until its first arm.
-// [spec:pgorm:req:bindings.merge]
+// [spec:pgorm:req:bindings.merge+1]
+// [spec:pgorm:req:bindings.merge-sources]
 fn merge_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let target = match this(cx, 0)? {
         Node::Table(table) => table,
@@ -116,7 +117,7 @@ fn arm_action(
 
 /// `mergeWhen(merge, kind, action, condition)`: one more WHEN arm, the first
 /// making a pending MERGE a statement.
-// [spec:pgorm:req:bindings.merge]
+// [spec:pgorm:req:bindings.merge+1]
 fn merge_when(cx: &mut FunctionContext) -> NeonResult<Node> {
     let node = this(cx, 0)?;
     let kind = choice(
@@ -205,6 +206,7 @@ fn merge_returning_action(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `mergeWith(merge, clause)`: a plain WITH clause; PostgreSQL refuses
 /// `WITH RECURSIVE` before a MERGE.
+// [spec:pgorm:req:bindings.cte-options]
 fn merge_with(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut merge = statement(cx)?;
     match with::clause_at(cx, 1)? {
@@ -226,7 +228,7 @@ fn merge_only(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `mergeActionUpdate(column, value)`: `UPDATE SET column = value`, its first
 /// assignment.
-// [spec:pgorm:req:bindings.merge]
+// [spec:pgorm:req:bindings.merge+1]
 fn action_update(cx: &mut FunctionContext) -> NeonResult<Node> {
     let column = name_at(cx, 0)?;
     let value = operand_at(cx, 1)?;

@@ -51,7 +51,7 @@ fn scalar(ty: &ColumnType) -> Option<ArrayType> {
 /// binding has no kind for, whose values a caller declares with `Value`. A
 /// domain's values travel as its base type's do, so a domain column is the
 /// kind of the type it is over.
-// [spec:pgorm:req:bindings.entities+2]
+// [spec:pgorm:req:bindings.entities+3]
 // [spec:pgorm:req:bindings.schema-domains+2]
 pub(crate) fn column_tag(ty: &ColumnType) -> Option<Tag> {
     let name =
@@ -90,6 +90,8 @@ pub(crate) fn column_tag(ty: &ColumnType) -> Option<Tag> {
 #[derive(Clone, Debug)]
 pub(crate) struct ColumnInfo {
     pub(crate) name: String,
+    /// The key the Rust field serializes under, `ColumnTrait::json_key`.
+    pub(crate) json_key: String,
     pub(crate) sql_type: String,
     pub(crate) rust_type: Option<&'static str>,
     pub(crate) nullable: bool,
@@ -120,6 +122,7 @@ impl ColumnInfo {
     fn describe(&self) -> Result<Json, Failure> {
         Ok(json!({
             "name": self.name,
+            "jsonKey": self.json_key,
             "sqlType": self.sql_type,
             "rustType": self.rust_type,
             "nullable": self.nullable,
@@ -179,6 +182,7 @@ impl EntityInfo {
                         .map(|field| field.rust_type())
                 }),
                 primary_key: primary_key.contains(&column_name),
+                json_key: column.json_key().to_owned(),
                 sql_type: format!("{:?}", definition.get_column_type()),
                 nullable: definition.is_null(),
                 tag: column_tag(definition.get_column_type()),
@@ -216,7 +220,7 @@ impl EntityInfo {
     }
 
     /// The registration as `describe()` gives it.
-    // [spec:pgorm:req:bindings.entities+2]
+    // [spec:pgorm:req:bindings.entities+3]
     pub(crate) fn describe(&self) -> Result<Json, Failure> {
         Ok(json!({
             "name": self.name,
@@ -241,7 +245,7 @@ impl EntityInfo {
 /// holds its foreign key's rows to. `onCondition` is present or absent only:
 /// it is a Rust closure over the two tables' aliases, which has no rendering
 /// of its own until a join supplies them.
-// [spec:pgorm:req:bindings.entities+2]
+// [spec:pgorm:req:bindings.entities+3]
 // [spec:pgorm:req:bindings.relation-conditions]
 fn relation_json(name: &str, def: &RelationDef) -> Json {
     json!({
@@ -292,6 +296,7 @@ fn table(item: &FromItem) -> Json {
 mod tests {
     use std::sync::Arc;
 
+    use pgorm::pgorm_query::tests_cfg::Variants;
     use pgorm::pgorm_query::{
         ColumnType, Condition, IntervalSpec, IntoName, Name, RangeType, StringLen, TableName,
     };
@@ -316,7 +321,7 @@ mod tests {
         }
     }
 
-    // [spec:pgorm:req:bindings.entities+2/test]
+    // [spec:pgorm:req:bindings.entities+3/test]
     // [spec:pgorm:req:bindings.relation-conditions/test]
     #[test]
     fn join_condition_shape_is_reported() {
@@ -338,7 +343,7 @@ mod tests {
             .map(|tag| kind_key(tag).unwrap_or_else(|failure| panic!("{failure}")))
     }
 
-    // [spec:pgorm:req:bindings.entities+2/test]    each column type maps to the kind
+    // [spec:pgorm:req:bindings.entities+3/test]    each column type maps to the kind
     // a decoded column of it carries, so a registered column's values bind and
     // read as the binding's own; a type it has no kind for takes a `Value`
     #[test]
@@ -419,5 +424,16 @@ mod tests {
             Some(vec!["calm".to_owned(), "tense".to_owned()])
         );
         assert_eq!(key(&over("money", ColumnType::Money)), None);
+    }
+
+    // [spec:pgorm:req:bindings.entities+3/test]
+    #[test]
+    fn only_types_without_a_kind_have_no_tag() {
+        let untagged: Vec<&str> = ColumnType::variants()
+            .iter()
+            .filter(|ty| column_tag(ty).is_none())
+            .map(Variants::variant_name)
+            .collect();
+        assert_eq!(untagged, ["Bit", "VarBit", "Money", "Named", "LTree"]);
     }
 }

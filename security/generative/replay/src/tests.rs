@@ -8,7 +8,7 @@
 use std::error::Error;
 
 use jiff::{Timestamp, civil::DateTime, tz::TimeZone};
-use pgorm::pgorm_query::{ArrayType, Interval, MacAddress, Value, Vector};
+use pgorm::pgorm_query::{ArrayType, Interval, MacAddress, Value, Vector, tests_cfg::Variants};
 use rust_decimal::Decimal;
 use serde_json::{Value as Json, json};
 
@@ -21,7 +21,7 @@ use crate::{
 type TestResult = Result<(), Box<dyn Error + Send + Sync>>;
 
 fn encoded(value: Value) -> Result<Json, Box<dyn Error + Send + Sync>> {
-    Ok(Tagged::from_value(value)?.encode_checked()?)
+    Ok(Tagged::from_value(value).encode_checked()?)
 }
 
 fn text(value: &str) -> Value {
@@ -401,9 +401,9 @@ fn validation_accepts_the_canonical_spellings() -> TestResult {
 
 #[test]
 fn a_tag_names_its_kind() -> TestResult {
-    assert_eq!(Tag::Scalar(ArrayType::Decimal).name()?, "decimal");
-    assert_eq!(Tag::Enum(TypeName::new("mood")).name()?, "enum");
-    assert_eq!(Tag::Scalar(ArrayType::Int).array().name()?, "array");
+    assert_eq!(Tag::Scalar(ArrayType::Decimal).name(), "decimal");
+    assert_eq!(Tag::Enum(TypeName::new("mood")).name(), "enum");
+    assert_eq!(Tag::Scalar(ArrayType::Int).array().name(), "array");
     Ok(())
 }
 
@@ -743,4 +743,16 @@ fn interval_validation_rejects_what_the_python_format_rejects() {
     let multirange =
         json!({"version": 1, "type": {"kind": "multirange"}, "sql_null": true, "data": Json::Null});
     assert!(validate(&multirange).is_err());
+}
+
+// [spec:pgorm:req:generative.replay/test]    every value pgorm holds encodes,
+// none reaching the arm for a kind the harness does not represent
+#[test]
+fn every_value_kind_has_an_encoding() -> TestResult {
+    for value in Value::variants() {
+        let kind = value.array_type();
+        Tagged::from_value(value).encode()?;
+        Tagged::from_value(kind.null()).encode()?;
+    }
+    Ok(())
 }

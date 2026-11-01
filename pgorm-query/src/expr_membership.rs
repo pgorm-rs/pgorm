@@ -108,7 +108,7 @@ impl Expr {
     ///     r#"SELECT "id" FROM "character" WHERE "character"."size_w" = ANY(ARRAY []::int4[])"#
     /// );
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.eq-any]
+    // [spec:pgorm:req:sql.ast.expr.eq-any+1]
     pub fn eq_any<V, I>(self, v: I) -> SimpleExpr
     where
         V: Into<Value> + ValueType,
@@ -153,7 +153,7 @@ impl Expr {
     /// );
     /// assert_eq!(values.0.len(), 1);
     /// ```
-    // [spec:pgorm:req:sql.ast.expr.eq-any]
+    // [spec:pgorm:req:sql.ast.expr.eq-any+1]
     pub fn ne_all<V, I>(self, v: I) -> SimpleExpr
     where
         V: Into<Value> + ValueType,

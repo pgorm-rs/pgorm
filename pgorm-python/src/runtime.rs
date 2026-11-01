@@ -77,6 +77,39 @@ impl PoolState {
         }
     }
 
+    /// Check a connection out within the acquire timeout, for its borrower
+    /// alone, and record it so that closing the pool closes it.
+    pub(crate) async fn lend(self: Arc<Self>) -> PyResult<Arc<ConnectionState>> {
+        let connection = tokio::select! {
+            _ = self.cancelled.cancelled() => return Err(LifecycleError::new_err("pool is closed")),
+            result = tokio::time::timeout(self.acquire_timeout, self.pool.get()) => {
+                self.ensure_open()?;
+                result.map_err(|_| TimeoutError::new_err("pool acquisition timed out"))?
+                    .map_err(|error| database_error(error, &self.secrets))?
+            }
+        };
+        if self.cancelled.is_cancelled() {
+            connection.discard();
+            return Err(LifecycleError::new_err("pool is closed"));
+        }
+        let state = Arc::new(ConnectionState {
+            pool: self.clone(),
+            cancelled: CancellationToken::new(),
+            slot: Arc::new(Mutex::new(Some(connection))),
+        });
+        let mut registry = self
+            .connections
+            .lock()
+            .map_err(|_| InternalError::new_err("connection registry lock failed"))?;
+        if self.cancelled.is_cancelled() {
+            state.close_now();
+            return Err(LifecycleError::new_err("pool is closed"));
+        }
+        registry.retain(|item| item.strong_count() > 0);
+        registry.push(Arc::downgrade(&state));
+        Ok(state)
+    }
+
     fn close_now(&self) -> PyResult<Vec<Arc<ConnectionState>>> {
         self.cancelled.cancel();
         self.pool.close();
@@ -158,34 +191,9 @@ impl NativePool {
         self.state.ensure_open()?;
         let pool = self.state.clone();
         future_into_py(py, async move {
-            let connection = tokio::select! {
-                _ = pool.cancelled.cancelled() => return Err(LifecycleError::new_err("pool is closed")),
-                result = tokio::time::timeout(pool.acquire_timeout, pool.pool.get()) => {
-                    pool.ensure_open()?;
-                    result.map_err(|_| TimeoutError::new_err("pool acquisition timed out"))?
-                        .map_err(|error| database_error(error, &pool.secrets))?
-                }
-            };
-            if pool.cancelled.is_cancelled() {
-                connection.discard();
-                return Err(LifecycleError::new_err("pool is closed"));
-            }
-            let state = Arc::new(ConnectionState {
-                pool: pool.clone(),
-                cancelled: CancellationToken::new(),
-                slot: Arc::new(Mutex::new(Some(connection))),
-            });
-            let mut registry = pool
-                .connections
-                .lock()
-                .map_err(|_| InternalError::new_err("connection registry lock failed"))?;
-            if pool.cancelled.is_cancelled() {
-                state.close_now();
-                return Err(LifecycleError::new_err("pool is closed"));
-            }
-            registry.retain(|item| item.strong_count() > 0);
-            registry.push(Arc::downgrade(&state));
-            Ok(NativeConnection { state })
+            Ok(NativeConnection {
+                state: pool.lend().await?,
+            })
         })
     }
 

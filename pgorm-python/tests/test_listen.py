@@ -198,7 +198,7 @@ class ListenerExecution(unittest.IsolatedAsyncioTestCase):
             await anext(listener)
 
     # [spec:pgorm:req:bindings.listen+2/test]    a capacity is a positive whole number
-    # [spec:pgorm:req:bindings.argument-errors/test]
+    # [spec:pgorm:req:bindings.argument-errors+1/test]
     async def test_capacity_is_a_positive_int(self):
         for capacity in (0, -1, 2**64):
             with self.subTest(capacity=capacity), self.assertRaises(ValueError):

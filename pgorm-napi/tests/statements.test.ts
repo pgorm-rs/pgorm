@@ -168,7 +168,7 @@ test("every terminal runs a built statement as it runs SQL text, on a pool, a co
 });
 
 // [spec:pgorm:req:bindings.statements/test]
-// [spec:pgorm:req:bindings.argument-errors/test]
+// [spec:pgorm:req:bindings.argument-errors+1/test]
 test("a built statement binds its own values, so parameters passed beside it are refused", async () => {
   const query = select().from(account);
   await assert.rejects(pool().query(query, [1] as never), (error: unknown) => {
@@ -286,7 +286,7 @@ test("regex, notRegex, iregex and notIregex, and pathExists, answer as PostgreSQ
   assert.throws(() => doc.pathExists(1 as never), mistyped(/JSON path is a string/));
 });
 
-// [spec:pgorm:req:bindings.quantifiers/test]    matches is @@, and any and all quantify each
+// [spec:pgorm:req:bindings.quantifiers+1/test]    matches is @@, and any and all quantify each
 // comparison over an array, bound or an expression, and over a subquery's rows or its ARRAY(..),
 // an empty array false under ANY and true under ALL, each answering as the SQL written by hand
 test("matches, and any and all after a comparison, answer as PostgreSQL's operators", async () => {
@@ -328,10 +328,59 @@ test("matches, and any and all after a comparison, answer as PostgreSQL's operat
   assert.deepStrictEqual(answers, { holds: true, fails: false });
   assert.match(account.col("id").eq(any([2, 4])).inspect().sql, /"a"\."id" = ANY\(\$1\)$/);
   const quantified = any(account.col("tags"));
-  assert.throws(() => account.col("id").add(quantified as never), refused(/ANY and ALL follow a comparison, not "add"/));
+  assert.throws(() => account.col("id").add(quantified as never), refused(/ANY and ALL follow .*, not "add"/));
+  assert.throws(() => account.col("name").concat(quantified as never), refused(/ANY and ALL follow .*, not "concat"/));
   assert.throws(() => account.col("id").isDistinctFrom(quantified as never), refused(/ANY and ALL follow a comparison/));
+  assert.throws(() => account.col("name").similarTo(quantified as never), refused(/not "similarTo"/));
+  assert.throws(() => account.col("name").like(quantified as never, { escape: "!" }), refused(/takes no escape/));
+  assert.throws(() => account.col("id").between(quantified as never, 3), refused(/got an ANY or ALL operand/));
   assert.throws(() => account.col("id").isIn([quantified as never]), refused(/expected an expression or a value, got an ANY or ALL operand/));
   assert.throws(() => bind(quantified as never), refused(/cannot be inferred/));
+});
+
+// [spec:pgorm:req:bindings.quantifiers+1/test]    any and all after LIKE's and ILIKE's family,
+// the regular-expression matches, containment, the range positions, @@ and @?, over a bound
+// array or a subquery's rows, answer as the SQL written by hand
+test("any and all follow LIKE, regex, containment, range, @@ and @? operators as PostgreSQL's", async () => {
+  await pool().execute(`CREATE TABLE app.quantified (id int8 PRIMARY KEY, label text NOT NULL, span int4range NOT NULL, doc jsonb NOT NULL)`);
+  await pool().execute(`INSERT INTO app.quantified VALUES (1, 'pgorm', '[1,5)', '{"a": 1}'), (2, 'PGORM', '[5,8)', '{"b": 2}'),
+    (3, 'sql', '[10,12)', '{"a": "x"}'), (4, 'other', '[30,40)', '{"c": true}')`);
+  const q = new Table("quantified", { schema: "app" });
+  const built = async (predicate: ReturnType<typeof col>) =>
+    ids(await pool().query(select(q.col("id")).from(q).where(predicate).orderBy(q.col("id").asc())));
+  const written = async (predicate: string) =>
+    ids(await pool().query(`SELECT id FROM app.quantified WHERE ${predicate} ORDER BY id`));
+  const windows = select(literal("[0,6)").cast("int4range")).union(select(literal("[8,20)").cast("int4range")));
+  const windowsSql = "SELECT '[0,6)'::int4range UNION SELECT '[8,20)'::int4range";
+  const paths = (...items: string[]) => bind(items).cast("jsonpath", { array: true });
+  const [label, span, doc] = [q.col("label"), q.col("span"), q.col("doc")];
+  const cases: [ReturnType<typeof col>, string, bigint[]][] = [
+    [label.like(any(["pg%", "s%"])), "label LIKE ANY('{pg%,s%}')", [1n, 3n]],
+    [label.notLike(all(["pg%", "s%"])), "label NOT LIKE ALL('{pg%,s%}')", [2n, 4n]],
+    [label.ilike(any(["pg%"])), "label ILIKE ANY('{pg%}')", [1n, 2n]],
+    [label.notIlike(all(["pg%", "o%"])), "label NOT ILIKE ALL('{pg%,o%}')", [3n]],
+    [label.like(any(select(literal("o%")))), "label LIKE ANY(SELECT 'o%')", [4n]],
+    [label.regex(any(["^p", "^s"])), "label ~ ANY('{^p,^s}')", [1n, 3n]],
+    [label.notRegex(all(["^p", "^s"])), "label !~ ALL('{^p,^s}')", [2n, 4n]],
+    [label.iregex(any(["^PG", "^O"])), "label ~* ANY('{^PG,^O}')", [1n, 2n, 4n]],
+    [label.notIregex(all(["^pg"])), "label !~* ALL('{^pg}')", [3n, 4n]],
+    [span.contains(any(bind(Value.array("i32", [3, 11])).cast("int4", { array: true }))), "span @> ANY('{3,11}'::int4[])", [1n, 3n]],
+    [span.containedBy(any(windows)), `span <@ ANY(${windowsSql})`, [1n, 3n]],
+    [span.overlaps(any(windows)), `span && ANY(${windowsSql})`, [1n, 2n, 3n]],
+    [span.strictlyLeftOf(any(windows)), `span << ANY(${windowsSql})`, [1n, 2n]],
+    [span.strictlyRightOf(any(windows)), `span >> ANY(${windowsSql})`, [3n, 4n]],
+    [span.notExtendRightOf(all(windows)), `span &< ALL(${windowsSql})`, [1n]],
+    [span.notExtendLeftOf(all(windows)), `span &> ALL(${windowsSql})`, [3n, 4n]],
+    [span.adjacentTo(any(windows)), `span -|- ANY(${windowsSql})`, [2n]],
+    [label.matches(any(["pgorm", "sql"])), "label @@ ANY('{pgorm,sql}'::text[])", [1n, 2n, 3n]],
+    [doc.pathExists(any(paths("$.a", "$.c"))), "doc @? ANY('{$.a,$.c}'::jsonpath[])", [1n, 3n, 4n]],
+    [doc.matches(all(paths("$.a == 1"))), `doc @@ ALL('{"$.a == 1"}'::jsonpath[])`, [1n]],
+  ];
+  for (const [predicate, sql, expected] of cases) {
+    assert.deepStrictEqual(await built(predicate), expected, sql);
+    assert.deepStrictEqual(await written(sql), expected, sql);
+  }
+  await assert.rejects(built(doc.pathExists(any(["$.a"]))), refused(/cannot bind a `String` value to Postgres type `jsonpath`/));
 });
 
 // [spec:pgorm:req:bindings.expressions+2/test]
@@ -491,7 +540,8 @@ test("a locking read takes its rows' locks, OF an aliased schema-qualified table
   });
 });
 
-// [spec:pgorm:req:bindings.with/test]
+// [spec:pgorm:req:bindings.with+1/test]
+// [spec:pgorm:req:bindings.cte-options/test]
 test("common table expressions, recursive ones with SEARCH and CYCLE included, run", async () => {
   const clicks = new With("clicks", select(event.col("account_id")).from(event).where(event.col("kind").eq("click")), {
     columns: ["who"],
@@ -614,7 +664,7 @@ test("literal() writes a value into the SQL as pgorm-query renders a constant, a
 });
 
 // [spec:pgorm:req:bindings.identifiers+2/test]
-// [spec:pgorm:req:bindings.argument-errors/test]
+// [spec:pgorm:req:bindings.argument-errors+1/test]
 test("an identifier is 1–63 UTF-8 bytes without NUL, or refused", () => {
   assert.throws(() => col(""), refused(/identifier/));
   assert.throws(() => col("x".repeat(64)), refused(/identifier/));
@@ -650,7 +700,7 @@ test("limits and offsets are non-negative integers within PostgreSQL's bigint", 
 });
 
 // [spec:pgorm:req:bindings.expressions+2/test]
-// [spec:pgorm:req:bindings.argument-errors/test]
+// [spec:pgorm:req:bindings.argument-errors+1/test]
 test("shapes PostgreSQL has no SQL for are refused as they are built", () => {
   assert.throws(() => (select().select as () => unknown).call(select()), refused(/at least one item/));
   assert.throws(() => (tuple as () => unknown)(), refused(/at least one item/));

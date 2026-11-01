@@ -23,7 +23,6 @@ use uuid::Uuid;
 use super::{
     CREATED_SUBTYPES, CreatedKind, Tag, Tagged, TypeName, created,
     json::{self, MAX_SAFE_INTEGER},
-    parse_scalar, range_element, scalar_name, scalar_null,
 };
 use crate::{
     codec::{Codec, Description},
@@ -40,7 +39,7 @@ pub(crate) fn refuse<'cx, T>(cx: &mut Cx<'cx>, message: impl Into<String>) -> Ne
 /// The string an argument that is text must be, `what` naming it in the
 /// `TypeError` anything else is. A value to bind has no wrong type, since any
 /// value may be a parameter; one that cannot be bound is `refuse`d.
-// [spec:pgorm:req:bindings.argument-errors]
+// [spec:pgorm:req:bindings.argument-errors+1]
 pub(crate) fn text<'cx>(
     cx: &mut Cx<'cx>,
     data: Handle<'cx, JsValue>,
@@ -113,7 +112,7 @@ pub(crate) fn kind<'cx>(
 ) -> NeonResult<Tag> {
     if data.is_a::<JsString, _>(cx) {
         let name = string(cx, data)?;
-        return match parse_scalar(&name) {
+        return match ArrayType::from_kind_name(&name) {
             Some(scalar) => Ok(Tag::Scalar(scalar)),
             None => refuse(cx, format!("{name:?} is not a value kind")),
         };
@@ -128,7 +127,7 @@ pub(crate) fn kind<'cx>(
             let subtype = string(cx, subtype)?;
             let multirange = description.field(cx, 3);
             let multirange = multirange.downcast_or_throw::<JsBoolean, _>(cx)?.value(cx);
-            let subtype = match parse_scalar(&subtype) {
+            let subtype = match ArrayType::from_kind_name(&subtype) {
                 Some(kind) if CREATED_SUBTYPES.contains(&kind) => kind,
                 _ => {
                     return refuse(
@@ -196,7 +195,7 @@ pub(crate) fn tagged<'cx>(
     tag: &Tag,
 ) -> NeonResult<Tagged> {
     if data.is_a::<JsNull, _>(cx) {
-        return Tagged::null(tag.clone()).or_else(|failure| throw(cx, failure));
+        return Ok(Tagged::null(tag.clone()));
     }
     if let Some(description) = describe(cx, codec, data)?
         && description.tag == "value"
@@ -204,11 +203,13 @@ pub(crate) fn tagged<'cx>(
         let value = description.field(cx, 0);
         let value = boxed(cx, value)?;
         if value.tag != *tag {
-            let names = value.tag.name().and_then(|given| Ok((given, tag.name()?)));
-            let (given, declared) = names.or_else(|failure| throw(cx, failure))?;
             return refuse(
                 cx,
-                format!("a {given} value is not a value of kind {declared}"),
+                format!(
+                    "a {} value is not a value of kind {}",
+                    value.tag.name(),
+                    tag.name()
+                ),
             );
         }
         return Ok(value);
@@ -417,8 +418,7 @@ fn temporal<'cx>(
                 ArrayType::DateTime => "Temporal.PlainDateTime",
                 _ => "Temporal.Instant",
             };
-            let name = scalar_name(kind).or_else(|failure| throw(cx, failure))?;
-            return refuse(cx, format!("{name} takes a {class}"));
+            return refuse(cx, format!("{} takes a {class}", kind.kind_name()));
         }
     };
     temporal_value(cx, &description)
@@ -640,7 +640,7 @@ fn created_text<'cx>(
         match created::ranges(&kind.subtype, &text, kind.multirange) {
             Some(ranges) => ranges,
             None => {
-                let subtype = scalar_name(&kind.subtype).or_else(|failure| throw(cx, failure))?;
+                let subtype = kind.subtype.kind_name();
                 return refuse(cx, format!("{text:?} is no {label} over {subtype}"));
             }
         }
@@ -722,14 +722,14 @@ fn scalar<'cx>(
             Value::Vector(Some(Box::new(Vector::from(values))))
         }
         ArrayType::Range(range_type) => {
-            let element = range_element(*range_type).or_else(|failure| throw(cx, failure))?;
+            let element = range_type.element_type();
             Value::Range(
                 *range_type,
                 Some(Box::new(range(cx, codec, data, &element)?)),
             )
         }
         ArrayType::Multirange(range_type) => {
-            let element = range_element(*range_type).or_else(|failure| throw(cx, failure))?;
+            let element = range_type.element_type();
             let ranges = ranges(cx, codec, data, &element, true)?;
             Value::Multirange(*range_type, Some(Box::new(Multirange::from(ranges))))
         }
@@ -781,9 +781,7 @@ pub(crate) fn infer<'cx>(
     } else {
         return infer_described(cx, codec, data);
     };
-    Tagged::value(value)
-        .map(Some)
-        .or_else(|failure| throw(cx, failure))
+    Ok(Some(Tagged::value(value)))
 }
 
 /// What a plain JavaScript value that is neither a primitive nor binary data
@@ -835,9 +833,7 @@ fn infer_described<'cx>(
         }
         _ => return refuse(cx, "a kind is not a value"),
     };
-    Tagged::value(value)
-        .map(Some)
-        .or_else(|failure| throw(cx, failure))
+    Ok(Some(Tagged::value(value)))
 }
 
 /// A number with no declared kind: an `i64` when it is a safe integer other
@@ -898,7 +894,7 @@ fn infer_array<'cx>(
         let mut elements = Vec::with_capacity(items.len());
         for (item, value) in items.iter().zip(&values) {
             elements.push(match value {
-                None => scalar_null(&kind).or_else(|failure| throw(cx, failure))?,
+                None => kind.null(),
                 Some(value) if all_integers => value.datum.clone(),
                 Some(_) => {
                     let number = item.downcast_or_throw::<JsNumber, _>(cx)?.value(cx);
@@ -936,14 +932,13 @@ fn infer_array<'cx>(
     let elements = values
         .into_iter()
         .map(|value| match value {
-            Some(value) => Ok(value.datum),
+            Some(value) => value.datum,
             None => match &element {
-                Tag::Enum(_) => Ok(Value::String(None)),
-                _ => scalar_null(&kind),
+                Tag::Enum(_) => Value::String(None),
+                _ => kind.null(),
             },
         })
-        .collect::<Result<Vec<_>, _>>()
-        .or_else(|failure| throw(cx, failure))?;
+        .collect();
     let datum = Value::Array(kind, Some(Box::new(elements)));
     Ok(Tagged {
         datum,

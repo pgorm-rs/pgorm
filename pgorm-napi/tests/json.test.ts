@@ -198,7 +198,7 @@ test("JSON_TABLE reads rows out of a document, each kind of column its own way, 
 });
 
 // [spec:pgorm:req:bindings.sql-json/test]
-// [spec:pgorm:req:bindings.argument-errors/test]
+// [spec:pgorm:req:bindings.argument-errors+1/test]
 test("a behaviour, type or shape a SQL/JSON function cannot take is refused as it is built", () => {
   assert.throws(() => jsonValue(doc, "$.a", { returning: "jsonb" }), refused(/JSON_VALUE cannot return json or jsonb/));
   assert.throws(() => jsonValue(doc, "$.a", { returning: "json" }), refused(/bug #19695/));

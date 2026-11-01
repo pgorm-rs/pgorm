@@ -6,7 +6,7 @@
  */
 
 // [spec:pgorm:req:napi.typing+1]
-// [spec:pgorm:req:bindings.entities+2]
+// [spec:pgorm:req:bindings.entities+3]
 
 import type { Compiled, Expr, Operand, OrderBy, Predicate, Quantified } from "./expressions.d.ts";
 import type { Select } from "./select.d.ts";
@@ -116,6 +116,8 @@ export interface EntityDescription {
   readonly table: string;
   readonly columns: readonly {
     readonly name: string;
+    /** The key the entity's Rust field serializes under. */
+    readonly jsonKey: string;
     readonly sqlType: string;
     readonly rustType: string | null;
     readonly nullable: boolean;

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from .writes import ModelDelete, ModelInsert, ModelUpdate
 
 
-# [spec:pgorm:req:bindings.models+3]
+# [spec:pgorm:req:bindings.models+4]
 @dataclass(frozen=True, eq=False, slots=True, init=False)
 class Model:
     table: p.Table
@@ -89,10 +89,16 @@ class Model:
     def _sql(self, field: str) -> str:
         return cast(str, self.columns[field].name)
 
-    def _projected(self, field: str, column: p.Expr) -> p.Expr | p.Aliased:
-        """``column`` projected under the field's name: as it is when the
-        field is its column's name, aliased otherwise."""
-        return column if field == self._sql(field) else column.as_(field)
+    def _projected(
+        self, field: str, column: p.Expr, name: str | None = None
+    ) -> p.Expr | p.Aliased:
+        """``column`` projected under ``name``, the field's own by default:
+        as it is when that is its column's name, aliased otherwise, and cast
+        to ``text`` when the field is read as its text."""
+        name = field if name is None else name
+        if self.columns[field]._read_as_text:
+            return column.cast(p.TypeName("text")).as_(name)
+        return column if name == self._sql(field) else column.as_(name)
 
     def _selection(self, fields: tuple[str, ...]) -> tuple[str, ...]:
         selected = tuple(self.columns) if not fields else fields
@@ -185,15 +191,18 @@ class Model:
 
     def describe(self) -> dict[str, Any]:
         """The declaration as data: the table, its primary key, and each
-        field's column with every option it was declared with."""
+        field's column with every option it was declared with, its kind
+        spelled as a decoded column's is compared: ``i64``, ``text[]``,
+        ``enum "app"."mood"``."""
         return {
             "schema": self.table.schema,
             "table": self.table.name,
             "alias": self.table.alias,
-            "columns": {
+            "primary_key": list(self.primary_key),
+            "fields": {
                 name: {
                     "column": column.name,
-                    "type": column._null.snapshot()["type"],
+                    "kind": column._null._kind_key(),
                     "nullable": column.nullable,
                     "primary_key": column.primary_key,
                     "default": column.default,
@@ -202,6 +211,4 @@ class Model:
                 }
                 for name, column in self.columns.items()
             },
-            "primary_key": list(self.primary_key),
-            "path": "runtime statements",
         }

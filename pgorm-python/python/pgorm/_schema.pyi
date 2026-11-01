@@ -3,7 +3,7 @@ from typing import Any, Literal, NotRequired, TypeAlias, TypedDict, Never, Unpac
 from ._native import Identifier, TypeName, Compiled
 from ._ranges import CreatedRange, CreatedMultirange
 from ._expressions import Expr
-from ._statements import Table
+from ._from_items import Table
 from ._entities import Entity
 from ._schema_tables import CreateTable, CreateIndex
 from ._schema_types import CreateType

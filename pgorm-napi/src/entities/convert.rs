@@ -68,7 +68,7 @@ pub(crate) fn tagged(column: &ColumnInfo, value: Value) -> Result<Tagged, Failur
     };
     let tag = match named {
         Some(tag) => tag,
-        None => value_tag(&value)?,
+        None => value_tag(&value),
     };
     Ok(Tagged { tag, datum: value })
 }

@@ -6,7 +6,10 @@
  */
 
 // [spec:pgorm:req:napi.typing+1]
-// [spec:pgorm:req:bindings.writes]
+// [spec:pgorm:req:bindings.writes+1]
+// [spec:pgorm:req:bindings.write-sources]
+// [spec:pgorm:req:bindings.write-ctes]
+// [spec:pgorm:req:bindings.conflict-arbiters]
 
 import type { Aliased, Builder, Expr, Operand, Predicate } from "./expressions.d.ts";
 import type { Select, Source, Table, With } from "./select.d.ts";

@@ -30,14 +30,15 @@ pub(crate) enum Arbiter {
 }
 
 /// `conflictDoNothing()`: `ON CONFLICT DO NOTHING`, answering any conflict.
-// [spec:pgorm:req:bindings.writes]
+// [spec:pgorm:req:bindings.writes+1]
 fn conflict_do_nothing(_: &mut FunctionContext) -> NeonResult<Node> {
     Ok(Node::Conflict(OnConflict::do_nothing()))
 }
 
 /// `conflictOn(items)`: an inference target of columns, named by string, and
 /// index expressions; at least one.
-// [spec:pgorm:req:bindings.writes]
+// [spec:pgorm:req:bindings.writes+1]
+// [spec:pgorm:req:bindings.conflict-arbiters]
 fn conflict_on(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut target: Option<ConflictTarget> = None;
     for item in list(cx, 0)? {
@@ -73,6 +74,7 @@ fn conflict_on(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `conflictOnConstraint(name)`: `ON CONSTRAINT "name"`, which takes no
 /// predicate.
+// [spec:pgorm:req:bindings.conflict-arbiters]
 fn conflict_on_constraint(cx: &mut FunctionContext) -> NeonResult<Node> {
     let constraint = name_at(cx, 0)?;
     Ok(Node::Arbiter(Arbiter::Constraint(OnConflict::constraint(
@@ -82,6 +84,7 @@ fn conflict_on_constraint(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `conflictWhere(node, predicate)`: an inference target's partial-index
 /// predicate, or an update's condition; a constraint arbiter takes neither.
+// [spec:pgorm:req:bindings.conflict-arbiters]
 fn conflict_where(cx: &mut FunctionContext) -> NeonResult<Node> {
     let node = this(cx, 0)?;
     let predicate = predicate_at(cx, 1)?;

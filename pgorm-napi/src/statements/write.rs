@@ -66,7 +66,7 @@ pub(crate) struct Delete {
 }
 
 /// The SQL and values a write builds, or why it cannot run.
-// [spec:pgorm:req:bindings.writes]
+// [spec:pgorm:req:bindings.writes+1]
 pub(crate) fn built(node: &Node) -> Option<Result<(String, Values), &'static str>> {
     Some(match node {
         Node::Insert(insert) if insert.rows == Rows::None => {
@@ -106,7 +106,7 @@ fn target<'cx>(cx: &mut FunctionContext<'cx>) -> NeonResult<pgorm::pgorm_query::
 }
 
 /// `insertNew(table)`.
-// [spec:pgorm:req:bindings.writes]
+// [spec:pgorm:req:bindings.writes+1]
 fn insert_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = target(cx)?;
     Ok(Node::Insert(Insert {
@@ -159,6 +159,7 @@ fn insert_values(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `insertSelect(insert, select)`: the rows a query yields, as many columns
 /// as the INSERT names.
+// [spec:pgorm:req:bindings.write-sources]
 fn insert_select(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut insert = insert_receiver(cx)?;
     if insert.columns.is_empty() || insert.rows != Rows::None {
@@ -188,6 +189,7 @@ fn insert_defaults(cx: &mut FunctionContext) -> NeonResult<Node> {
 
 /// `insertOverriding(insert, which)`: `OVERRIDING SYSTEM VALUE` or `USER
 /// VALUE`, for identity columns.
+// [spec:pgorm:req:bindings.write-sources]
 fn insert_overriding(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut insert = insert_receiver(cx)?;
     let overriding = match choice(cx, 1, "overriding", &["systemValue", "userValue"])? {
@@ -208,7 +210,7 @@ fn insert_on_conflict(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `updateNew(table)`.
-// [spec:pgorm:req:bindings.writes]
+// [spec:pgorm:req:bindings.writes+1]
 fn update_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = target(cx)?;
     Ok(Node::Update(Update {
@@ -239,7 +241,7 @@ fn update_set(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `deleteNew(table)`.
-// [spec:pgorm:req:bindings.writes]
+// [spec:pgorm:req:bindings.writes+1]
 fn delete_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = target(cx)?;
     Ok(Node::Delete(Delete {
@@ -286,6 +288,7 @@ fn write_all_rows(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `writeFrom(write, item)`: an UPDATE's FROM item or a DELETE's USING item.
+// [spec:pgorm:req:bindings.write-sources]
 fn write_from(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut node = this(cx, 0)?;
     let item = arg(cx, 1);
@@ -306,7 +309,7 @@ fn write_from(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `writeReturning(write, items, oldAs, newAs)`: the RETURNING list.
-// [spec:pgorm:req:bindings.writes]
+// [spec:pgorm:req:bindings.writes+1]
 fn write_returning(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut node = this(cx, 0)?;
     let clause = returning::clause(cx, 1)?;
@@ -315,6 +318,7 @@ fn write_returning(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `writeWith(write, clause)`: the write's WITH clause, replacing any.
+// [spec:pgorm:req:bindings.write-ctes]
 fn write_with(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut node = this(cx, 0)?;
     let clause = with::clause_at(cx, 1)?;

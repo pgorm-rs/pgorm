@@ -67,7 +67,7 @@ class SchemaObjectConstruction(unittest.TestCase):
 
     # [spec:pgorm:req:bindings.schema-tables/test]
     # [spec:pgorm:req:bindings.schema-alter/test]
-    # [spec:pgorm:req:bindings.argument-errors/test]
+    # [spec:pgorm:req:bindings.argument-errors+1/test]
     def test_impossible_shapes_refused_as_built(self):
         a = p.col("a")
         for action in (

@@ -135,7 +135,7 @@ pub(crate) fn inspected<'cx>(
     let codec = Codec::get(cx)?;
     let list = JsArray::new(cx, values.0.len());
     for (at, value) in values.0.into_iter().enumerate() {
-        let value = crate::values::Tagged::value(value).or_else(|failure| throw(cx, failure))?;
+        let value = crate::values::Tagged::value(value);
         let value = rows::value(cx, codec, value, true)?;
         list.set(cx, u32::try_from(at).unwrap_or(u32::MAX), value)?;
     }
@@ -196,7 +196,7 @@ fn entity_names(mut cx: FunctionContext) -> JsResult<JsValue> {
 }
 
 /// `entityGet(registry, name)`: the entity registered as `name`.
-// [spec:pgorm:req:bindings.entities+2]
+// [spec:pgorm:req:bindings.entities+3]
 fn entity_get(mut cx: FunctionContext) -> JsResult<JsValue> {
     let registry = held!(cx, RegistryHandle, 0);
     let name = text!(cx, 1);

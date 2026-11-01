@@ -208,7 +208,7 @@ class Pool:
             raise
         return CopyRowStream(native, connection)
 
-    # [spec:pgorm:req:bindings.argument-errors]
+    # [spec:pgorm:req:bindings.argument-errors+1]
     async def listener(self, *, capacity: int = 1024) -> Listener:
         """Open a dedicated listening connection with this pool's configuration.
 

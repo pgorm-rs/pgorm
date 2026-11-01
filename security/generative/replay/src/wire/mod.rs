@@ -21,7 +21,7 @@ pub use temporal::{
 };
 pub use validate::validate;
 
-use pgorm::pgorm_query::{ArrayType, Range, RangeType, Value};
+use pgorm::pgorm_query::{ArrayType, Range, Value};
 use serde_json::{Value as Json, json};
 use std::ops::Bound;
 
@@ -79,137 +79,34 @@ impl Tag {
         Self::Array(Box::new(self))
     }
 
-    /// The portable kind name, as it appears in the encoded `kind` field.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`FormatError`] for a scalar kind [`scalar_name`] refuses.
-    pub fn name(&self) -> Result<&'static str, FormatError> {
-        Ok(match self {
-            Self::Scalar(kind) => scalar_name(kind)?,
+    /// The tag a Rust value carries on its own, before enum identity applies.
+    pub fn of(value: &Value) -> Self {
+        let kind = Self::Scalar(value.array_type());
+        if value.is_array() { kind.array() } else { kind }
+    }
+
+    /// The portable kind name, as it appears in the encoded `kind` field: a
+    /// scalar's and a range's as pgorm names them, as `wire.SCALARS` and
+    /// `wire.RANGES` do. A multirange is named `multirange` here, but has no
+    /// portable kind, so [`validate`] refuses a value tagged with one.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Scalar(ArrayType::Multirange(_)) => "multirange",
+            Self::Scalar(kind) => kind.kind_name(),
             Self::Enum(_) => "enum",
             Self::Array(_) => "array",
-        })
+        }
     }
 
     /// The encoded tag: `{"kind": ..}`, plus enum identity or element tag.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`FormatError`] for a scalar kind [`scalar_name`] refuses.
-    pub fn encode(&self) -> Result<Json, FormatError> {
-        Ok(match self {
-            Self::Scalar(_) => json!({"kind": self.name()?}),
+    pub fn encode(&self) -> Json {
+        match self {
+            Self::Scalar(_) => json!({"kind": self.name()}),
             Self::Enum(name) => json!({"kind": "enum", "name": name.name, "schema": name.schema}),
-            Self::Array(element) => json!({"kind": "array", "element": element.encode()?}),
-        })
+            Self::Array(element) => json!({"kind": "array", "element": element.encode()}),
+        }
     }
 }
-
-macro_rules! scalar_kinds {
-    ($( $variant:ident => $name:literal ),+ $(,)?) => {
-        /// Every scalar kind name, matching `wire.SCALARS` less `enum`.
-        pub const SCALAR_NAMES: &[&str] = &[$($name),+];
-
-        /// The portable name of a Rust scalar variant.
-        ///
-        /// A range is named by its catalogue type, as `wire.RANGES` names it. A
-        /// multirange has a name here, but no portable kind, so [`validate`]
-        /// refuses a value tagged with one.
-        ///
-        /// # Errors
-        ///
-        /// Returns [`FormatError`] for a kind pgorm gained after this harness
-        /// was written, which has no portable name.
-        pub fn scalar_name(kind: &ArrayType) -> Result<&'static str, FormatError> {
-            Ok(match kind {
-                $(ArrayType::$variant => $name,)+
-                ArrayType::Range(ty) => ty.range_type_name(),
-                ArrayType::Multirange(_) => "multirange",
-                _ => return Err(unrepresented()),
-            })
-        }
-
-        /// The scalar variant a portable name denotes.
-        pub fn parse_scalar(name: &str) -> Option<ArrayType> {
-            match name {
-                $($name => Some(ArrayType::$variant),)+
-                _ => None,
-            }
-        }
-
-        /// The typed SQL NULL of a scalar kind.
-        ///
-        /// # Errors
-        ///
-        /// Returns [`FormatError`] for a kind pgorm gained after this harness
-        /// was written.
-        pub fn scalar_null(kind: &ArrayType) -> Result<Value, FormatError> {
-            Ok(match kind {
-                $(ArrayType::$variant => Value::$variant(None),)+
-                ArrayType::Range(ty) => Value::Range(*ty, None),
-                ArrayType::Multirange(ty) => Value::Multirange(*ty, None),
-                _ => return Err(unrepresented()),
-            })
-        }
-
-        /// The tag a Rust value carries on its own, before enum identity applies.
-        ///
-        /// # Errors
-        ///
-        /// Returns [`FormatError`] for a value of a kind pgorm gained after
-        /// this harness was written.
-        pub fn rust_tag(value: &Value) -> Result<Tag, FormatError> {
-            Ok(match value {
-                $(Value::$variant(_) => Tag::Scalar(ArrayType::$variant),)+
-                Value::Array(kind, _) => Tag::Array(Box::new(Tag::Scalar(kind.clone()))),
-                Value::Range(ty, _) => Tag::Scalar(ArrayType::Range(*ty)),
-                Value::Multirange(ty, _) => Tag::Scalar(ArrayType::Multirange(*ty)),
-                _ => return Err(unrepresented()),
-            })
-        }
-
-        /// Whether the value is an SQL NULL rather than a present payload.
-        ///
-        /// Distinct from a JSON `null` payload, which is a present value whose
-        /// content happens to be JSON's null literal.
-        ///
-        /// # Errors
-        ///
-        /// Returns [`FormatError`] for a value of a kind pgorm gained after
-        /// this harness was written.
-        pub fn is_sql_null(value: &Value) -> Result<bool, FormatError> {
-            Ok(match value {
-                $(Value::$variant(value) => value.is_none(),)+
-                Value::Array(_, value) => value.is_none(),
-                Value::Range(_, value) => value.is_none(),
-                Value::Multirange(_, value) => value.is_none(),
-                _ => return Err(unrepresented()),
-            })
-        }
-    };
-}
-
-scalar_kinds! {
-    Bool => "bool", TinyInt => "i8", SmallInt => "i16", Int => "i32",
-    BigInt => "i64", Unsigned => "u32", BigUnsigned => "u64",
-    Float => "f32", Double => "f64", String => "text", Char => "char",
-    Bytes => "bytes", Json => "json", Decimal => "decimal", Uuid => "uuid",
-    Date => "date", Time => "time", DateTime => "datetime",
-    DateTimeWithTimeZone => "datetime_utc", IpNetwork => "ipnetwork",
-    MacAddress => "mac_address", Vector => "vector", Interval => "interval",
-}
-
-/// Every built-in range type by its portable name and the scalar kind of its
-/// bounds, matching `wire.RANGES`.
-pub const RANGES: &[(RangeType, &str)] = &[
-    (RangeType::Int4, "i32"),
-    (RangeType::Int8, "i64"),
-    (RangeType::Numeric, "decimal"),
-    (RangeType::Date, "date"),
-    (RangeType::Timestamp, "datetime"),
-    (RangeType::TimestampTz, "datetime_utc"),
-];
 
 /// A range's payload: `{"empty": true}`, or each bound's own payload (absent
 /// where unbounded) and the two inclusivity characters.
@@ -220,7 +117,7 @@ fn range_payload(range: &Range<Value>) -> Result<Json, FormatError> {
     };
     let side = |bound: &Bound<Value>| match bound {
         Bound::Included(value) | Bound::Excluded(value) => Tagged {
-            tag: rust_tag(value)?,
+            tag: Tag::of(value),
             inner: value.clone(),
         }
         .payload(),
@@ -256,16 +153,11 @@ pub struct Tagged {
 
 impl Tagged {
     /// Wrap a Rust value, taking its tag from its own variant.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`FormatError`] for a value of a kind pgorm gained after this
-    /// harness was written.
-    pub fn from_value(inner: Value) -> Result<Self, FormatError> {
-        Ok(Self {
-            tag: rust_tag(&inner)?,
+    pub fn from_value(inner: Value) -> Self {
+        Self {
+            tag: Tag::of(&inner),
             inner,
-        })
+        }
     }
 
     /// Retain a PostgreSQL enum's qualified identity alongside its label payload.
@@ -292,14 +184,11 @@ impl Tagged {
         &self.inner
     }
 
-    /// Whether this is an SQL NULL rather than a present payload.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`FormatError`] for a value of a kind pgorm gained after this
-    /// harness was written.
-    pub fn is_sql_null(&self) -> Result<bool, FormatError> {
-        is_sql_null(&self.inner)
+    /// Whether this is an SQL NULL rather than a present payload, which a
+    /// JSON `null` payload is: a present value whose content happens to be
+    /// JSON's null literal.
+    pub fn is_sql_null(&self) -> bool {
+        self.inner.is_null()
     }
 
     /// The tagged encoding: version, type tag, SQL NULL flag, payload.
@@ -311,8 +200,8 @@ impl Tagged {
     pub fn encode(&self) -> Result<Json, FormatError> {
         Ok(json!({
             "version": 1,
-            "type": self.tag.encode()?,
-            "sql_null": self.is_sql_null()?,
+            "type": self.tag.encode(),
+            "sql_null": self.is_sql_null(),
             "data": self.payload()?,
         }))
     }
@@ -375,7 +264,7 @@ impl Tagged {
                             .map(|inner| {
                                 let tag = match &self.tag {
                                     Tag::Array(element) => (**element).clone(),
-                                    _ => rust_tag(inner)?,
+                                    _ => Tag::of(inner),
                                 };
                                 Self {
                                     inner: inner.clone(),

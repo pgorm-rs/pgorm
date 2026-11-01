@@ -1,9 +1,11 @@
 // @ts-check
 
 // Comparison, arithmetic and logic: the operators every expression has. An
-// operand that is not an expression is a value, bound as a parameter; a
-// comparison's may also be `any(..)` or `all(..)`.
+// operand that is not an expression is a value, bound as a parameter; that of
+// an operator PostgreSQL reads a quantifier after may also be `any(..)` or
+// `all(..)`.
 // [spec:pgorm:req:bindings.expressions+2]
+// [spec:pgorm:req:bindings.quantifiers+1]
 
 import { arg, Builder, made } from "./builder.js";
 import { native } from "./operations.js";
@@ -204,12 +206,13 @@ export class Operand extends Builder {
 
   /**
    * `@?`: whether a `jsonpath` returns any item for this `jsonb`; the path,
-   * a string, is bound as text cast to `jsonpath`.
+   * a string, is bound as text cast to `jsonpath`, or `any(..)` or `all(..)`
+   * ranges over `jsonpath` values.
    *
-   * @param {string} path
+   * @param {string | import("./expressions.js").Quantified} path
    */
   pathExists(path) {
-    return made.expr(native.exprPathExists(arg(this), path));
+    return made.expr(native.exprPathExists(arg(this), arg(path)));
   }
 
   /** @param {unknown} other */

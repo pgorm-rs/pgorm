@@ -156,9 +156,9 @@ fn declared(kind: &ColumnType, value: Value) -> Result<Tagged, FormatError> {
         ColumnType::Enum { name, schema, .. } => enumerated(name, schema.as_ref(), value, false),
         ColumnType::Array(member) => match member.as_ref() {
             ColumnType::Enum { name, schema, .. } => enumerated(name, schema.as_ref(), value, true),
-            _ => Tagged::from_value(value),
+            _ => Ok(Tagged::from_value(value)),
         },
-        _ => Tagged::from_value(value),
+        _ => Ok(Tagged::from_value(value)),
     }
 }
 

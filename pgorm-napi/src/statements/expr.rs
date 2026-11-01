@@ -176,9 +176,9 @@ fn subquery(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `exprQuantified("any" | "all", select | operand)`: `ANY (..)` or
 /// `ALL (..)` over a subquery's rows, pgorm-query's `Expr::any` / `Expr::all`,
 /// or over an array, `Func::any` / `Func::all` with the array bound unless it
-/// is an expression. It is no expression: only a comparison takes it, as its
-/// right operand, the one place PostgreSQL's grammar reads it.
-// [spec:pgorm:req:bindings.quantifiers]
+/// is an expression. It is no expression: only an operator PostgreSQL reads
+/// one after takes it, as its right operand.
+// [spec:pgorm:req:bindings.quantifiers+1]
 fn quantified(cx: &mut FunctionContext) -> NeonResult<Node> {
     let all = choice(cx, 0, "a quantifier", &["any", "all"])? == "all";
     let source = arg(cx, 1);
@@ -200,11 +200,46 @@ fn quantified(cx: &mut FunctionContext) -> NeonResult<Node> {
     Ok(Node::Quantified(built))
 }
 
-/// The operators a quantified operand can follow: the comparisons.
-const COMPARISONS: [&str; 6] = ["eq", "ne", "lt", "lte", "gt", "gte"];
+/// The operators of `BINARY` PostgreSQL's grammar takes before `ANY` or `ALL`
+/// whose result is a boolean, as the server requires of one (`42809`). LIKE's
+/// family and `@?` read theirs in `like` and `path_exists`.
+// [spec:pgorm:req:bindings.quantifiers+1]
+const QUANTIFIABLE: [&str; 19] = [
+    "eq",
+    "ne",
+    "lt",
+    "lte",
+    "gt",
+    "gte",
+    "contains",
+    "containedBy",
+    "overlaps",
+    "strictlyLeftOf",
+    "strictlyRightOf",
+    "notExtendRightOf",
+    "notExtendLeftOf",
+    "adjacentTo",
+    "regex",
+    "notRegex",
+    "iregex",
+    "notIregex",
+    "matches",
+];
+
+/// The refusal of `ANY (..)` or `ALL (..)` after `operator`, which
+/// PostgreSQL reads none after.
+fn unquantifiable<T>(cx: &mut FunctionContext, operator: &str) -> NeonResult<T> {
+    refuse(
+        cx,
+        format!(
+            "ANY and ALL follow a comparison, LIKE or ILIKE, a regular-expression match, \
+             containment, a range position, matches or pathExists, not {operator:?}"
+        ),
+    )
+}
 
 // [spec:pgorm:req:bindings.ranges]
-const BINARY: [(&str, BinOper); 26] = [
+pub(super) const BINARY: [(&str, BinOper); 26] = [
     ("eq", BinOper::Equal),
     ("ne", BinOper::NotEqual),
     ("lt", BinOper::SmallerThan),
@@ -234,9 +269,9 @@ const BINARY: [(&str, BinOper); 26] = [
 ];
 
 /// `exprBinary(expr, operator, operand)`: a comparison or arithmetic, the
-/// operand bound unless it is an expression, or for a comparison `ANY (..)`
-/// or `ALL (..)`. `isNotDistinctFrom` is the one operator outside the table,
-/// as pgorm-query spells it.
+/// operand bound unless it is an expression, or `ANY (..)` or `ALL (..)` for
+/// an operator PostgreSQL reads one after. `isNotDistinctFrom` is the one
+/// operator outside the table, as pgorm-query spells it.
 // [spec:pgorm:req:bindings.expressions+2]
 fn binary(cx: &mut FunctionContext) -> NeonResult<Node> {
     let left = receiver(cx, 0)?;
@@ -244,15 +279,10 @@ fn binary(cx: &mut FunctionContext) -> NeonResult<Node> {
     let operator = crate::values::read::string(cx, operator)?;
     let right = arg(cx, 2);
     let right = match args::node(cx, right) {
-        Some(Node::Quantified(quantified)) if COMPARISONS.contains(&operator.as_str()) => {
+        Some(Node::Quantified(quantified)) if QUANTIFIABLE.contains(&operator.as_str()) => {
             quantified
         }
-        Some(Node::Quantified(_)) => {
-            return refuse(
-                cx,
-                format!("ANY and ALL follow a comparison, not {operator:?}"),
-            );
-        }
+        Some(Node::Quantified(_)) => return unquantifiable(cx, &operator),
         _ => operand(cx, right)?,
     };
     let expr = match BINARY.iter().find(|(name, _)| *name == operator) {
@@ -264,13 +294,18 @@ fn binary(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `exprPathExists(expr, path)`: `@?`, the path a string bound as text cast
-/// to `jsonpath` by pgorm-query's `json_path_exists`.
+/// to `jsonpath` by pgorm-query's `json_path_exists`, or `ANY (..)` or
+/// `ALL (..)` over `jsonpath` values.
 // [spec:pgorm:req:bindings.expressions+2]
+// [spec:pgorm:req:bindings.quantifiers+1]
 fn path_exists(cx: &mut FunctionContext) -> NeonResult<Node> {
-    let expr = Expr::expr(receiver(cx, 0)?);
+    let expr = receiver(cx, 0)?;
     let path = arg(cx, 1);
+    if let Some(Node::Quantified(quantified)) = args::node(cx, path) {
+        return Ok(Node::Expr(expr.binary(BinOper::JsonPathExists, quantified)));
+    }
     let path = crate::values::read::text(cx, path, "a JSON path")?;
-    Ok(Node::Expr(expr.json_path_exists(path)))
+    Ok(Node::Expr(Expr::expr(expr).json_path_exists(path)))
 }
 
 /// `exprLogic(expr, "and" | "or", other)`: both sides expressions, never a
@@ -344,10 +379,13 @@ fn between(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `exprLike(expr, operator, pattern, escape)`: a pattern match, LIKE's or
 /// SIMILAR TO's. The pattern is bound; the escape, one character, is written
 /// by pgorm-query's literal renderer, the one place the grammar admits it,
-/// and an empty one turns escaping off.
+/// and an empty one turns escaping off. LIKE's family also takes `ANY (..)`
+/// or `ALL (..)` over patterns, with no escape, which the grammar reads
+/// nowhere after one.
 // [spec:pgorm:req:bindings.expressions+2]
+// [spec:pgorm:req:bindings.quantifiers+1]
 fn like(cx: &mut FunctionContext) -> NeonResult<Node> {
-    let expr = Expr::expr(receiver(cx, 0)?);
+    let left = receiver(cx, 0)?;
     let operator = choice(
         cx,
         1,
@@ -362,6 +400,10 @@ fn like(cx: &mut FunctionContext) -> NeonResult<Node> {
         ],
     )?;
     let pattern = arg(cx, 2);
+    if let Some(Node::Quantified(quantified)) = args::node(cx, pattern) {
+        return quantified_like(cx, left, operator, quantified);
+    }
+    let expr = Expr::expr(left);
     let pattern = crate::values::read::text(cx, pattern, "a LIKE or SIMILAR TO pattern")?;
     let mut pattern = pgorm::pgorm_query::LikeExpr::new(pattern);
     let escape = arg(cx, 3);
@@ -388,6 +430,30 @@ fn like(cx: &mut FunctionContext) -> NeonResult<Node> {
         _ => expr.not_similar_to(pattern),
     };
     Ok(Node::Expr(built))
+}
+
+/// LIKE's family over `ANY (..)` or `ALL (..)`, given with no escape.
+fn quantified_like(
+    cx: &mut FunctionContext,
+    left: SimpleExpr,
+    operator: &str,
+    quantified: SimpleExpr,
+) -> NeonResult<Node> {
+    let escape = arg(cx, 3);
+    if !args::absent(cx, escape) {
+        return refuse(
+            cx,
+            "a quantified pattern takes no escape: PostgreSQL reads none after ANY or ALL",
+        );
+    }
+    let operator = match operator {
+        "like" => BinOper::Like,
+        "notLike" => BinOper::NotLike,
+        "ilike" => BinOper::ILike,
+        "notIlike" => BinOper::NotILike,
+        other => return unquantifiable(cx, other),
+    };
+    Ok(Node::Expr(left.binary(operator, quantified)))
 }
 
 /// `exprText(expr, helper, text)`: a test that reads its argument as text,

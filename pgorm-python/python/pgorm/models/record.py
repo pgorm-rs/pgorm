@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Callable, TypeAlias
 
 from .. import _native as p
@@ -27,13 +28,15 @@ class ModelRecord(Mapping[str, Any]):
 
     Each field is read from the result column ``columns`` names for it, the
     field's own name by default; the native row may carry other sources'
-    columns beside them, as a graph's row does.
+    columns beside them, as a graph's row does. A field the model projects
+    as its text, a created multirange's, holds the value that text spells.
     """
 
     model: Model
     native: p.Record
     selected: tuple[str, ...]
     columns: tuple[str, ...]
+    read: Mapping[str, p.Value]
 
     def __init__(
         self,
@@ -60,14 +63,21 @@ class ModelRecord(Mapping[str, Any]):
             for name in names:
                 if name not in native:
                     raise p.DecodeError(f"the result has no column {name!r}")
+        read = {}
         for name, column in zip(fields, names):
-            model.columns[name]._validate(native.tagged(column), decoding=True)
+            declared = model.columns[name]
+            value = declared._decoded(native.tagged(column))
+            if declared._read_as_text:
+                read[name] = value
         object.__setattr__(self, "model", model)
         object.__setattr__(self, "native", native)
         object.__setattr__(self, "selected", fields)
         object.__setattr__(self, "columns", names)
+        object.__setattr__(self, "read", MappingProxyType(read))
 
     def __getitem__(self, name: str) -> Any:
+        if name in self.read:
+            return self.read[name].value
         return self.native[self._column(name)]
 
     def __iter__(self) -> Iterator[str]:
@@ -77,6 +87,8 @@ class ModelRecord(Mapping[str, Any]):
         return len(self.selected)
 
     def tagged(self, name: str) -> p.Value:
+        if name in self.read:
+            return self.read[name]
         return self.native.tagged(self._column(name))
 
     def _column(self, name: str) -> str:

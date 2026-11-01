@@ -1,20 +1,39 @@
 use pgorm::pgorm_query::{DeleteStatement, Query, UpdateStatement};
 use pyo3::{prelude::*, types::PyTuple};
 
-use super::{common, table::PyTable};
+use super::{common, from_item::from_item, table::PyTable, with::PyWith};
 use crate::{
     errors::ConstructionError,
     expressions::{Compiled, coerce},
     identifiers::PyIdentifier,
 };
 
-// [spec:pgorm:req:bindings.writes]
+// [spec:pgorm:req:bindings.writes+1]
 /// A runtime UPDATE with explicit predicates or all-rows intent.
 #[pyclass(name = "Update", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyUpdate {
     pub inner: UpdateStatement,
     guarded: bool,
+}
+
+impl PyUpdate {
+    // [spec:pgorm:req:bindings.writes+1]
+    /// Refuse an UPDATE that cannot run, whether it is inspected, run or read
+    /// into a WITH clause.
+    pub(crate) fn check(&self) -> PyResult<()> {
+        if !self.guarded {
+            return Err(ConstructionError::new_err(
+                "update requires where or explicit all_rows",
+            ));
+        }
+        if self.inner.get_values().is_empty() {
+            return Err(ConstructionError::new_err(
+                "update requires at least one assignment",
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[pymethods]
@@ -68,17 +87,24 @@ impl PyUpdate {
         Ok(next)
     }
 
+    // [spec:pgorm:req:bindings.write-sources]
+    /// One more FROM item the UPDATE reads, a `Table` or a `FromItem`.
+    fn from_(&self, item: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let mut next = self.clone();
+        next.inner.from(from_item(item)?);
+        Ok(next)
+    }
+
+    // [spec:pgorm:req:bindings.write-ctes]
+    /// Prefix a WITH clause; the last call wins.
+    fn with_(&self, clause: PyRef<'_, PyWith>) -> Self {
+        let mut next = self.clone();
+        next.inner.with(clause.inner.clone());
+        next
+    }
+
     pub fn inspect(&self) -> PyResult<Compiled> {
-        if !self.guarded {
-            return Err(ConstructionError::new_err(
-                "update requires where or explicit all_rows",
-            ));
-        }
-        if self.inner.get_values().is_empty() {
-            return Err(ConstructionError::new_err(
-                "update requires at least one assignment",
-            ));
-        }
+        self.check()?;
         common::compiled(self.inner.build())
     }
 
@@ -92,13 +118,27 @@ impl PyUpdate {
     }
 }
 
-// [spec:pgorm:req:bindings.writes]
+// [spec:pgorm:req:bindings.writes+1]
 /// A runtime DELETE with explicit predicates or all-rows intent.
 #[pyclass(name = "Delete", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
 pub struct PyDelete {
     pub inner: DeleteStatement,
     guarded: bool,
+}
+
+impl PyDelete {
+    // [spec:pgorm:req:bindings.writes+1]
+    /// Refuse a DELETE with neither a WHERE nor `all_rows()`, whether it is
+    /// inspected, run or read into a WITH clause.
+    pub(crate) fn check(&self) -> PyResult<()> {
+        if !self.guarded {
+            return Err(ConstructionError::new_err(
+                "delete requires where or explicit all_rows",
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[pymethods]
@@ -137,12 +177,25 @@ impl PyDelete {
         Ok(next)
     }
 
+    // [spec:pgorm:req:bindings.write-sources]
+    /// One more FROM item the DELETE reads through `USING`, a `Table` or a
+    /// `FromItem`.
+    fn using(&self, item: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let mut next = self.clone();
+        next.inner.using(from_item(item)?);
+        Ok(next)
+    }
+
+    // [spec:pgorm:req:bindings.write-ctes]
+    /// Prefix a WITH clause; the last call wins.
+    fn with_(&self, clause: PyRef<'_, PyWith>) -> Self {
+        let mut next = self.clone();
+        next.inner.with(clause.inner.clone());
+        next
+    }
+
     pub fn inspect(&self) -> PyResult<Compiled> {
-        if !self.guarded {
-            return Err(ConstructionError::new_err(
-                "delete requires where or explicit all_rows",
-            ));
-        }
+        self.check()?;
         common::compiled(self.inner.build())
     }
 

@@ -84,7 +84,10 @@ def statement_samples():
         p.TableFunction(p.call("generate_series", 1, 3)),
         p.TableFunction(p.call("generate_series", 1, 3)).alias("series"),
         p.GroupingElement.empty(), p.Join.Inner, p.SampleMethod.Bernoulli,
-        p.With("recent", query), p.ReturningRow.Old,
+        p.LockStrength.Update, p.LockWait.Nowait,
+        p.With("recent", query), p.ReturningRow.Old, p.SearchOrder.Depth,
+        p.Search(p.SearchOrder.Breadth, p.col("id"), "ord"), p.Cycle(p.col("id"), "looped", "path"),
+        p.Conflict.on_constraint("account_pkey"),
         p.Conflict.do_nothing(), p.ConflictTarget("id"), p.ConflictTarget("id").update("name"),
         p.MatchedAction.Delete, p.NotMatchedAction.DoNothing, p.Overriding.SystemValue,
         p.MergeUpdate("name", "x"), p.MergeInsert("id", 1),
@@ -103,6 +106,7 @@ def expression_samples():
         p.JsonKind.Object, p.JsonExistsBehavior.Error, p.JsonValueBehavior.Null,
         p.JsonQueryBehavior.Null, p.JsonDefault("x"), p.JsonTableBehavior.Empty,
         p.JsonTableColumn.ordinality("n"), p.any_(p.col("ids")),
+        p.case_when(expression, 1), p.case_of(p.col("id")), p.case_of(p.col("id")).when(1, 2),
         _native._DeclaredColumn(p.col("id")),
     ]
 

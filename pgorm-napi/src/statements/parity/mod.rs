@@ -32,9 +32,7 @@ pub(crate) fn n(name: &str) -> Name {
 /// A value as the golden file writes it: its kind, and a text the JavaScript
 /// suite writes the same way from the `Value` it inspects.
 fn canonical(value: &Value) -> [String; 2] {
-    let tag = value_tag(value).and_then(|tag| tag.name());
-    let name = tag.unwrap_or_else(|failure| panic!("{}", failure.message()));
-    [name.to_owned(), text(value)]
+    [value_tag(value).name().to_owned(), text(value)]
 }
 
 fn text(value: &Value) -> String {
@@ -66,7 +64,7 @@ fn text(value: &Value) -> String {
             let ranges: Vec<String> = ranges.iter().map(range_text).collect();
             format!("{{{}}}", ranges.join(","))
         }
-        other if crate::values::value_is_null(other) == Ok(true) => "null".to_owned(),
+        other if other.is_null() => "null".to_owned(),
         other => panic!("no canonical text for {other:?}"),
     }
 }
@@ -136,6 +134,8 @@ pub(crate) fn check(file: &str, built: Vec<(&str, (String, Values))>) {
 
 // [spec:pgorm:req:bindings.select+2/test]
 // [spec:pgorm:req:bindings.expressions+2/test]
+// [spec:pgorm:req:bindings.quantifiers+1/test]
+// [spec:pgorm:req:bindings.cte-options/test]
 #[test]
 fn select_family_matches_its_golden_file() {
     check(
@@ -144,7 +144,10 @@ fn select_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:bindings.writes/test]
+// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.write-sources/test]
+// [spec:pgorm:req:bindings.conflict-arbiters/test]
+// [spec:pgorm:req:bindings.write-ctes/test]
 #[test]
 fn writes_family_matches_its_golden_file() {
     check(
@@ -153,7 +156,8 @@ fn writes_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:bindings.merge/test]
+// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge-sources/test]
 #[test]
 fn merge_family_matches_its_golden_file() {
     check(

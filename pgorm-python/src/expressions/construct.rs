@@ -61,13 +61,16 @@ fn value_expr(value: &Bound<'_, PyAny>, literal: bool) -> PyResult<PyExpr> {
 }
 
 /// An operand: an expression, or a value to bind. `ANY (..)` and `ALL (..)`
-/// are refused by name, since only a comparison takes them.
+/// are refused by name, since only the operators PostgreSQL reads one after
+/// take them, and those read them before coercing.
+// [spec:pgorm:req:bindings.quantifiers+1]
 pub(crate) fn coerce(value: &Bound<'_, PyAny>) -> PyResult<PyExpr> {
     if let Ok(expr) = value.extract::<PyRef<'_, PyExpr>>() {
         Ok(expr.clone())
     } else if value.is_instance_of::<crate::statements::PyQuantified>() {
         Err(ConstructionError::new_err(
-            "ANY and ALL are the right operand of a comparison: eq, ne, gt, gte, lt or lte",
+            "ANY and ALL are the right operand of a comparison, LIKE or ILIKE, a regular-expression \
+             match, containment, a range position, matches or path_exists, and of nothing else",
         ))
     } else {
         bind(value)

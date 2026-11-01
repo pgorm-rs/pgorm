@@ -6,6 +6,10 @@ pub use serde_json::json;
 
 use crate::SqlName;
 
+mod variants;
+
+pub use variants::Variants;
+
 /// Representation of a database table named `Character`.
 ///
 /// A `Enum` implemented [`SqlName`] used in rustdoc and test to demonstrate the library usage.

@@ -68,7 +68,7 @@ async function seed(): Promise<void> {
 
 const byId = Account.col("id").asc();
 
-// [spec:pgorm:req:bindings.models+3/test]
+// [spec:pgorm:req:bindings.models+4/test]
 test("a declaration is data: it sends nothing, and describes its table and fields", () => {
   const unconnected = model("nowhere", { schema: "absent", columns: { id: column("i32", { primaryKey: true }) } });
   assert.equal(unconnected.find().inspect().sql, 'SELECT "nowhere"."id" FROM "absent"."nowhere"');
@@ -96,8 +96,8 @@ test("a declaration is data: it sends nothing, and describes its table and field
   assert.equal(Account.alias, null);
 });
 
-// [spec:pgorm:req:bindings.models+3/test]
-// [spec:pgorm:req:bindings.argument-errors/test]
+// [spec:pgorm:req:bindings.models+4/test]
+// [spec:pgorm:req:bindings.argument-errors+1/test]
 test("a declaration that cannot be used is refused as it is made", () => {
   const unknown = { nullabel: true } as unknown as Record<string, never>;
   assert.throws(() => column("text", unknown), mistyped(/"nullabel" is no column option/));
@@ -239,7 +239,7 @@ test("a column compares through its declared kind, and refuses what it cannot bi
     await Account.select("name").where(Account.col("name").ne(all(["Ann", "Cy"]))).orderBy(byId).all(pool()),
     [{ name: "Bob" }],
   );
-  assert.throws(() => Account.col("tags").contains(any(["a"]) as never), refused(/ANY and ALL follow a comparison/));
+  assert.throws(() => Account.col("id").isDistinctFrom(any([1]) as never), refused(/ANY and ALL follow a comparison/));
   assert.deepStrictEqual(await Account.select("name").where(Account.col("id").between(2, 3)).orderBy(byId).all(pool()), [
     { name: "Bob" },
     { name: "Cy" },

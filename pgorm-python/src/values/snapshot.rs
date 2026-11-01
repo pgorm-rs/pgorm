@@ -4,25 +4,22 @@ use pgorm::pgorm_query::{Range, RangeType, Value};
 use pyo3::PyResult;
 use serde_json::{Value as Json, json};
 
-use super::{
-    PyValue, ranges,
-    types::{Tag, is_null},
-};
+use super::{PyValue, types::Tag};
 
 // [spec:pgorm:req:python.value-tags+1]
 pub(super) fn encode(value: &PyValue) -> PyResult<Json> {
     Ok(
-        json!({"version": 1, "type": tag(&value.tag)?, "sql_null": is_null(&value.inner)?, "data": payload(value)?}),
+        json!({"version": 1, "type": tag(&value.tag)?, "sql_null": value.inner.is_null(), "data": payload(value)?}),
     )
 }
 
 fn tag(value: &Tag) -> PyResult<Json> {
     Ok(match value {
-        Tag::Scalar(_) => json!({"kind": value.name()?}),
+        Tag::Scalar(_) => json!({"kind": value.name()}),
         Tag::Enum(name) => json!({"kind": "enum", "name": name.name, "schema": name.schema}),
         Tag::Created(kind) => json!({
             "kind": kind.kind_name(), "name": kind.name.name, "schema": kind.name.schema,
-            "subtype": super::types::scalar_name(&kind.subtype)?,
+            "subtype": kind.subtype.kind_name(),
         }),
         Tag::Array(element) => json!({"kind": "array", "element": tag(element)?}),
     })
@@ -77,7 +74,7 @@ fn payload(value: &PyValue) -> PyResult<Json> {
                         .map(|inner| {
                             let tag = match &value.tag {
                                 Tag::Array(element) => (**element).clone(),
-                                _ => super::types::rust_tag(inner)?,
+                                _ => super::types::rust_tag(inner),
                             };
                             encode(&PyValue {
                                 inner: inner.clone(),
@@ -116,7 +113,7 @@ fn range_payload(range: RangeType, value: &Range<Value>) -> PyResult<Json> {
             Bound::Included(inner) | Bound::Excluded(inner) => (
                 payload(&PyValue {
                     inner: inner.clone(),
-                    tag: Tag::Scalar(ranges::element(range)?),
+                    tag: Tag::Scalar(range.element_type()),
                 })?,
                 matches!(bound, Bound::Included(_)),
             ),

@@ -72,7 +72,14 @@ from ._native import (
     Quantified,
     any_,
     all_,
+    SearchedCase,
+    SimpleCase,
+    CaseOperand,
+    case_when,
+    case_of,
     Join,
+    LockStrength,
+    LockWait,
     SampleMethod,
     TableFunction,
     GroupingElement,
@@ -102,6 +109,9 @@ from ._native import (
     PendingMerge,
     Merge,
     With,
+    SearchOrder,
+    Search,
+    Cycle,
     ReturningRow,
     merge,
     CopyFrom,
@@ -143,7 +153,7 @@ from .transactions import Transaction, TransactionMode, IsolationLevel
 from .copy import CopyOutStream, CopyRows, CopyRowStream, CopySource
 from .listen import Listener
 
-# [spec:pgorm:req:bindings.surface]
+# [spec:pgorm:req:bindings.surface+1]
 # [spec:pgorm:req:python.naming+2]
 select = Select
 insert = Insert
@@ -246,7 +256,14 @@ __all__ = [
     "Quantified",
     "any_",
     "all_",
+    "SearchedCase",
+    "SimpleCase",
+    "CaseOperand",
+    "case_when",
+    "case_of",
     "Join",
+    "LockStrength",
+    "LockWait",
     "SampleMethod",
     "TableFunction",
     "GroupingElement",
@@ -276,6 +293,9 @@ __all__ = [
     "PendingMerge",
     "Merge",
     "With",
+    "SearchOrder",
+    "Search",
+    "Cycle",
     "ReturningRow",
     "merge",
     "CopyFrom",

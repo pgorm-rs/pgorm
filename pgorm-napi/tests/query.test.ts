@@ -216,7 +216,7 @@ test("a result the binding cannot decode exactly rejects with a DecodeError", as
   await assert.rejects(pool.query("SELECT point(1, 2) AS n"), DecodeError);
 });
 
-// [spec:pgorm:req:bindings.argument-errors/test]
+// [spec:pgorm:req:bindings.argument-errors+1/test]
 test("an argument of the wrong JavaScript type rejects with a TypeError", async () => {
   await assert.rejects(pool.query(42 as never), TypeError);
   await assert.rejects(pool.query("SELECT 1", [], { tagged: "yes" as never }), TypeError);

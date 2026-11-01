@@ -7,11 +7,14 @@ import keyword
 from pathlib import Path
 import unittest
 
+import pgorm as p
+
 SURFACE = json.loads(
     (Path(__file__).resolve().parents[2] / "docs" / "spec" / "bindings-surface.json").read_text()
 )
 SIDE = SURFACE["python"]
 OPERATORS = SIDE["operators"]
+DESCRIPTIONS = SURFACE["descriptions"]
 
 
 def class_members(cls):
@@ -92,6 +95,41 @@ def own_names():
     return own
 
 
+def declared_paths(shape, path=""):
+    """Every key path a declared description holds, nested keys included."""
+    if isinstance(shape, list):
+        yield from declared_paths(shape[0], path + "[]")
+    elif isinstance(shape, dict):
+        for key, inner in shape.items():
+            yield f"{path}.{key}"
+            yield from declared_paths(inner, f"{path}.{key}")
+
+
+def differences(live, shape, path, seen):
+    """How a live description differs from its declared shape, each difference
+    at its neutral key path; every declared path it reaches joins `seen`.
+    Python spells a neutral key as written (python.naming)."""
+    if shape is None:
+        return []
+    if isinstance(shape, list):
+        if not isinstance(live, list):
+            return [f"{path}: is no list"]
+        return [found for item in live for found in differences(item, shape[0], path + "[]", seen)]
+    if not isinstance(live, dict):
+        return [f"{path}: is no mapping"]
+    if set(shape) == {"*"}:
+        seen.update(f"{path}.*" for _ in live)
+        return [found for item in live.values() for found in differences(item, shape["*"], f"{path}.*", seen)]
+    found = [f"{path}.{key}: undeclared" for key in live if key not in shape]
+    for key, inner in shape.items():
+        if key not in live:
+            found.append(f"{path}.{key}: missing")
+        else:
+            seen.add(f"{path}.{key}")
+            found.extend(differences(live[key], inner, f"{path}.{key}", seen))
+    return found
+
+
 class SurfaceTests(unittest.TestCase):
     maxDiff = None
 
@@ -110,13 +148,13 @@ class SurfaceTests(unittest.TestCase):
             if len(key) == 2 and SURFACE["modules"][key[0]][path.split(".")[1]] is not None
         }
 
-    # [spec:pgorm:req:bindings.surface/test]
+    # [spec:pgorm:req:bindings.surface+1/test]
     # [spec:pgorm:req:python.naming+2/test]
     def test_every_shared_name_is_offered(self):
         missing = sorted(self.expected[key] for key in self.expected if key not in self.live)
         self.assertEqual(missing, [], "shared names the package lacks: add them, or list each as a gap with its plan node")
 
-    # [spec:pgorm:req:bindings.surface/test]
+    # [spec:pgorm:req:bindings.surface+1/test]
     def test_offers_only_declared_names(self):
         checked = self.checked_classes()
         extra = []
@@ -129,17 +167,17 @@ class SurfaceTests(unittest.TestCase):
             extra.append(".".join(key))
         self.assertEqual(extra, [], "undeclared public names: share them in bindings-surface.json, or list them as Python's own with a reason")
 
-    # [spec:pgorm:req:bindings.surface/test]
+    # [spec:pgorm:req:bindings.surface+1/test]
     def test_landed_gaps_leave_the_list(self):
         closed = sorted(path for key, path in self.gaps.items() if key in self.live and key not in self.expected)
         self.assertEqual(closed, [], "names offered now that the list still calls gaps: remove them from python.gaps")
 
-    # [spec:pgorm:req:bindings.surface/test]
+    # [spec:pgorm:req:bindings.surface+1/test]
     def test_every_declared_own_name_exists(self):
         stale = sorted(path for key, path in self.own.items() if key not in self.live)
         self.assertEqual(stale, [], "names python.only or python.undecided declares that the package no longer offers")
 
-    # [spec:pgorm:req:bindings.surface/test]
+    # [spec:pgorm:req:bindings.surface+1/test]
     def test_entries_name_a_node_or_question(self):
         shared = {
             f"{module}.{name}{suffix}"
@@ -157,6 +195,40 @@ class SurfaceTests(unittest.TestCase):
         for path, reason in {**SIDE["only"], **SIDE["protocols"]}.items():
             with self.subTest(path=path):
                 self.assertTrue(reason.strip())
+
+
+class DescriptionTests(unittest.TestCase):
+    """bindings.surface: each describe() reports exactly the keys the surface declares for it."""
+
+    maxDiff = None
+
+    def assert_declared(self, owner, descriptions):
+        shape, seen = DESCRIPTIONS[owner], set()
+        found = sorted({f for d in descriptions for f in differences(d, shape, owner, seen)})
+        self.assertEqual(found, [], "describe() keys differ from bindings-surface.json's descriptions")
+        unreached = sorted({owner + path for path in declared_paths(shape)} - seen)
+        self.assertEqual(unreached, [], "declared keys no live description reached")
+
+    # [spec:pgorm:req:bindings.surface+1/test]
+    # [spec:pgorm:req:bindings.models+4/test]
+    def test_model_description_has_the_declared_keys(self):
+        model = p.Model(
+            "accounts",
+            {
+                "id": p.Column("i64", primary_key=True, generated="always"),
+                "mood": p.Column(p.TypeName("mood", schema="app"), nullable=True, values=["calm"]),
+            },
+            schema="app",
+        )
+        self.assert_declared("pgorm.Model", [model.describe(), model.as_("a").describe()])
+
+    # [spec:pgorm:req:bindings.surface+1/test]
+    # [spec:pgorm:req:bindings.entities+3/test]
+    def test_entity_description_has_the_declared_keys(self):
+        names = p.entities()
+        if not names:
+            self.skipTest("the module registers no entity; checks/entities.py runs this against an application's")
+        self.assert_declared("pgorm.Entity", [p.entity(name).describe() for name in names])
 
 
 if __name__ == "__main__":

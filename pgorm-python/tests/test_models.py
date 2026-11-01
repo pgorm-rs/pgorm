@@ -31,7 +31,7 @@ def accounts():
 
 
 class ModelConstruction(unittest.TestCase):
-    # [spec:pgorm:req:bindings.models+3/test]
+    # [spec:pgorm:req:bindings.models+4/test]
     def test_descriptor_names_and_values_are_owned(self):
         from pgorm.models.columns import MODEL_KINDS
 
@@ -70,7 +70,7 @@ class ModelConstruction(unittest.TestCase):
         self.assertEqual(write.inspect().params[-1].value, ["a"])
         self.assertEqual(write.inspect().params[0].kind, "i32")
 
-    # [spec:pgorm:req:bindings.models+3/test]
+    # [spec:pgorm:req:bindings.models+4/test]
     def test_describe_reports_each_fields_declaration(self):
         model = p.Model(
             "accounts",
@@ -79,6 +79,7 @@ class ModelConstruction(unittest.TestCase):
                 "display_name": p.Column("text", name="display name", default=True),
                 "mood": p.Column(p.TypeName("Mood", schema="app"), nullable=True, values=["calm"]),
                 "tags": p.Column("text", array=True, nullable=True),
+                "span": p.Column(p.CreatedRange("floatrange", "f64", schema="app")),
             },
             schema="app",
         ).as_("a")
@@ -87,24 +88,28 @@ class ModelConstruction(unittest.TestCase):
             {key: described[key] for key in ("schema", "table", "alias", "primary_key")},
             {"schema": "app", "table": "accounts", "alias": "a", "primary_key": ["id"]},
         )
-        self.assertEqual(described["columns"], {
-            "id": {"column": "id", "type": {"kind": "i64"}, "nullable": False, "primary_key": True,
+        self.assertEqual(described["fields"], {
+            "id": {"column": "id", "kind": "i64", "nullable": False, "primary_key": True,
                    "default": False, "generated": "always", "values": None},
-            "display_name": {"column": "display name", "type": {"kind": "text"}, "nullable": False,
+            "display_name": {"column": "display name", "kind": "text", "nullable": False,
                              "primary_key": False, "default": True, "generated": None, "values": None},
-            "mood": {"column": "mood", "type": {"kind": "enum", "name": "Mood", "schema": "app"},
+            "mood": {"column": "mood", "kind": 'enum "app"."Mood"',
                      "nullable": True, "primary_key": False, "default": False, "generated": None,
                      "values": ["calm"]},
-            "tags": {"column": "tags", "type": {"kind": "array", "element": {"kind": "text"}},
+            "tags": {"column": "tags", "kind": "text[]",
                      "nullable": True, "primary_key": False, "default": False, "generated": None,
                      "values": None},
+            "span": {"column": "span", "kind": 'range "app"."floatrange" of f64',
+                     "nullable": False, "primary_key": False, "default": False, "generated": None,
+                     "values": None},
         })
+        self.assertEqual(set(described), {"schema", "table", "alias", "primary_key", "fields"})
         for name in ("describe", "validate", "value"):
             with self.subTest(method=name):
                 self.assertFalse(hasattr(model.columns["id"], name))
         self.assertFalse(hasattr(model.col("id"), "describe"))
 
-    # [spec:pgorm:req:bindings.models+3/test]
+    # [spec:pgorm:req:bindings.models+4/test]
     def test_unknown_fields_and_collisions_fail_early(self):
         model = accounts()
         for operation in (
@@ -252,7 +257,7 @@ class ModelConstruction(unittest.TestCase):
             lambda: column.between(1, None),
             lambda: column.contains(p.Value(2, "i64")),
             lambda: column.adjacent_to("2"),
-            lambda: column.overlaps(p.any_(p.Value.array("i32", [1]))),
+            lambda: column.is_distinct_from(p.any_(p.Value.array("i32", [1]))),
         ):
             with self.assertRaises(p.ConstructionError):
                 operation()
@@ -556,5 +561,64 @@ class ModelDatabase(unittest.IsolatedAsyncioTestCase):
             p.Column(p.CreatedRange("floatrange", "f64"))
         with self.assertRaises(p.ConstructionError):
             p.Column(floatrange, array=True)
-        with self.assertRaises(p.UnsupportedCapabilityError):
-            p.Column(p.CreatedMultirange("floatmultirange", "f64", schema="python_models"))
+
+    # [spec:pgorm:req:bindings.models+4/test]
+    # [spec:pgorm:req:bindings.model-records/test]
+    # [spec:pgorm:req:bindings.created-ranges/test]
+    async def test_created_multirange_columns_read_and_write(self):
+        await self.pool.execute(
+            p.RawSQL(
+                "CREATE TYPE python_models.floatrange AS RANGE "
+                "(SUBTYPE = float8, MULTIRANGE_TYPE_NAME = python_models.floatmultirange)"
+            )
+        )
+        await self.pool.execute(
+            p.RawSQL(
+                "CREATE TABLE python_models.slots "
+                "(id integer PRIMARY KEY, open python_models.floatmultirange)"
+            )
+        )
+        kind = p.CreatedMultirange("floatmultirange", "f64", schema="python_models")
+        slots = p.Model(
+            "slots",
+            {"id": p.Column("i32", primary_key=True), "open": p.Column(kind, nullable=True)},
+            schema="python_models",
+        )
+        hours = p.Multirange([p.Range(9.0, 12.5), p.Range(13.5, 17.0)])
+        written = await slots.insert({"id": 1, "open": hours}).returning().one(self.pool)
+        self.assertEqual(written["open"], hours)
+        self.assertEqual(written.tagged("open"), p.Value(hours, kind))
+        await slots.insert({"id": 2, "open": None}).execute(self.pool)
+        # The text is read through the declared subtype, so text that subtype
+        # does not read is a DecodeError, never a value of another type.
+        wrong = p.Model(
+            "slots",
+            {
+                "id": p.Column("i32", primary_key=True),
+                "open": p.Column(
+                    p.CreatedMultirange("floatmultirange", "i64", schema="python_models"),
+                    nullable=True,
+                ),
+            },
+            schema="python_models",
+        )
+        with self.assertRaises(p.DecodeError):
+            await wrong.find_by_key({"id": 1}).one(self.pool)
+        found = await slots.find().where(slots.col("open") == hours).one(self.pool)
+        self.assertEqual((found["id"], found["open"]), (1, hours))
+        self.assertIsNone((await slots.find_by_key({"id": 2}).one(self.pool))["open"])
+        later = p.Multirange([p.Range(18.0, None)])
+        change = await (
+            slots.update({"open": later}).where(slots.col("id") == 1).returning_change(self.pool)
+        )
+        self.assertEqual((change.old["open"], change.new["open"]), (hours, later))
+        (row,) = await slots.graph().where(slots.col("id") == 1).all(self.pool)
+        self.assertEqual(row["open"], later)
+        self.assertEqual(
+            slots.describe()["fields"]["open"]["kind"],
+            'multirange "python_models"."floatmultirange" of f64',
+        )
+        with self.assertRaises(p.ConstructionError):
+            p.Column(p.CreatedMultirange("floatmultirange", "f64"))
+        with self.assertRaises(p.ConstructionError):
+            p.Column(kind, array=True)

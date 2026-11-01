@@ -1,7 +1,7 @@
 //! Borrowed execution context: all calls preserve the selected native executor.
 
 mod target;
-pub(crate) use target::Target;
+pub(crate) use target::{Executor, Target};
 
 use pgorm::{ConnectionTrait, DatabaseConnection, DatabaseTransaction, Error, SqlText};
 use tokio_postgres::{

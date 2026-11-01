@@ -499,7 +499,7 @@ fn decode(ty: &Type, raw: Option<&[u8]>) -> Result<Value, WireError> {
     let Kind::Array(member) = ty.kind() else {
         let kind = kind(ty)?;
         return match raw {
-            None => null(&kind),
+            None => Ok(kind.null()),
             Some(raw) => scalar(ty, &kind, raw),
         };
     };
@@ -513,7 +513,7 @@ fn decode(ty: &Type, raw: Option<&[u8]>) -> Result<Value, WireError> {
     let values = elements
         .into_iter()
         .map(|element| match element {
-            None => null(&kind),
+            None => Ok(kind.null()),
             Some(Element(raw)) => scalar(member, &kind, raw),
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -584,38 +584,6 @@ fn kind(ty: &Type) -> Result<ArrayType, WireError> {
         _ if matches!(ty.name(), "citext" | "ltree" | "lquery" | "ltxtquery") => ArrayType::String,
         _ if ty.name() == "vector" => ArrayType::Vector,
         _ => return Err("no pgorm value holds this type".into()),
-    })
-}
-
-/// SQL NULL as a value of `kind`.
-fn null(kind: &ArrayType) -> Result<Value, WireError> {
-    Ok(match kind {
-        ArrayType::Bool => Value::Bool(None),
-        ArrayType::TinyInt => Value::TinyInt(None),
-        ArrayType::SmallInt => Value::SmallInt(None),
-        ArrayType::Int => Value::Int(None),
-        ArrayType::BigInt => Value::BigInt(None),
-        ArrayType::Unsigned => Value::Unsigned(None),
-        ArrayType::BigUnsigned => Value::BigUnsigned(None),
-        ArrayType::Float => Value::Float(None),
-        ArrayType::Double => Value::Double(None),
-        ArrayType::String => Value::String(None),
-        ArrayType::Char => Value::Char(None),
-        ArrayType::Bytes => Value::Bytes(None),
-        ArrayType::Json => Value::Json(None),
-        ArrayType::Date => Value::Date(None),
-        ArrayType::Time => Value::Time(None),
-        ArrayType::DateTime => Value::DateTime(None),
-        ArrayType::DateTimeWithTimeZone => Value::DateTimeWithTimeZone(None),
-        ArrayType::Uuid => Value::Uuid(None),
-        ArrayType::Decimal => Value::Decimal(None),
-        ArrayType::IpNetwork => Value::IpNetwork(None),
-        ArrayType::MacAddress => Value::MacAddress(None),
-        ArrayType::Vector => Value::Vector(None),
-        ArrayType::Interval => Value::Interval(None),
-        ArrayType::Range(range) => Value::Range(*range, None),
-        ArrayType::Multirange(range) => Value::Multirange(*range, None),
-        _ => return Err("no pgorm value holds this kind".into()),
     })
 }
 
