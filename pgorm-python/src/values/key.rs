@@ -62,7 +62,7 @@ mod tests {
     // compared: a scalar's name, an enum's quoted type, a created range's type and subtype,
     // and an array's element followed by `[]`
     #[test]
-    fn kinds_are_spelled_as_results_compare_them() -> PyResult<()> {
+    fn kinds_are_spelled_as_results_compare_them() {
         assert_eq!(Tag::Scalar(ArrayType::BigInt).key(), "i64");
         assert_eq!(
             Tag::Scalar(ArrayType::Range(RangeType::Int4)).key(),
@@ -93,6 +93,5 @@ mod tests {
             Tag::Created(created(true)).key(),
             "multirange \"app\".\"floatrange\" of f64"
         );
-        Ok(())
     }
 }

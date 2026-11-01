@@ -44,7 +44,7 @@ fn python_scalars_preserve_rust_variants() -> PyResult<()> {
                 actual.extract::<PyRef<'_, PyValue>>()?.rust_value(),
                 &expected
             );
-            let inverse = Py::new(py, PyValue::from_rust(expected)?)?;
+            let inverse = Py::new(py, PyValue::from_rust(expected))?;
             assert!(actual.eq(inverse)?);
         }
         Ok(())
@@ -68,7 +68,7 @@ fn python_interval_is_the_rust_interval() -> PyResult<()> {
                 value.extract::<PyRef<'_, PyValue>>()?.rust_value(),
                 &Value::from(interval)
             );
-            let output = Py::new(py, PyValue::from_rust(Value::from(interval))?)?;
+            let output = Py::new(py, PyValue::from_rust(Value::from(interval)))?;
             assert!(value.eq(&output)?);
             let read = output.bind(py).getattr("value")?;
             assert_eq!(
@@ -82,7 +82,7 @@ fn python_interval_is_the_rust_interval() -> PyResult<()> {
         }
         let array = Py::new(
             py,
-            PyValue::from_rust(Value::array([Interval::new(0, 1, 0)]))?,
+            PyValue::from_rust(Value::array([Interval::new(0, 1, 0)])),
         )?;
         assert_eq!(
             array
@@ -109,7 +109,7 @@ fn rust_output_rejects_lost_temporal_precision() -> PyResult<()> {
             Value::Date(Some(Box::new(date(0, 1, 1)))),
             Value::Float(Some(f32::from_bits(0x7f800001))),
         ] {
-            let value = Py::new(py, PyValue::from_rust(inner)?)?;
+            let value = Py::new(py, PyValue::from_rust(inner))?;
             let error = value.bind(py).getattr("value").err().ok_or_else(|| {
                 pyo3::exceptions::PyAssertionError::new_err("lossy conversion succeeded")
             })?;
@@ -191,7 +191,7 @@ fn rust_ranges_round_trip_through_python() -> PyResult<()> {
                 "int8multirange",
             ),
         ] {
-            let value = Py::new(py, PyValue::from_rust(inner.clone())?)?;
+            let value = Py::new(py, PyValue::from_rust(inner.clone()))?;
             let value = value.bind(py);
             assert_eq!(value.getattr("kind")?.extract::<String>()?, kind);
             let python = value.getattr("value")?;
@@ -199,7 +199,7 @@ fn rust_ranges_round_trip_through_python() -> PyResult<()> {
             assert_eq!(back.extract::<PyRef<'_, PyValue>>()?.rust_value(), &inner);
         }
         // A NULL bound is no bound: it reaches Python as an unbounded side.
-        let unbounded = Py::new(py, PyValue::from_rust(null_lower)?)?;
+        let unbounded = Py::new(py, PyValue::from_rust(null_lower))?;
         let range = unbounded.bind(py).getattr("value")?;
         assert!(range.is_exact_instance_of::<PyRange>());
         assert!(range.getattr("lower_inf")?.extract::<bool>()?);

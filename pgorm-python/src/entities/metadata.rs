@@ -14,7 +14,7 @@ use crate::{
 
 #[derive(Clone, Debug)]
 pub(crate) enum InputKind {
-    Scalar(&'static str),
+    Scalar(ArrayType),
     Enum(PyTypeName),
     Created(CreatedKind),
     Array(Box<Self>),
@@ -27,34 +27,34 @@ impl InputKind {
             return Self::Created(kind);
         }
         let scalar = match ty {
-            ColumnType::Char(Some(1)) => "char",
-            ColumnType::Char(_) | ColumnType::String(_) | ColumnType::Text => "text",
-            ColumnType::Bytea => "bytes",
-            ColumnType::SmallInteger => "i16",
-            ColumnType::Integer => "i32",
-            ColumnType::BigInteger => "i64",
-            ColumnType::Float => "f32",
-            ColumnType::Double => "f64",
-            ColumnType::Decimal(_) => "decimal",
-            ColumnType::Boolean => "bool",
-            ColumnType::Date => "date",
-            ColumnType::Time => "time",
-            ColumnType::Timestamp => "datetime",
-            ColumnType::TimestampWithTimeZone => "datetime_utc",
-            ColumnType::Json | ColumnType::JsonBinary => "json",
-            ColumnType::Uuid => "uuid",
-            ColumnType::Vector(_) => "vector",
-            ColumnType::Inet | ColumnType::Cidr => "ipnetwork",
-            ColumnType::MacAddr => "mac_address",
-            ColumnType::Interval(_) => "interval",
+            ColumnType::Char(Some(1)) => ArrayType::Char,
+            ColumnType::Char(_) | ColumnType::String(_) | ColumnType::Text => ArrayType::String,
+            ColumnType::Bytea => ArrayType::Bytes,
+            ColumnType::SmallInteger => ArrayType::SmallInt,
+            ColumnType::Integer => ArrayType::Int,
+            ColumnType::BigInteger => ArrayType::BigInt,
+            ColumnType::Float => ArrayType::Float,
+            ColumnType::Double => ArrayType::Double,
+            ColumnType::Decimal(_) => ArrayType::Decimal,
+            ColumnType::Boolean => ArrayType::Bool,
+            ColumnType::Date => ArrayType::Date,
+            ColumnType::Time => ArrayType::Time,
+            ColumnType::Timestamp => ArrayType::DateTime,
+            ColumnType::TimestampWithTimeZone => ArrayType::DateTimeWithTimeZone,
+            ColumnType::Json | ColumnType::JsonBinary => ArrayType::Json,
+            ColumnType::Uuid => ArrayType::Uuid,
+            ColumnType::Vector(_) => ArrayType::Vector,
+            ColumnType::Inet | ColumnType::Cidr => ArrayType::IpNetwork,
+            ColumnType::MacAddr => ArrayType::MacAddress,
+            ColumnType::Interval(_) => ArrayType::Interval,
             ColumnType::Enum { name, schema, .. } => {
                 return Self::Enum(PyTypeName {
                     name: name.to_string(),
                     schema: schema.as_ref().map(|s| s.to_string()),
                 });
             }
-            ColumnType::Range(range) => range.range_type_name(),
-            ColumnType::Multirange(range) => range.multirange_type_name(),
+            ColumnType::Range(range) => ArrayType::Range(*range),
+            ColumnType::Multirange(range) => ArrayType::Multirange(*range),
             ColumnType::Array(member) => return Self::Array(Box::new(Self::from_column(member))),
             // A domain's values travel as its base type's do, so its column
             // takes and reads back what a column of the base would.
@@ -67,7 +67,7 @@ impl InputKind {
 
     fn kind<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         match self {
-            Self::Scalar(name) => Ok(PyString::new(py, name).into_any()),
+            Self::Scalar(kind) => Ok(PyString::new(py, kind.kind_name()).into_any()),
             Self::Enum(name) => Ok(Py::new(py, name.clone())?.into_bound(py).into_any()),
             Self::Created(kind) => Ok(kind.to_python(py)?.into_bound(py)),
             _ => Err(ConstructionError::new_err(
@@ -138,37 +138,31 @@ impl InputKind {
                 Self::Enum(_) => Err(DecodeError::new_err(
                     "compiled enum array returned an incompatible Rust Value",
                 )),
-                _ => PyValue::from_rust(value),
+                _ => Ok(PyValue::from_rust(value)),
             },
             Self::Enum(_) => Err(DecodeError::new_err(
                 "compiled enum returned an incompatible Rust Value",
             )),
-            _ => PyValue::from_rust(value),
+            _ => Ok(PyValue::from_rust(value)),
         }
     }
 
     /// The kind a value of the column carries, or `None` for a column that
     /// takes an explicit `Value`, an array of one included.
-    fn tag(&self) -> PyResult<Option<Tag>> {
-        Ok(Some(match self {
-            Self::Scalar(name) => Tag::Scalar(
-                ArrayType::from_kind_name(name)
-                    .ok_or_else(|| ConstructionError::new_err("unknown scalar value kind"))?,
-            ),
+    fn tag(&self) -> Option<Tag> {
+        Some(match self {
+            Self::Scalar(kind) => Tag::Scalar(kind.clone()),
             Self::Enum(name) => Tag::Enum(name.clone()),
             Self::Created(kind) => Tag::Created(kind.clone()),
-            Self::Array(member) => match member.tag()? {
-                Some(element) => Tag::Array(Box::new(element)),
-                None => return Ok(None),
-            },
-            Self::Explicit => return Ok(None),
-        }))
+            Self::Array(member) => Tag::Array(Box::new(member.tag()?)),
+            Self::Explicit => return None,
+        })
     }
 
     /// The kind as `describe()` spells it.
     // [spec:pgorm:req:bindings.entities+3]
-    fn key(&self) -> PyResult<Option<String>> {
-        Ok(self.tag()?.map(|tag| tag.key()))
+    fn key(&self) -> Option<String> {
+        self.tag().map(|tag| tag.key())
     }
 }
 
@@ -201,17 +195,17 @@ pub(crate) struct ColumnInfo {
 }
 
 impl ColumnInfo {
-    fn describe(&self) -> PyResult<Json> {
-        Ok(json!({
+    fn describe(&self) -> Json {
+        json!({
             "name": self.name,
             "json_key": self.json_key,
             "sql_type": self.sql_type,
             "rust_type": self.rust_type,
             "nullable": self.nullable,
             "primary_key": self.primary_key,
-            "kind": self.input.key()?,
+            "kind": self.input.key(),
             "values": self.labels,
-        }))
+        })
     }
 }
 
@@ -306,12 +300,12 @@ impl EntityInfo {
 
     /// The registration as `describe()` gives it.
     // [spec:pgorm:req:bindings.entities+3]
-    pub(crate) fn describe(&self) -> PyResult<Json> {
-        Ok(json!({
+    pub(crate) fn describe(&self) -> Json {
+        json!({
             "name": self.name,
             "schema": self.schema,
             "table": self.table,
-            "columns": self.columns.iter().map(ColumnInfo::describe).collect::<PyResult<Vec<_>>>()?,
+            "columns": self.columns.iter().map(ColumnInfo::describe).collect::<Vec<_>>(),
             "primary_key": self.primary_key,
             "primary_key_without_overlaps": self.without_overlaps,
             "relations": self.relations,
@@ -321,7 +315,7 @@ impl EntityInfo {
                 "active_model": self.active_type,
                 "column": self.column_type,
             },
-        }))
+        })
     }
 }
 
@@ -332,7 +326,7 @@ mod tests {
     use pgorm::pgorm_query::{ArrayType, Range, RangeType};
     use std::sync::Arc;
 
-    fn key(ty: &ColumnType) -> PyResult<Option<String>> {
+    fn key(ty: &ColumnType) -> Option<String> {
         InputKind::from_column(ty).key()
     }
 
@@ -341,22 +335,22 @@ mod tests {
     #[test]
     fn range_columns_take_their_range_kind() -> PyResult<()> {
         assert_eq!(
-            key(&ColumnType::Range(RangeType::Int4))?.as_deref(),
+            key(&ColumnType::Range(RangeType::Int4)).as_deref(),
             Some("int4range")
         );
         assert_eq!(
-            key(&ColumnType::Multirange(RangeType::TimestampTz))?.as_deref(),
+            key(&ColumnType::Multirange(RangeType::TimestampTz)).as_deref(),
             Some("tstzmultirange")
         );
         assert_eq!(
             key(&ColumnType::Array(Arc::new(ColumnType::Range(
                 RangeType::Date
-            ))))?
+            ))))
             .as_deref(),
             Some("daterange[]")
         );
-        assert_eq!(key(&ColumnType::Money)?, None);
-        assert_eq!(key(&ColumnType::Array(Arc::new(ColumnType::Money)))?, None);
+        assert_eq!(key(&ColumnType::Money), None);
+        assert_eq!(key(&ColumnType::Array(Arc::new(ColumnType::Money))), None);
 
         Python::initialize();
         Python::attach(|py| {
@@ -399,7 +393,7 @@ mod tests {
         };
         let input = InputKind::from_column(&column);
         assert_eq!(
-            input.key()?.as_deref(),
+            input.key().as_deref(),
             Some("range \"measure\".\"floatrange\" of f64")
         );
         let multirange = ColumnType::CreatedMultirange {
@@ -408,7 +402,7 @@ mod tests {
             subtype: Arc::new(ColumnType::Integer),
         };
         assert_eq!(
-            key(&multirange)?.as_deref(),
+            key(&multirange).as_deref(),
             Some("multirange \"slot_multirange\" of i32")
         );
 
@@ -451,13 +445,13 @@ mod tests {
             base: Arc::new(base),
         };
         let quantity = domain("quantity", ColumnType::Integer);
-        assert_eq!(key(&quantity)?.as_deref(), Some("i32"));
+        assert_eq!(key(&quantity).as_deref(), Some("i32"));
         assert_eq!(
-            key(&domain("small", quantity.clone()))?.as_deref(),
+            key(&domain("small", quantity.clone())).as_deref(),
             Some("i32")
         );
         assert_eq!(
-            key(&ColumnType::Array(Arc::new(quantity.clone())))?.as_deref(),
+            key(&ColumnType::Array(Arc::new(quantity.clone()))).as_deref(),
             Some("i32[]")
         );
         let mood = ColumnType::Enum {
@@ -466,7 +460,7 @@ mod tests {
             variants: vec![Name::runtime("calm"), Name::runtime("tense")],
         };
         let cheerful = domain("cheerful", mood);
-        assert_eq!(key(&cheerful)?.as_deref(), Some("enum \"mood\""));
+        assert_eq!(key(&cheerful).as_deref(), Some("enum \"mood\""));
         assert_eq!(
             labels(&ColumnType::Array(Arc::new(cheerful))),
             Some(vec!["calm".to_owned(), "tense".to_owned()])

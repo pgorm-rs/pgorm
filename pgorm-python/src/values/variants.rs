@@ -36,7 +36,7 @@ fn no_value_kind_reaches_a_conversions_wildcard_arm() -> PyResult<()> {
                 let back = convert::from_python(python.bind(py), &value.array_type())?;
                 assert_eq!(back, value);
             }
-            snapshot::encode(&PyValue::from_rust(value)?)?;
+            snapshot::encode(&PyValue::from_rust(value))?;
         }
         Ok(())
     })
