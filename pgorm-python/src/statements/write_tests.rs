@@ -75,7 +75,7 @@ fn insert_rows_from_a_select_match_rust_builders() -> PyResult<()> {
                 "p.Insert(t).columns('a').select(t)",
                 "p.Insert(t).columns('a').select(q.as_('s'))",
                 "p.Insert(t).overriding('system')",
-                "p.Insert(t).overriding(p.MatchedAction.Delete)",
+                "p.Insert(t).overriding(p.MergeAction.delete())",
                 "p.Insert(t).with_(q)",
             ],
         )
@@ -134,6 +134,7 @@ fn update_from_and_delete_using_match_rust_builders() -> PyResult<()> {
     })
 }
 
+// [spec:pgorm:req:bindings.writes+2/test]
 // [spec:pgorm:req:bindings.write-ctes/test]
 // [spec:pgorm:req:bindings.cte-options/test]
 #[test]
@@ -242,7 +243,7 @@ fn recursive_with_matches_rust_builders() -> PyResult<()> {
         .cycle(Cycle::new(Expr::col(n("n")), n("looped"), n("path")))
         .to_owned();
         py.run(
-            c"body = p.Select(p.bind(p.Value(1, 'i32')).as_('n')).union_all(p.Select(p.col('n') + 1).from_(p.Table('r')).where(p.col('n') < 5))\nr = p.With.recursive('r', body, columns=('n',), materialized=True, search=p.Search(p.SearchOrder.Depth, p.col('n'), 'ord'), cycle=p.Cycle(p.col('n'), 'looped', 'path'))\nm = p.merge(p.Table('a'), p.Table('r'), p.col('id', table='a') == p.col('n', table='r')).when_matched(p.MatchedAction.Delete)",
+            c"body = p.Select(p.bind(p.Value(1, 'i32')).as_('n')).union_all(p.Select(p.col('n') + 1).from_(p.Table('r')).where(p.col('n') < 5))\nr = p.With.recursive('r', body, columns=('n',), materialized=True, search=p.Search(p.SearchOrder.Depth, p.col('n'), 'ord'), cycle=p.Cycle(p.col('n'), 'looped', 'path'))\nm = p.merge(p.Table('a'), p.Table('r'), p.col('id', table='a') == p.col('n', table='r')).when_matched(p.MergeAction.delete())",
             Some(&globals),
             None,
         )?;
@@ -313,6 +314,7 @@ fn recursive_with_matches_rust_builders() -> PyResult<()> {
     })
 }
 
+// [spec:pgorm:req:bindings.writes+2/test]
 // [spec:pgorm:req:bindings.conflict-arbiters/test]
 #[test]
 fn conflict_arbiters_match_rust_builders() -> PyResult<()> {
@@ -356,7 +358,7 @@ fn conflict_arbiters_match_rust_builders() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "row.on_conflict(p.ConflictTarget('id', p.call('lower', p.col('name'))).where(p.col('active') == True).do_nothing())",
+            "row.on_conflict(p.Conflict.on('id', p.call('lower', p.col('name'))).where(p.col('active') == True).do_nothing())",
             insert()
                 .on_conflict(
                     OnConflict::column(n("id"))
@@ -369,12 +371,26 @@ fn conflict_arbiters_match_rust_builders() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "row.on_conflict(p.ConflictTarget(p.call('lower', p.col('name')), p.Identifier('tenant')).update('name'))",
+            "row.on_conflict(p.Conflict.on(p.call('lower', p.col('name')), p.Identifier('tenant')).update('name'))",
             insert()
                 .on_conflict(
                     OnConflict::expr(Func::lower(Expr::col(n("name"))))
                         .and_column(n("tenant"))
                         .update_column(n("name")),
+                )
+                .build(),
+        )?;
+        parity(
+            py,
+            &globals,
+            "row.on_conflict(p.Conflict.on('id').update('name', 'note').update('tenant', 'kind'))",
+            insert()
+                .on_conflict(
+                    OnConflict::column(n("id"))
+                        .update_column(n("name"))
+                        .update_column(n("note"))
+                        .update_column(n("tenant"))
+                        .update_column(n("kind")),
                 )
                 .build(),
         )?;
@@ -384,17 +400,22 @@ fn conflict_arbiters_match_rust_builders() -> PyResult<()> {
             &[
                 "p.Conflict.on_constraint('account_pkey').where(p.col('a') == 1)",
                 "p.Conflict.on_constraint('')",
-                "p.ConflictTarget()",
-                "p.ConflictTarget('')",
+                "p.Conflict.on()",
+                "p.Conflict.on('')",
+                "p.Conflict.on('id').update()",
+                "p.Conflict.on('id').set('a', 1).update()",
             ],
         )?;
         refused::<PyTypeError>(
             py,
             &globals,
             &[
-                "p.ConflictTarget(1)",
-                "p.ConflictTarget(p.Table('t'))",
-                "p.ConflictTarget(p.col('a').asc())",
+                "p.Conflict.on(1)",
+                "p.Conflict.on(p.Table('t'))",
+                "p.Conflict.on(p.col('a').asc())",
+                "p.Conflict.on('id').update(1)",
+                "p.ConflictTarget('id')",
+                "p.ConflictUpdate()",
                 "p.Conflict.on_constraint(1)",
                 "row.on_conflict(p.Conflict.on_constraint('account_pkey'))",
             ],
@@ -413,7 +434,7 @@ fn merge_reads_any_from_item_as_its_source() -> PyResult<()> {
         let update = || MergeUpdate::value(n("name"), Expr::col((n("staged"), n("name"))));
         let target = || n("account").into_named_table().alias(n("t"));
         py.run(
-            c"t = p.Table('account', alias='t')\nstaged = p.col('id', table='staged')\non = t.col('id') == staged\nupdate = p.MergeUpdate('name', p.col('name', table='staged'))",
+            c"t = p.Table('account', alias='t')\nstaged = p.col('id', table='staged')\non = t.col('id') == staged\nupdate = p.MergeAction.update('name', p.col('name', table='staged'))",
             Some(&globals),
             None,
         )?;

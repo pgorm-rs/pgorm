@@ -4,8 +4,8 @@ import unittest
 
 import pgorm
 from pgorm import (
-    Condition, Conflict, ConflictTarget, ConstructionError, DataType, Join, MatchedAction, Nulls,
-    RawSQL, Table, TableFunction, Value, bind, call, col, delete, insert, literal, merge, select,
+    Condition, Conflict, ConflictTarget, ConflictUpdate, ConstructionError, DataType, Join,
+    MergeAction, Nulls, RawSQL, Table, TableFunction, Value, bind, call, col, delete, insert, literal, merge, select,
     update,
 )
 from pgorm import schema
@@ -95,7 +95,7 @@ class StatementTests(unittest.TestCase):
         with self.assertRaises(ConstructionError):
             base.inspect()
 
-    # [spec:pgorm:req:bindings.writes+1/test]
+    # [spec:pgorm:req:bindings.writes+2/test]
     def test_insert_rejects_incomplete_or_inconsistent_shapes(self):
         table = Table("account")
         for build in [lambda: insert(table).inspect(),
@@ -114,9 +114,10 @@ class StatementTests(unittest.TestCase):
         self.assertEqual(default.sql, 'INSERT INTO "account" VALUES (DEFAULT) RETURNING *')
         self.assertEqual(default.params, [])
 
+    # [spec:pgorm:req:bindings.writes+2/test]
     def test_conflict_targets_and_updates_follow_rust_typestate(self):
         table = Table("account", alias="a")
-        target = ConflictTarget("id").where(col("id") > 0)
+        target = Conflict.on("id").where(col("id") > 0)
         action = target.update("name").set("visits", literal(1)).where(col("active") == True)
         query = insert(table).columns("id", "name").values(1, "Alice").on_conflict(action)
         compiled = query.inspect()
@@ -124,11 +125,16 @@ class StatementTests(unittest.TestCase):
         self.assertEqual([value.value for value in compiled.params], [1, "Alice", 0, True])
         self.assertIn("DO NOTHING", query.on_conflict(target.do_nothing()).inspect().sql)
         self.assertIn("ON CONFLICT DO NOTHING", query.on_conflict(Conflict.do_nothing()).inspect().sql)
-        for build in [lambda: ConflictTarget(), lambda: target.update()]:
+        several = query.on_conflict(Conflict.on("id").update("name", "visits").update("active"))
+        self.assertIn('DO UPDATE SET "name" = "excluded"."name", "visits" = "excluded"."visits", '
+                      '"active" = "excluded"."active"', several.inspect().sql)
+        for build in [lambda: Conflict.on(), lambda: target.update(), lambda: action.update()]:
             with self.assertRaises(ConstructionError):
                 build()
-        with self.assertRaises(TypeError):
-            query.on_conflict(target)
+        for build in [lambda: query.on_conflict(target), lambda: ConflictTarget("id"),
+                      lambda: ConflictUpdate()]:
+            with self.assertRaises(TypeError):
+                build()
 
     def test_update_and_delete_require_explicit_write_intent(self):
         table = Table("account", schema="application", alias="a")
@@ -173,7 +179,7 @@ class StatementTests(unittest.TestCase):
     def test_statement_truth_testing_is_rejected(self):
         table, source = Table("account"), Table("staged")
         pending = merge(table, source, table.col("id") == source.col("id"))
-        merged = pending.when_matched(MatchedAction.Delete)
+        merged = pending.when_matched(MergeAction.delete())
         for query in [select(), insert(table), update(table), delete(table), RawSQL("SELECT 1"),
                       pending, merged, merged.inspect(), RawSQL("SELECT $1", [1]).inspect()]:
             with self.assertRaises(ConstructionError):

@@ -22,7 +22,7 @@ enum Rows {
     Defaults,
 }
 
-// [spec:pgorm:req:bindings.writes+1]
+// [spec:pgorm:req:bindings.writes+2]
 /// A runtime INSERT with explicit columns, row arity and default-row state.
 #[pyclass(name = "Insert", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -33,7 +33,7 @@ pub struct PyInsert {
 }
 
 impl PyInsert {
-    // [spec:pgorm:req:bindings.writes+1]
+    // [spec:pgorm:req:bindings.writes+2]
     /// Refuse an INSERT with no rows, whether it is inspected, run or read
     /// into a WITH clause.
     pub(crate) fn check(&self) -> PyResult<()> {
@@ -57,7 +57,7 @@ impl PyInsert {
         }
     }
 
-    // [spec:pgorm:req:bindings.writes+1]
+    // [spec:pgorm:req:bindings.writes+2]
     /// The distinct columns the rows fill, named once, before any row.
     #[pyo3(signature = (*columns))]
     fn columns(&self, columns: &Bound<'_, PyTuple>) -> PyResult<Self> {

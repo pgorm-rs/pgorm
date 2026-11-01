@@ -72,7 +72,7 @@ async def stream(query, data, connection):
 def conflict(data, p):
     """The ON CONFLICT action an upsert declares: update the named columns
     from the proposed row, or, naming none, do nothing."""
-    target = p.ConflictTarget(*data["conflict"])
+    target = p.Conflict.on(*data["conflict"])
     return target.update(*data["update"]) if data["update"] else target.do_nothing()
 
 

@@ -10,6 +10,8 @@ import {
   call,
   col,
   Conflict,
+  ConflictTarget,
+  ConflictUpdate,
   ConstructionError,
   DatabaseError,
   deleteFrom,
@@ -80,7 +82,7 @@ async function names(): Promise<unknown[]> {
   return rows.map((row) => [row.id, row.name]);
 }
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 test("an INSERT writes its rows and returns what it wrote", async () => {
   const rows = await pool().query(
     insert(account).columns("id", "name", "mood").values(1, "Alice", new Value("calm", mood)).values(2, "O'Brien", Value.null(mood))
@@ -90,7 +92,7 @@ test("an INSERT writes its rows and returns what it wrote", async () => {
   assert.deepStrictEqual(await names(), [[1n, "Alice"], [2n, "O'Brien"]]);
 });
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 test("an upsert updates from EXCLUDED, and RETURNING's old version tells inserted rows from updated ones", async () => {
   await pool().execute(insert(account).columns("id", "name").values(1, "Alice"));
   const upsert = insert(account).columns("id", "name").values(1, "Alicia").values(2, "Bob")
@@ -103,7 +105,7 @@ test("an upsert updates from EXCLUDED, and RETURNING's old version tells inserte
   assert.deepStrictEqual(await names(), [[1n, "Alicia"], [2n, "Bob"]]);
 });
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 // [spec:pgorm:req:bindings.conflict-arbiters/test]
 test("conflict arbiters: any conflict, a named constraint, and a partial index with its predicate", async () => {
   await pool().execute(insert(account).columns("id", "name", "email").values(1, "Alice", "a@x").values(2, "Bob", "b@x"));
@@ -124,7 +126,7 @@ test("conflict arbiters: any conflict, a named constraint, and a partial index w
   );
 });
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 // [spec:pgorm:req:bindings.write-sources/test]
 test("INSERT takes its rows from a query, or writes one row of defaults, OVERRIDING an identity when told", async () => {
   await pool().execute("INSERT INTO staged VALUES (7, 'Gil'), (8, 'Hal')");
@@ -142,7 +144,7 @@ test("INSERT takes its rows from a query, or writes one row of defaults, OVERRID
   );
 });
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 test("UPDATE returns each row's old and new versions, renamed when the statement asks", async () => {
   await pool().execute(insert(account).columns("id", "name").values(1, "Alice").values(2, "Bob"));
   const renamed = update(account).set("name", col("name").concat("!")).where(col("id").eq(2))
@@ -156,7 +158,7 @@ test("UPDATE returns each row's old and new versions, renamed when the statement
   assert.deepStrictEqual(await pool().query(both), [{ before: 0, after: 1 }]);
 });
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 // [spec:pgorm:req:bindings.write-sources/test]
 test("UPDATE reads FROM another item, and DELETE reads USING one and returns the rows it removed", async () => {
   await pool().execute(insert(account).columns("id", "name").values(1, "Alice").values(2, "Bob").values(3, "Carol"));
@@ -173,7 +175,7 @@ test("UPDATE reads FROM another item, and DELETE reads USING one and returns the
   assert.deepStrictEqual(await names(), [[2n, "Bob"]]);
 });
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 // [spec:pgorm:req:bindings.write-ctes/test]
 test("a write with a RETURNING list is a common table expression's body, and a write takes a WITH clause", async () => {
   await pool().execute(insert(account).columns("id", "name").values(1, "Alice").values(2, "Bob").values(3, "Carol"));
@@ -188,7 +190,7 @@ test("a write with a RETURNING list is a common table expression's body, and a w
   assert.equal(counted.n, 2n);
 });
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 test("a write that cannot run is refused before anything is sent", async () => {
   await pool().execute(insert(account).columns("id", "name").values(1, "Alice"));
   const unguarded = update(account).set("name", "nobody");
@@ -221,7 +223,7 @@ test("a write that could not run is refused as a WITH clause reads it", () => {
   assert.match(select().from(new Table("w")).with(runnable).inspect().sql, /^WITH "w" AS \(DELETE FROM/);
 });
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 // [spec:pgorm:req:bindings.argument-errors+1/test]
 // [spec:pgorm:req:bindings.write-sources/test]
 // [spec:pgorm:req:bindings.conflict-arbiters/test]
@@ -241,6 +243,10 @@ test("shapes an INSERT, an UPDATE or a conflict cannot take are refused as they 
   assert.throws(() => Conflict.on(1 as never), mistyped(/column name or an index expression/));
   assert.throws(() => (Conflict.on("id").update as () => unknown).call(Conflict.on("id")), refused(/at least one column/));
   assert.throws(() => Conflict.onConstraint("account_pkey").where(col("x").eq(1)), refused(/ON CONSTRAINT takes no predicate/));
+  for (const made of [Conflict, ConflictTarget, ConflictUpdate]) {
+    const call = made as unknown as new (...args: unknown[]) => unknown;
+    assert.throws(() => new call("id"), mistyped(/is made by/));
+  }
   assert.throws(
     () => insert(account).columns("id").values(1).onConflict(Conflict.on("id") as never),
     mistyped(/needs its action/),
@@ -249,7 +255,7 @@ test("shapes an INSERT, an UPDATE or a conflict cannot take are refused as they 
   assert.throws(() => insert(col("t") as never), mistyped(/target is a Table/));
 });
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 test("a write in a transaction rolled back leaves nothing", async () => {
   await assert.rejects(
     pool().transaction(async (transaction) => {

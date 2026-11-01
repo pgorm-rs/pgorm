@@ -12,6 +12,8 @@ import {
   insert,
   merge,
   MergeAction,
+  MergeInsert,
+  MergeUpdate,
   Pool,
   ReturningRow,
   select,
@@ -72,7 +74,7 @@ async function accounts(): Promise<unknown[]> {
   return rows.map((row) => [row.id, row.name, row.visits]);
 }
 
-// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge+2/test]
 test("a MERGE updates, deletes and inserts by the arm each row takes, and returns each row's action", async () => {
   const sync = merge(target, source, on)
     .whenMatched(MergeAction.update("name", source.col("name")).set("visits", target.col("visits").add(1)))
@@ -89,7 +91,7 @@ test("a MERGE updates, deletes and inserts by the arm each row takes, and return
   assert.deepStrictEqual(await accounts(), [[1n, "Alicia", 1], [3n, "orphan", 0], [4n, "Dan", 0]]);
 });
 
-// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge+2/test]
 test("a row takes the first conditional arm that holds, and otherwise its kind's unconditional arm", async () => {
   const sync = merge(target, source, on)
     .whenMatched(MergeAction.update("name", "first"))
@@ -102,7 +104,7 @@ test("a row takes the first conditional arm that holds, and otherwise its kind's
   assert.deepStrictEqual(await accounts(), [[1n, "renamed", 0], [2n, "fallback", 0], [3n, "Carol", 0]]);
 });
 
-// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge+2/test]
 test("a MERGE with no WHEN arm has nothing to inspect, and every terminal refuses it before sending it", async () => {
   const pending = merge(target, source, on);
   assert.equal("inspect" in pending, false);
@@ -118,7 +120,7 @@ test("a MERGE with no WHEN arm has nothing to inspect, and every terminal refuse
   assert.deepStrictEqual(await accounts(), [[1n, "Alice", 0], [2n, "Bob", 0], [3n, "Carol", 0]]);
 });
 
-// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge+2/test]
 // [spec:pgorm:req:bindings.argument-errors+1/test]
 // [spec:pgorm:req:bindings.cte-options/test]
 test("an arm takes only an action its kind of row can take", () => {
@@ -133,6 +135,10 @@ test("an arm takes only an action its kind of row can take", () => {
     assert.throws(() => built.whenMatched(col("x") as never), mistyped(/takes a MergeAction/));
   }
   assert.throws(() => MergeAction.update("name", null as never), refused(/null has no kind/));
+  for (const made of [MergeAction, MergeUpdate, MergeInsert]) {
+    const call = made as unknown as new (...args: unknown[]) => unknown;
+    assert.throws(() => new call("id", 1), mistyped(/is made by MergeAction's functions/));
+  }
   assert.throws(() => MergeAction.insert("id", 1).overriding("never" as never), mistyped(/overriding/));
   assert.throws(() => merge(col("t") as never, source, on), mistyped(/target is a Table/));
   assert.throws(
@@ -141,7 +147,7 @@ test("an arm takes only an action its kind of row can take", () => {
   );
 });
 
-// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge+2/test]
 test("a MERGE with a RETURNING list is a common table expression's body, and reads one", async () => {
   const changed = merge(target, source, on)
     .whenMatched(MergeAction.update("name", source.col("name")), { condition: source.col("name").isNotNull() })
@@ -159,7 +165,7 @@ test("a MERGE with a RETURNING list is a common table expression's body, and rea
   assert.equal(await pool().execute(fromCte), 3);
 });
 
-// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge+2/test]
 test("ONLY leaves inheriting tables alone, and OVERRIDING writes an identity column", async () => {
   await pool().execute("INSERT INTO app.archived VALUES (1, 'Archived', 0)");
   const cleared = merge(target, source, on).whenMatched(MergeAction.delete()).only();
@@ -177,7 +183,7 @@ test("ONLY leaves inheriting tables alone, and OVERRIDING writes an identity col
   await pool().execute(insert(new Table("staged")).columns("id").values(9));
 });
 
-// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge+2/test]
 // [spec:pgorm:req:bindings.merge-sources/test]
 test("a subquery is a MERGE's source", async () => {
   const renames = select(col("id"), col("name")).from(new Table("staged")).where(col("kind").eq("rename")).as("s");

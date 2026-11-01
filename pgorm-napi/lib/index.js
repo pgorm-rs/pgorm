@@ -6,7 +6,7 @@
 // what an application imports.
 // [spec:pgorm:def:bindings.api]
 // [spec:pgorm:req:bindings.surface+1]
-// [spec:pgorm:req:napi.naming+3]
+// [spec:pgorm:req:napi.naming+4]
 // [spec:pgorm:def:napi.api+1]
 // [spec:pgorm:req:napi.typing+1]
 

@@ -80,7 +80,7 @@ def statement_samples():
     ranked = p.window_function("rank")
     return [
         table, query, p.insert(table), p.update(table), p.delete(table), p.RawSQL("SELECT 1"),
-        query.inspect(), pending, pending.when_matched(p.MatchedAction.Delete),
+        query.inspect(), pending, pending.when_matched(p.MergeAction.delete()),
         p.TableFunction(p.call("generate_series", 1, 3)),
         p.TableFunction(p.call("generate_series", 1, 3)).alias("series"),
         p.GroupingElement.empty(), p.Join.Inner, p.SampleMethod.Bernoulli,
@@ -88,9 +88,9 @@ def statement_samples():
         p.With("recent", query), p.ReturningRow.Old, p.SearchOrder.Depth,
         p.Search(p.SearchOrder.Breadth, p.col("id"), "ord"), p.Cycle(p.col("id"), "looped", "path"),
         p.Conflict.on_constraint("account_pkey"),
-        p.Conflict.do_nothing(), p.ConflictTarget("id"), p.ConflictTarget("id").update("name"),
-        p.MatchedAction.Delete, p.NotMatchedAction.DoNothing, p.Overriding.SystemValue,
-        p.MergeUpdate("name", "x"), p.MergeInsert("id", 1),
+        p.Conflict.do_nothing(), p.Conflict.on("id"), p.Conflict.on("id").update("name"),
+        p.MergeAction.delete(), p.Overriding.SystemValue,
+        p.MergeAction.update("name", "x"), p.MergeAction.insert("id", 1),
         rows, p.FrameExclusion.Ties, rows.preceding(1), rows.current_row(), rows.following(1),
         rows.preceding(1).and_current_row(), p.Window(), p.ExtendedWindow("w"),
         ranked, ranked.over(p.Window()),

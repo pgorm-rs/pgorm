@@ -106,7 +106,7 @@ async def exercise(
 
     visit = (
         p.merge(a, e, a.col("id") == e.col("account_id"))
-        .when_matched(p.MergeUpdate("visits", a.col("visits") + p.literal(1)))
+        .when_matched(p.MergeAction.update("visits", a.col("visits") + p.literal(1)))
         .returning_action()
         .returning(a.col("id"), a.col("visits"))
     )

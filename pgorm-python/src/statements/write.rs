@@ -8,7 +8,7 @@ use crate::{
     identifiers::PyIdentifier,
 };
 
-// [spec:pgorm:req:bindings.writes+1]
+// [spec:pgorm:req:bindings.writes+2]
 /// A runtime UPDATE with explicit predicates or all-rows intent.
 #[pyclass(name = "Update", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -18,7 +18,7 @@ pub struct PyUpdate {
 }
 
 impl PyUpdate {
-    // [spec:pgorm:req:bindings.writes+1]
+    // [spec:pgorm:req:bindings.writes+2]
     /// Refuse an UPDATE that cannot run, whether it is inspected, run or read
     /// into a WITH clause.
     pub(crate) fn check(&self) -> PyResult<()> {
@@ -118,7 +118,7 @@ impl PyUpdate {
     }
 }
 
-// [spec:pgorm:req:bindings.writes+1]
+// [spec:pgorm:req:bindings.writes+2]
 /// A runtime DELETE with explicit predicates or all-rows intent.
 #[pyclass(name = "Delete", module = "pgorm", frozen, from_py_object)]
 #[derive(Clone, Debug)]
@@ -128,7 +128,7 @@ pub struct PyDelete {
 }
 
 impl PyDelete {
-    // [spec:pgorm:req:bindings.writes+1]
+    // [spec:pgorm:req:bindings.writes+2]
     /// Refuse a DELETE with neither a WHERE nor `all_rows()`, whether it is
     /// inspected, run or read into a WITH clause.
     pub(crate) fn check(&self) -> PyResult<()> {

@@ -657,22 +657,30 @@ the same terminals that run raw SQL.
 > and each, with a RETURNING list, MUST be a common table expression's body,
 > whose rows are those its RETURNING list yields.
 
-> [spec:pgorm:req:bindings.writes+1]
+> [spec:pgorm:req:bindings.writes+2]
 > `insert`, `update` and `delete` MUST build pgorm-query's INSERT, UPDATE and
-> DELETE. An INSERT names its distinct columns before any row. Each `values`
-> call adds one row of exactly as many operands, by pgorm-query's arity check,
-> and `default_values` writes one row of defaults, mixed with neither.
+> DELETE. An INSERT names its distinct columns once, before any row, a second
+> `columns` call being a `ConstructionError`. Each `values` call adds one row
+> of exactly as many operands, by pgorm-query's arity check, and
+> `default_values` writes one row of defaults, mixed with neither.
 >
-> `on_conflict` takes only a completed action: do nothing, answering any
-> conflict; or an arbiter — a non-empty list of columns, with an optional
-> partial-index predicate — followed by do nothing or a non-empty update of
-> columns taken from EXCLUDED or set to expressions, with an optional
-> condition.
+> `on_conflict` takes only a completed action, which `Conflict`'s factories
+> begin: `Conflict.do_nothing()`, answering any conflict; or an arbiter,
+> `Conflict.on(columns..)`, a non-empty list of columns with an optional
+> partial-index predicate, `where`, followed by `do_nothing()` or a non-empty
+> update. An update is begun and extended by `update(columns..)`, one column
+> or more taken from EXCLUDED, and `set(column, value)`, a column set to an
+> expression, and takes an optional condition, `where`; an empty list of
+> targets or of columns is a `ConstructionError`. `Conflict`,
+> `ConflictTarget` and `ConflictUpdate` are exported for annotations and
+> `isinstance` (`instanceof`) and cannot be called, a call being a
+> `TypeError`.
 >
 > An UPDATE has at least one assignment, each column once. An INSERT with no
 > row, an UPDATE with no assignment, and an UPDATE or DELETE with neither a
 > WHERE nor an explicit `all_rows()` MUST be refused with a
-> `ConstructionError` when it is inspected or run. `returning` gives the
+> `ConstructionError` when it is inspected or run, or read into a WITH clause
+> (`bindings.write-ctes`). `returning` gives the
 > RETURNING list, every column when it is empty, and reads a written row's old
 > and new versions through `ReturningRow`'s old and new rows, renamed with
 > the `old_as` and `new_as` options.
@@ -691,23 +699,28 @@ the same terminals that run raw SQL.
 > instead name a constraint, `on_constraint(name)`, which takes no predicate:
 > a predicate given one is a `ConstructionError`.
 
-> [spec:pgorm:req:bindings.merge+1]
+> [spec:pgorm:req:bindings.merge+2]
 > `merge(target, source, on)` MUST follow pgorm-query's MERGE typestate. Its
 > source is a table. It gives a `PendingMerge`, which has no `inspect()` and
 > which every terminal refuses with a `ConstructionError`, because PostgreSQL
 > refuses a MERGE with no WHEN arm; its first arm gives the `Merge`
-> statement. `when_matched` and `when_not_matched_by_source` take an
-> action on a target row — an update, which takes its first assignment and so
-> is never empty, a delete, or do nothing — and `when_not_matched` an action
-> on a source row — an insert, likewise never empty and taking OVERRIDING,
-> an insert of default values, or do nothing. Any other pairing MUST be a
-> `ConstructionError`. Each arm takes an optional condition. Within a kind of
-> row the unconditional arm renders after the conditional ones, and a later
-> one replaces it, as pgorm-query orders them. `returning` reads a row's
-> versions as a write's does; `returning_action()` puts `merge_action()`
-> first in the list, its only form; and `only()` writes `ONLY` before the
-> target. A MERGE reads a common table expression and, with a RETURNING list,
-> is a common table expression's body (`bindings.with`).
+> statement. `MergeAction`'s factories make an arm's action. `when_matched`
+> and `when_not_matched_by_source` take an action on a target row —
+> `MergeAction.update(column, value)`, `delete()` or `do_nothing()` — and
+> `when_not_matched` an action on a source row —
+> `MergeAction.insert(column, value)`, `insert_defaults()` or `do_nothing()`.
+> An update and an insert take their first column with its value, so neither
+> is ever empty, and `set(column, value)` adds another; an insert takes
+> OVERRIDING. An action given to an arm whose row it cannot take MUST be a
+> `ConstructionError`. `MergeAction`, `MergeUpdate` and `MergeInsert` are
+> exported for annotations and `isinstance` (`instanceof`) and cannot be
+> called, a call being a `TypeError`. Each arm takes an optional condition.
+> Within a kind of row the unconditional arm renders after the conditional
+> ones, and a later one replaces it, as pgorm-query orders them. `returning`
+> reads a row's versions as a write's does; `returning_action()` puts
+> `merge_action()` first in the list, its only form; and `only()` writes
+> `ONLY` before the target. A MERGE reads a common table expression and, with
+> a RETURNING list, is a common table expression's body (`bindings.with`).
 
 > [spec:pgorm:req:bindings.merge-sources]
 > A MERGE's source MUST be, beside a table, any FROM item: a subquery

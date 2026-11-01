@@ -67,7 +67,7 @@ def dispatch(name, i, d, p):
                 "pgorm_query::InsertStatement::or_default_values"
             ]
         case "insert.conflict":
-            target = p.ConflictTarget(*d["keys"])
+            target = p.Conflict.on(*d["keys"])
             action = (
                 target.do_nothing()
                 if d["action"] == "nothing"

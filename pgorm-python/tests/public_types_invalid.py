@@ -10,6 +10,14 @@ async def invalid(connection: p.Connection) -> None:
     await connection.execute("SELECT 1")  # expected-error: arg-type
     pending = p.merge(p.Table("t"), p.Table("s"), p.col("id") == 1)
     await connection.query(pending)  # expected-error: arg-type
+    pending.when_matched(p.MergeAction.insert("id", 1))  # expected-error: arg-type
+    pending.when_matched(p.MergeAction.insert_defaults())  # expected-error: arg-type
+    pending.when_not_matched_by_source(p.MergeAction.insert("id", 1))  # expected-error: arg-type
+    pending.when_not_matched(p.MergeAction.update("id", 1))  # expected-error: arg-type
+    pending.when_not_matched(p.MergeAction.delete())  # expected-error: arg-type
+    pending.when_matched(p.MergeAction.do_nothing()).when_not_matched(p.MergeAction.do_nothing())
+    p.MergeAction("delete")  # expected-error: arg-type
+    p.ConflictTarget("id")  # expected-error: arg-type
     scalar: int = await connection.one(  # expected-error: assignment
         p.select(p.literal(1))
     )

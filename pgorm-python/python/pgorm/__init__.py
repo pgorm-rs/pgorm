@@ -1,6 +1,6 @@
 """Compose native pgorm builders and execute them directly against PostgreSQL."""
 
-# [spec:pgorm:req:python.typing+1]
+# [spec:pgorm:req:python.typing+2]
 from ._native import (
     PgormError,
     CancelledError,
@@ -101,8 +101,7 @@ from ._native import (
     ConflictTarget,
     ConflictUpdate,
     RawSQL,
-    MatchedAction,
-    NotMatchedAction,
+    MergeAction,
     Overriding,
     MergeUpdate,
     MergeInsert,
@@ -154,7 +153,7 @@ from .copy import CopyOutStream, CopyRows, CopyRowStream, CopySource
 from .listen import Listener
 
 # [spec:pgorm:req:bindings.surface+1]
-# [spec:pgorm:req:python.naming+2]
+# [spec:pgorm:req:python.naming+3]
 select = Select
 insert = Insert
 update = Update
@@ -285,8 +284,7 @@ __all__ = [
     "ConflictTarget",
     "ConflictUpdate",
     "RawSQL",
-    "MatchedAction",
-    "NotMatchedAction",
+    "MergeAction",
     "Overriding",
     "MergeUpdate",
     "MergeInsert",

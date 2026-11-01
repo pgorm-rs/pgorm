@@ -76,7 +76,7 @@ class CopyStatements(unittest.TestCase):
     # [spec:pgorm:req:bindings.copy/test]    a write without RETURNING is refused as a COPY TO source
     def test_write_without_returning_is_refused(self):
         t, s = p.Table("t"), p.Table("s")
-        merge = p.merge(t, s, t.col("id") == s.col("id")).when_matched(p.MatchedAction.Delete)
+        merge = p.merge(t, s, t.col("id") == s.col("id")).when_matched(p.MergeAction.delete())
         writes = [
             (p.insert(t).columns("id").values(1), "INSERT"),
             (p.update(t).set("id", 1).all_rows(), "UPDATE"),
@@ -311,7 +311,7 @@ class CopyExecution(unittest.IsolatedAsyncioTestCase):
         delete = p.delete(self.items).where(p.col("id") == 3).returning(p.col("name"))
         self.assertEqual(await collect(await self.pool.copy_out(p.CopyTo(delete, "text"))), b"c\n")
         merge = (p.merge(self.items, self.mirror, self.items.col("id") == self.mirror.col("id"))
-                 .when_not_matched(p.MergeInsert("id", self.mirror.col("id"))
+                 .when_not_matched(p.MergeAction.insert("id", self.mirror.col("id"))
                                    .set("name", self.mirror.col("name")))
                  .returning_action().returning(self.items.col("id")))
         await self.pool.execute(p.insert(self.mirror).columns("id", "name").values(5, "e"))

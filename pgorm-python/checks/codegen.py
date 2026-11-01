@@ -47,7 +47,7 @@ def install(wheel, destination, environment):
 
 
 # [spec:pgorm:req:bindings.codegen/test]
-# [spec:pgorm:req:python.typing+1/test]
+# [spec:pgorm:req:python.typing+2/test]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=Path("target/python-codegen"))

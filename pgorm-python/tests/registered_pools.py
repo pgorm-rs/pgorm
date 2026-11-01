@@ -56,7 +56,7 @@ class RegisteredPools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((change.old["note"], change.new["note"]), (None, "one"))
         changes = await self.account.update_many().set("note", "all").all_rows().returning_changes(self.pool)
         self.assertEqual([(c.old["note"], c.new["note"]) for c in changes], [("one", "all")])
-        renamed = p.ConflictTarget("id").update("display name")
+        renamed = p.Conflict.on("id").update("display name")
         upsert = await self.account.insert(self.active(1, "again")).on_conflict(renamed).returning_upsert(self.pool)
         self.assertIsInstance(upsert, p.Upserted.Updated)
         upserts = await (self.account.insert_many([self.active(1, "third"), self.active(2, "new")])

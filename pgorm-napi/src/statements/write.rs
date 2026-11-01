@@ -98,7 +98,7 @@ impl Delete {
 
 /// The SQL and values a write builds, or why it cannot run: its `check()`,
 /// which a WITH clause reading the write as a body refuses it by too.
-// [spec:pgorm:req:bindings.writes+1]
+// [spec:pgorm:req:bindings.writes+2]
 pub(crate) fn built(node: &Node) -> Option<Result<(String, Values), &'static str>> {
     Some(match node {
         Node::Insert(insert) => insert.check().map(|()| insert.inner.build()),
@@ -126,7 +126,7 @@ fn target<'cx>(cx: &mut FunctionContext<'cx>) -> NeonResult<pgorm::pgorm_query::
 }
 
 /// `insertNew(table)`.
-// [spec:pgorm:req:bindings.writes+1]
+// [spec:pgorm:req:bindings.writes+2]
 fn insert_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = target(cx)?;
     Ok(Node::Insert(Insert {
@@ -230,7 +230,7 @@ fn insert_on_conflict(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `updateNew(table)`.
-// [spec:pgorm:req:bindings.writes+1]
+// [spec:pgorm:req:bindings.writes+2]
 fn update_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = target(cx)?;
     Ok(Node::Update(Update {
@@ -261,7 +261,7 @@ fn update_set(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `deleteNew(table)`.
-// [spec:pgorm:req:bindings.writes+1]
+// [spec:pgorm:req:bindings.writes+2]
 fn delete_new(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = target(cx)?;
     Ok(Node::Delete(Delete {
@@ -329,7 +329,7 @@ fn write_from(cx: &mut FunctionContext) -> NeonResult<Node> {
 }
 
 /// `writeReturning(write, items, oldAs, newAs)`: the RETURNING list.
-// [spec:pgorm:req:bindings.writes+1]
+// [spec:pgorm:req:bindings.writes+2]
 fn write_returning(cx: &mut FunctionContext) -> NeonResult<Node> {
     let mut node = this(cx, 0)?;
     let clause = returning::clause(cx, 1)?;

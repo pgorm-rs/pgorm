@@ -332,7 +332,7 @@ windowed aggregate (`0A000`).
 ## Writes
 
 ```python
-from pgorm import ConflictTarget, Table, col, delete, insert, literal, update
+from pgorm import Conflict, Table, col, delete, insert, literal, update
 
 account = Table("account", schema="application")
 
@@ -340,7 +340,7 @@ create = (
     insert(account).columns("id", "name")
     .values(1, "Alice")
     .values(literal(2), "O'Brien")
-    .on_conflict(ConflictTarget("id").update("name"))
+    .on_conflict(Conflict.on("id").update("name"))
     .returning(col("id"), col("name"))
 )
 rename = update(account).set("name", "new name").where(account.col("id") == 1)
@@ -352,7 +352,8 @@ are `i64`, and explicit `Value(number, "i32")` selects an `i32` parameter for
 columns requiring that Rust wire type. Literal and bound expression operands
 remain selectable on writes.
 
-INSERT columns are distinct identifiers and must be chosen before adding rows.
+INSERT columns are distinct identifiers, named by one `columns` call before
+adding rows; a second call raises `ConstructionError`.
 Each `values(*items)` call adds one row using Rust's fallible arity check.
 `select(query)` takes the rows a `Select` of as many columns yields instead,
 through Rust's `select_from`, and mixes with no other rows; the query's tie
@@ -391,11 +392,11 @@ that `ON CONFLICT DO UPDATE` updated has the existing row as its `old`, so
 `ReturningRow.Old.col("id").is_null()` says which rows an upsert inserted:
 
 ```python
-from pgorm import ConflictTarget, ReturningRow, col, insert
+from pgorm import Conflict, ReturningRow, col, insert
 
 upsert = (
     insert(account).columns("id", "name").values(1, "Alice")
-    .on_conflict(ConflictTarget("id").update("name"))
+    .on_conflict(Conflict.on("id").update("name"))
     .returning(col("id"), ReturningRow.Old.col("id").is_null().as_("inserted"))
 )
 ```
@@ -442,15 +443,15 @@ using`. A MERGE takes no recursive clause, which PostgreSQL refuses, so
 ## MERGE
 
 ```python
-from pgorm import MatchedAction, MergeInsert, MergeUpdate, ReturningRow, Table, merge
+from pgorm import MergeAction, ReturningRow, Table, merge
 
 target, source = Table("account").as_("t"), Table("staged").as_("s")
 sync = (
     merge(target, source, target.col("id") == source.col("id"))
-    .when_matched(MergeUpdate("name", source.col("name")))
-    .when_matched(MatchedAction.Delete, condition=source.col("name").is_null())
-    .when_not_matched(MergeInsert("id", source.col("id")).set("name", source.col("name")))
-    .when_not_matched_by_source(MatchedAction.Delete)
+    .when_matched(MergeAction.update("name", source.col("name")))
+    .when_matched(MergeAction.delete(), condition=source.col("name").is_null())
+    .when_not_matched(MergeAction.insert("id", source.col("id")).set("name", source.col("name")))
+    .when_not_matched_by_source(MergeAction.delete())
     .returning_action()
     .returning(target.col("id"), ReturningRow.Old.col("name").as_("was"))
 )
@@ -465,14 +466,18 @@ row, `when_not_matched` a source row it paired with none, and
 `when_not_matched_by_source` a target row no source row matched. Each takes an
 action and an optional `condition=`, which adds `AND condition` to the arm.
 
-Actions are typed by the row they take, as in Rust. A target row is updated
-(`MergeUpdate`), deleted (`MatchedAction.Delete`) or left alone
-(`MatchedAction.DoNothing`). A source row is inserted (`MergeInsert`, or
-`NotMatchedAction.InsertDefaultValues`) or skipped (`NotMatchedAction.DoNothing`).
-Anything else raises `TypeError`, so an insert for a target row cannot be
-built. `MergeUpdate(column, value)` and `MergeInsert(column, value)` take
-their first pair at construction, so neither is ever empty, and
-`.set(column, value)` adds another. A column is a bare name.
+`MergeAction`'s functions make every action, as JavaScript's do; the classes
+`MergeAction`, `MergeUpdate` and `MergeInsert` are for annotations and
+`isinstance`, and calling one raises `TypeError`. A target row is updated
+(`MergeAction.update(column, value)`), deleted (`MergeAction.delete()`) or
+left alone (`MergeAction.do_nothing()`). A source row is inserted
+(`MergeAction.insert(column, value)`, or `MergeAction.insert_defaults()`) or
+skipped (`MergeAction.do_nothing()`). An action given to an arm whose row it
+cannot take raises `ConstructionError`, as Rust's types refuse it, so an
+insert for a target row is never built; the stubs give the two kinds of arm
+different action types, so a type checker refuses the pairing before it runs.
+`update` and `insert` take their first pair as they are called, so neither is
+ever empty, and `.set(column, value)` adds another. A column is a bare name.
 `MergeInsert.overriding(Overriding.SystemValue)` or `Overriding.UserValue`
 writes `OVERRIDING ..` for identity columns.
 
@@ -480,7 +485,7 @@ Within a kind, a row takes the first conditional arm whose condition holds, in
 call order, and otherwise the kind's one unconditional arm. The unconditional
 arm always renders after the conditional ones, the only place PostgreSQL
 accepts it, and a later unconditional arm of the same kind replaces it. A row
-that `DoNothing` left alone is not returned.
+that `do_nothing()` left alone is not returned.
 
 `returning(*items, old_as=, new_as=)` is the statement's RETURNING list, as for
 the other writes. `returning_action()` adds `merge_action()` as its first
@@ -501,10 +506,12 @@ merge))` reads the rows its RETURNING list yields. A value in a CTE's own
 ## Conflict actions
 
 `Conflict.do_nothing()` selects Rust's untargeted `ON CONFLICT DO NOTHING`.
-`ConflictTarget(*targets)` requires a nonempty inference target of column
+`Conflict.on(*targets)` requires a nonempty inference target of column
 names and index expressions (`call("lower", col("email"))`), and
 `Conflict.on_constraint(name)` names a constraint outright, `ON CONSTRAINT`,
-which takes no predicate: its `.where` raises `ConstructionError`. Both
+which takes no predicate: its `.where` raises `ConstructionError`. Both give a
+`ConflictTarget`, which, like `Conflict` and `ConflictUpdate`, is for
+annotations and `isinstance`: calling the class raises `TypeError`. Both
 preserve the Rust target/action states:
 
 | Operation | Rust API |
@@ -513,7 +520,7 @@ preserve the Rust target/action states:
 | `target.do_nothing()` | `ConflictTarget::do_nothing` |
 | `target.update(*columns)` | nonempty `ConflictUpdate` from EXCLUDED column values |
 | `target.set(column, value)` | nonempty `ConflictUpdate` with an expression assignment |
-| `action.update(column)` | `ConflictUpdate::update_column` |
+| `action.update(*columns)` | `ConflictUpdate::update_column` for each, at least one |
 | `action.set(column, value)` | `ConflictUpdate::value` |
 | `action.where(predicate)` | `ConflictUpdate::cond_where` for the update action |
 

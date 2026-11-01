@@ -174,7 +174,7 @@ from ._writes import (
     Conflict as Conflict, ConflictTarget as ConflictTarget, ConflictUpdate as ConflictUpdate,
 )
 from ._merge import (
-    MatchedAction as MatchedAction, NotMatchedAction as NotMatchedAction, Overriding as Overriding,
+    MergeAction as MergeAction, Overriding as Overriding,
     MergeUpdate as MergeUpdate, MergeInsert as MergeInsert, PendingMerge as PendingMerge,
     Merge as Merge, With as With, SearchOrder as SearchOrder, Search as Search, Cycle as Cycle,
     ReturningRow as ReturningRow, merge as merge,

@@ -152,15 +152,15 @@ class ConflictArbiterTests(WriteTests):
         await self.seed("Alice")
         lower = p.call("lower", p.col("name"))
         partial = (p.Insert(self.account).columns("id", "name").values(4, "ALICE")
-                   .on_conflict(p.ConflictTarget(lower).where(p.col("active") == True).do_nothing()))
+                   .on_conflict(p.Conflict.on(lower).where(p.col("active") == True).do_nothing()))
         self.assertEqual(await self.connection.execute(partial), 0)
         unmatched = (p.Insert(self.account).columns("id", "name").values(5, "ALICE")
-                     .on_conflict(p.ConflictTarget(lower).do_nothing()))
+                     .on_conflict(p.Conflict.on(lower).do_nothing()))
         with self.assertRaises(p.DatabaseError) as caught:
             await self.connection.execute(unmatched)
         self.assertEqual(caught.exception.sqlstate, "42P10")
         with self.assertRaises(TypeError):
-            p.ConflictTarget(1)
+            p.Conflict.on(1)
 
 
 if __name__ == "__main__":
