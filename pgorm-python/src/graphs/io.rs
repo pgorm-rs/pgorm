@@ -1,7 +1,7 @@
 use super::backend::{CursorPlan, Query};
 use crate::{
     errors::{ConstructionError, InternalError},
-    execution::Target,
+    execution::Executor,
     transactions::work::{Output, Work},
 };
 use pyo3::{
@@ -24,7 +24,7 @@ pub(crate) fn read<'py>(
     query: Query,
     terminal: Read,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let target = Target::extract(py, connection)?;
+    let target = Executor::extract(py, connection)?;
     let optional = matches!(terminal, Read::Optional);
     if query.compile(optional).1.0.len() > 65535 {
         return Err(ConstructionError::new_err(

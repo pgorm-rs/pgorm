@@ -15,7 +15,7 @@ use super::{
 };
 use crate::{
     errors::{ConstructionError, InternalError, LifecycleError},
-    execution::Target,
+    execution::Executor,
     expressions::PyExpr,
     statements::{condition, conflict_clause},
     transactions::work::{Output, Work},
@@ -128,7 +128,7 @@ fn run<'py>(
     write: VersionWrite,
     answer: Answer,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let target = Target::extract(py, connection)?;
+    let target = Executor::extract(py, connection)?;
     future_into_py(py, async move {
         let Output::Versions(rows) = target.run(Work::Versions(entity, Box::new(write))).await?
         else {

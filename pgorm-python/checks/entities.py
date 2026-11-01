@@ -248,6 +248,15 @@ def main():
             [
                 str(python),
                 "-I",
+                str(root / "pgorm-python/tests/registered_pools.py"),
+                "-v",
+            ],
+            environment,
+        )
+        run(
+            [
+                str(python),
+                "-I",
                 str(root / "pgorm-python/tests/registered_execution.py"),
             ],
             environment,
@@ -286,6 +295,7 @@ def main():
                 "registered_versions": True,
                 "registered_schema": True,
                 "registered_transactions": True,
+                "registered_pools": True,
                 "rust_execution_parity": True,
                 "execution_mismatch_rejected": True,
                 "wheel": wheel.name,

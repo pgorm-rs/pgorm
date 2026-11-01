@@ -122,13 +122,16 @@ list of expressions or `any_(..)` included, is compared as written.
 `col(name).expr()` gives its plain expression, whose comparisons bind as an
 `Expr`'s do rather than through the column's `ColumnTrait`.
 
-Entity terminals currently require an acquired `Connection`. They return
-native asyncio awaitables; calling a terminal schedules its operation. Await
-each operation before reusing the connection. An outstanding operation can be
-cancelled through its future or `asyncio.wait_for`; cancellation discards the
-connection if the operation's completion is uncertain. Closing its connection
-or pool also cancels an outstanding Rust hook. Cancellation does not guarantee
-rollback of a submitted write.
+Every entity terminal, ActiveModel write and version terminal runs on a
+`Pool`, an acquired `Connection` or a `Transaction`. On a pool it runs on a
+connection the pool lends it alone, returned once the operation finishes, as a
+pool's statement does. They return native asyncio awaitables; calling a
+terminal schedules its operation. Await each operation before reusing a
+connection. An outstanding operation can be cancelled through its future or
+`asyncio.wait_for`; cancellation discards the connection if the operation's
+completion is uncertain. Closing its connection or pool also cancels an
+outstanding Rust hook. Cancellation does not guarantee rollback of a submitted
+write.
 
 `all` returns a list of detached models. `one` and `optional` are Rust's `one`
 and `one_opt`, which narrow the query's limit to one row: `LIMIT 1`, including

@@ -1340,7 +1340,6 @@ assertions (
     {id verify.sql, kind @complete, author "brendan@necessary.nu", at 2026-09-02T01:45:02.009226Z}
     {id view-check-dedup, kind @complete, author "brendan@necessary.nu", at 2026-10-19T13:16:21.425085Z}
     {id window-frame-bounds, kind @complete, author "brendan@necessary.nu", at 2026-09-15T17:28:37.183269Z}
-    {id python-registered-pools, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:29.150894Z}
     {id python-hook-refusal-class, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:44.640722Z}
     {id binding-describe-shapes, kind @doing, author "brendan@necessary.nu", at 2026-10-31T22:54:44.983153Z}
 )
@@ -2255,18 +2254,11 @@ impl_evidence (
         {impl_name python, rule bindings.models}
         {impl_name python, rule bindings.pagination}
         {impl_name python, rule bindings.relations}
-    ), rule_versions_seen (
-        {id bindings.cursors, version 0}
-        {id bindings.graphs, version 0}
-        {id bindings.model-reads, version 0}
-        {id bindings.model-records, version 0}
-        {id bindings.model-writes, version 1}
-        {id bindings.models, version 3}
-        {id bindings.pagination, version 0}
-        {id bindings.relations, version 0}
     )}
-    {id python-registered-pools, rule_versions_seen (
-        {id bindings.registered-pools, version 0}
+    {id python-registered-pools, covered_rules (
+        bindings.registered-pools
+    ), covered_claims (
+        {impl_name python, rule bindings.registered-pools}
     )}
     {id python-schema-gaps, covered_rules (
         bindings.schema-alter
