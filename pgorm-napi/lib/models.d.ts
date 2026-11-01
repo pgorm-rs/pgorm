@@ -7,7 +7,7 @@
 // [spec:pgorm:req:napi.typing+1]
 // [spec:pgorm:req:bindings.models+4]
 
-import type { Compiled, Condition, Expr, Operand, OrderBy, Predicate, Quantified } from "./expressions.d.ts";
+import type { Compiled, Condition, Expr, ModelOperand, Operand, OrderBy, Predicate } from "./expressions.d.ts";
 import type { Select, Table } from "./select.d.ts";
 import type { Conflict, ConflictUpdate, Delete, Insert, Update } from "./writes.d.ts";
 import type {
@@ -182,12 +182,13 @@ export type FieldInput<C> = C extends Column<infer K, infer O>
   : never;
 
 /**
- * What a column is compared with: a value of its kind that a statement can
- * bind, a {@link Value} of its own kind, or an expression. A range is
- * compared as a `Value` naming its kind, as built statements bind it.
+ * What a column is compared with: a value of its kind, a `Range` or
+ * `Multirange` of a range or multirange kind included, which the column
+ * converts as a write does; a {@link Value} of its own kind; or an
+ * expression. Never `null`, which `isNull()` tests.
  */
 export type FieldOperand<C> = C extends Column<infer K, infer O>
-  ? Extract<Arrayed<KindInput<K, O>, O>, Operand> | Value | Expr
+  ? Exclude<Arrayed<KindInput<K, O>, O>, null> | Value | Expr
   : never;
 
 /** A model's columns by field. */
@@ -233,40 +234,28 @@ export type UpdateOf<M> = M extends Model<infer C> ? { [F in Exclude<keyof C, Ge
 /** A model's primary key: each key field's value. */
 export type KeyOf<M> = M extends Model<infer C> ? { [F in PrimaryKey<C>]: Exclude<FieldOperand<C[F]>, Expr> } : never;
 
+declare const operands: unique symbol;
+
 /**
  * A model's column as an expression, qualified as its model's table is
- * named. A value it is compared with converts through the column's declared
- * kind — an enum's label is bound cast to its type — and an expression is
- * compared as written; comparing with `null` is a
- * {@link ConstructionError}, because it is never true: test with `isNull()`.
+ * named. A value its comparisons, membership tests, `between`, distinctness
+ * tests, containment, overlap and range positions take converts through the
+ * column's declared kind, `I` ({@link ModelOperand}): an enum's label is
+ * bound cast to its type, and a range or multirange column takes a `Range`
+ * or `Multirange` as it stands. An expression, and `any(..)` / `all(..)`
+ * beside an operator that reads one, are taken as written; comparing with
+ * `null` is a {@link ConstructionError}, because it is never true: test with
+ * `isNull()`.
  */
-export declare class ModelColumn<V = unknown, I extends Operand = Operand> extends Expr {
+export declare class ModelColumn<V = unknown, I = Operand> extends Expr {
+  #private;
   /** The field, in the model's records. */
   readonly field: string;
   readonly column: Column;
   /** The type its field reads as, for the types alone. */
   readonly [declared]?: V;
-  /** Equal to a value of the column's kind, or to an expression or `any(..)` / `all(..)`, as written. */
-  eq(other: I | Quantified): Expr;
-  ne(other: I | Quantified): Expr;
-  lt(other: I | Quantified): Expr;
-  lte(other: I | Quantified): Expr;
-  gt(other: I | Quantified): Expr;
-  gte(other: I | Quantified): Expr;
-  isDistinctFrom(other: I): Expr;
-  isNotDistinctFrom(other: I): Expr;
-  contains(other: I | Quantified): Expr;
-  containedBy(other: I | Quantified): Expr;
-  overlaps(other: I | Quantified): Expr;
-  strictlyLeftOf(other: I | Quantified): Expr;
-  strictlyRightOf(other: I | Quantified): Expr;
-  notExtendRightOf(other: I | Quantified): Expr;
-  notExtendLeftOf(other: I | Quantified): Expr;
-  adjacentTo(other: I | Quantified): Expr;
-  isIn(source: readonly I[] | Select): Expr;
-  isNotIn(source: readonly I[] | Select): Expr;
-  between(lower: I, upper: I, options?: { readonly symmetric?: boolean }): Expr;
-  notBetween(lower: I, upper: I, options?: { readonly symmetric?: boolean }): Expr;
+  /** The values its operators take, for the types alone. */
+  readonly [operands]?: I;
 }
 
 /** The column expression of field `F` of columns `C`. */

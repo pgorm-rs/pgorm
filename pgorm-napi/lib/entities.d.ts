@@ -8,8 +8,7 @@
 // [spec:pgorm:req:napi.typing+1]
 // [spec:pgorm:req:bindings.entities+3]
 
-import type { Compiled, Expr, Operand, OrderBy, Predicate, Quantified } from "./expressions.d.ts";
-import type { Select } from "./select.d.ts";
+import type { Compiled, ComparisonOperand, Expr, Operand, OrderBy, Predicate } from "./expressions.d.ts";
 import type { Conflict, ConflictUpdate } from "./writes.d.ts";
 import type { Change, Upserted } from "./models.d.ts";
 import type { OperationOptions, PlainValue, Queryable, Value } from "./index.d.ts";
@@ -81,33 +80,32 @@ export declare function entities(): string[];
  */
 export declare function entity<N extends EntityName>(name: N): Entity<TypesOf<N>>;
 
-/** A registered entity's column, its comparisons the column's own `ColumnTrait` methods. */
-export declare class EntityColumn<I extends Operand = Operand> extends Expr {
+declare const operands: unique symbol;
+
+/**
+ * A registered entity's column, its comparisons the column's own `ColumnTrait`
+ * methods, each taking `I` ({@link ComparisonOperand}).
+ *
+ * `eq`, `ne`, `gt`, `gte`, `lt` and `lte` compare with a value of the
+ * column's declared kind, a range or multirange column's `Range` or
+ * `Multirange` included, written through its `save_as`, or with an
+ * expression, `any(..)` or `all(..)` as it stands. `isIn` and `isNotIn` test
+ * membership in a list of values, each read as the column's declared kind as
+ * a compared value is, or in a subquery's rows, by the column's `ColumnTrait`:
+ * a column whose domain is over an enum is a member as the enum. A list
+ * holding an expression is a member as written.
+ */
+export declare class EntityColumn<I = Operand> extends Expr {
+  #private;
   /** The column's SQL name. */
   readonly name: string;
-  /**
-   * Equality with a value of the column's declared kind, written through its
-   * `save_as`, or with an expression, `any(..)` or `all(..)` as it stands.
-   */
-  eq(other: I | Quantified): Expr;
-  ne(other: I | Quantified): Expr;
-  gt(other: I | Quantified): Expr;
-  gte(other: I | Quantified): Expr;
-  lt(other: I | Quantified): Expr;
-  lte(other: I | Quantified): Expr;
-  /**
-   * In a list of values, each read as the column's declared kind as a
-   * compared value is, or in a subquery's rows, by the column's `ColumnTrait`:
-   * a column whose domain is over an enum is a member as the enum. A list
-   * holding an expression is a member as written.
-   */
-  isIn(source: readonly I[] | Select): Expr;
-  isNotIn(source: readonly I[] | Select): Expr;
+  /** The values its comparisons take, for the types alone. */
+  readonly [operands]?: I;
 }
 
-/** What a registered entity's column is compared with. */
+/** What a registered entity's column is compared with: a value of its input type, never `null`. */
 export type ColumnOperand<T extends EntityTypes<any, any>, C> = unknown extends EntityInputOf<T, C> ? Operand
-  : Extract<EntityInputOf<T, C>, Operand> | Value | Expr;
+  : Exclude<EntityInputOf<T, C>, null> | Value | Expr;
 
 /** A registration's description: its table, columns, key, relations and Rust types. */
 export interface EntityDescription {

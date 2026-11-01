@@ -1,19 +1,26 @@
 // What the declarations make of a model's declaration, held by `deno check`:
 // each assignment below type-checks only if a record, an insert, an update,
-// a key, a graph's tuple and a cursor's boundary are typed from the columns
-// alone, and each `@ts-expect-error` only if the types refuse what the
-// binding refuses at run time. The test itself builds the same statements,
-// so the function stays in step with the module it types.
+// a key, a graph's tuple, a cursor's boundary and a column's operands are
+// typed from the columns alone, and each `@ts-expect-error` only if the types
+// refuse what the binding refuses at run time. The tests themselves build the
+// same statements, so the functions stay in step with the module they type.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  col,
   column,
+  ConstructionError,
+  CreatedMultirange,
   CreatedRange,
+  type Entity,
+  type EntityTypes,
+  type Expr,
   type InsertOf,
   type KeyOf,
   model,
+  Multirange,
   type Pool,
   Range,
   type RowOf,
@@ -85,4 +92,63 @@ test("the declarations type a model's records, writes, keys, graphs and cursors 
   assert.match(Account.select("id", "name").inspect().sql, /SELECT "account"\."id", "account"\."name"/);
   assert.match(Post.graph().joinOne(author).joinMaybe(posts, { alias: "p", from: 1 }).inspect().sql, /"p"\."title" AS "s2_title"/);
   assert.equal(Account.find().cursor("id", "name").after(1n, "x").inspect().values.length, 3);
+});
+
+const Booking = model("booking", {
+  schema: "app",
+  columns: {
+    id: column("i32", { primaryKey: true }),
+    seats: column("int4range"),
+    free: column("int4multirange", { nullable: true }),
+    span: column(new CreatedRange("floatrange", "f64", { schema: "app" })),
+    open: column(new CreatedMultirange("floatmultirange", "f64", { schema: "app" })),
+  },
+});
+const seats = new Range(1, 4);
+const span = new Range(1.5, 2.5);
+const open = new Multirange([span]);
+
+/** A registered entity's types, as a generated module declares a range column's. */
+type Booked = EntityTypes<{ id: number; seats: Range<number> }, { id: number; seats: Range<number> }>;
+
+/** Never called: its body is what `deno check` holds a column's operands to. */
+function operands(registered: Entity<Booked>): Expr[] {
+  return [
+    Booking.col("seats").eq(seats),
+    Booking.col("seats").isIn([seats, new Range(5, 8)]),
+    Booking.col("seats").between(seats, new Range(5, 8)),
+    Booking.col("free").contains(new Multirange([seats])),
+    Booking.col("span").adjacentTo(span),
+    Booking.col("span").isDistinctFrom(span),
+    Booking.col("open").overlaps(open),
+    Booking.col("open").eq(open),
+    registered.col("seats").eq(seats),
+    registered.col("seats").isNotIn([seats]),
+    // @ts-expect-error: a scalar column takes no Range
+    Booking.col("id").eq(seats),
+    // @ts-expect-error: nor does its containment
+    Booking.col("id").contains(open),
+    // @ts-expect-error: a range column takes a Range, not a Multirange
+    Booking.col("span").eq(open),
+    // @ts-expect-error: a registered scalar column takes no Range
+    registered.col("id").eq(seats),
+    // @ts-expect-error: a registered column's containment binds as an expression's does, which infers no range's kind
+    registered.col("seats").contains(seats),
+    // @ts-expect-error: a free expression infers no range's kind
+    col("seats").eq(seats),
+  ];
+}
+
+// [spec:pgorm:req:napi.typing+1/test]
+// [spec:pgorm:req:bindings.column-operators+1/test]
+test("the declarations take a range or multirange column's Range or Multirange as its kind converts it", () => {
+  assert.equal(typeof operands, "function");
+  assert.equal(Booking.col("seats").isIn([seats]).inspect().values[0]?.kind, "int4range");
+  assert.equal(Booking.col("free").contains(new Multirange([seats])).inspect().values[0]?.kind, "int4multirange");
+  assert.match(Booking.col("span").adjacentTo(span).inspect().sql, /"span" -\|- CAST\(\$1::text AS app\.floatrange\)$/);
+  assert.match(Booking.col("open").eq(open).inspect().sql, /"open" = CAST\(\$1::text AS app\.floatmultirange\)$/);
+  assert.throws(() => Booking.col("id").eq(seats as never), ConstructionError);
+  assert.throws(() => Booking.col("id").contains(open as never), ConstructionError);
+  assert.throws(() => Booking.col("span").eq(open as never), ConstructionError);
+  assert.throws(() => col("seats").eq(seats as never), ConstructionError);
 });
