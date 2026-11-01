@@ -102,7 +102,7 @@ fn col(cx: &mut FunctionContext) -> NeonResult<Node> {
 /// `pipelineRegisteredCol(table, entity, column)`: a registered entity's
 /// column read under `table` — its own table, or the name a source was read
 /// by — and compared as the entity types it, through `Named::col`.
-// [spec:pgorm:req:bindings.pipeline-sources+2]
+// [spec:pgorm:req:bindings.pipeline-sources+3]
 fn registered_col(cx: &mut FunctionContext) -> NeonResult<Node> {
     let table = pipeline_name_at(cx, 0)?;
     let column = crate::entities::pipeline_column(cx, 1, 2)?;

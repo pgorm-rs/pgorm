@@ -165,7 +165,7 @@ pub(crate) struct EntitySource(Arc<dyn EntityBackend>);
 
 impl EntitySource {
     /// The entity's table as a pipeline source.
-    // [spec:pgorm:req:bindings.pipeline-sources+2]
+    // [spec:pgorm:req:bindings.pipeline-sources+3]
     pub(crate) fn source(&self) -> pgorm::pipeline::Source {
         self.0.source()
     }
@@ -341,7 +341,7 @@ fn entity_in(mut cx: FunctionContext) -> JsResult<JsValue> {
 
 /// The registered entity at argument `entity` and its column named at
 /// argument `column`, as a pipeline reads it.
-// [spec:pgorm:req:bindings.pipeline-sources+2]
+// [spec:pgorm:req:bindings.pipeline-sources+3]
 pub(crate) fn pipeline_column(
     cx: &mut FunctionContext,
     entity: usize,

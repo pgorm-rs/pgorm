@@ -73,7 +73,7 @@ pub(super) fn pipeline_alias(name: &Bound<'_, PyAny>) -> PyResult<PyPipelineExpr
 /// from. A registered entity's column (`entity.col(name)`) is the entity's
 /// own, compared as the entity types it; any other name only qualifies.
 // [spec:pgorm:req:bindings.pipeline-expressions+2]
-// [spec:pgorm:req:bindings.pipeline-sources+2]
+// [spec:pgorm:req:bindings.pipeline-sources+3]
 #[pyfunction]
 pub(super) fn pipeline_col(
     table: &Bound<'_, PyAny>,

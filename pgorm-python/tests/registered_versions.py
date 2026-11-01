@@ -79,7 +79,7 @@ class RegisteredVersions(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(rows(await narrowed.returning_changes(connection)), [(1, "every", "first")])
 
     async def test_upsert_says_what_it_did(self):
-        renamed = p.ConflictTarget("id").update("display name")
+        renamed = p.Conflict.on("id").update("display name")
         async with self.pool.connection() as connection:
             fresh = await self.account.insert(self.active(4, "four")).returning_upsert(connection)
             self.assertIsInstance(fresh, p.Upserted.Inserted)
@@ -90,7 +90,7 @@ class RegisteredVersions(unittest.IsolatedAsyncioTestCase):
                                      ("name 1|before", "renamed"))
                 case other:
                     self.fail(f"expected an update, got {other!r}")
-            skipped = p.ConflictTarget("id").do_nothing()
+            skipped = p.Conflict.on("id").do_nothing()
             self.assertIsNone(
                 await self.account.insert(self.active(2, "skipped")).on_conflict(skipped).returning_upsert(connection))
             guarded = renamed.where(p.literal(False))
@@ -112,7 +112,7 @@ class RegisteredVersions(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((change.old["label"], change.new["label"]), ("before", "after"))
             again = self.old.active().set("id", 1).set("label", "again")
             upsert = await self.old.insert(again).on_conflict(
-                p.ConflictTarget("id").update("label")).returning_upsert(connection)
+                p.Conflict.on("id").update("label")).returning_upsert(connection)
             self.assertEqual((upsert.change.old["label"], upsert.change.new["label"]), ("after", "again"))
 
 

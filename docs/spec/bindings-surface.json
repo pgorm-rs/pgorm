@@ -8,7 +8,7 @@
       "CheckViolationError": [],
       "Column": [],
       "Condition": ["add", "all", "any", "inspect", "not"],
-      "Conflict": ["do_nothing", "on_constraint"],
+      "Conflict": ["do_nothing", "on", "on_constraint"],
       "ConflictTarget": ["do_nothing", "set", "update", "where"],
       "ConflictUpdate": ["set", "update", "where"],
       "Connection": ["close", "copy_in", "copy_in_rows", "copy_out", "copy_out_rows", "execute", "notify", "one", "optional", "ping", "query", "stream", "transaction"],
@@ -55,6 +55,7 @@
       "LifecycleError": [],
       "Listener": ["close", "listen", "unlisten", "unlisten_all"],
       "Merge": ["inspect", "only", "returning", "returning_action", "when_matched", "when_not_matched", "when_not_matched_by_source", "with"],
+      "MergeAction": ["delete", "do_nothing", "insert", "insert_defaults", "update"],
       "MergeInsert": ["overriding", "set"],
       "MergeUpdate": ["set"],
       "Model": ["as", "belongs_to", "col", "delete", "describe", "find", "find_by_key", "graph", "has_many", "has_one", "insert", "insert_many", "key", "select", "update"],
@@ -277,10 +278,20 @@
         }
       ],
       "rust": {"entity": null, "model": null, "active_model": null, "column": null}
+    },
+    "pgorm.EntityGraph": {
+      "name": null,
+      "rust_shape": null,
+      "sources": [{"index": null, "entity": null, "slot": null}]
+    },
+    "pipeline.SourceSelection": {
+      "name": null,
+      "rust_shape": null,
+      "entities": null
     }
   },
   "questions": {
-    "shapes": "One feature offered through differently shaped API: grouping elements, table functions, conflict arbiters, MERGE actions, LIKE patterns, the identifier wrapper, registered inserts and a pipeline's own terminals."
+    "shapes": "One feature offered through differently shaped API: grouping elements, table functions, LIKE patterns, the identifier wrapper, registered inserts and a pipeline's own terminals."
   },
   "python": {
     "modules": {
@@ -359,8 +370,6 @@
       "pgorm.Identifier": {"question": "shapes"},
       "pgorm.LikePattern": {"question": "shapes"},
       "pgorm.TableFunction": {"question": "shapes"},
-      "pgorm.MatchedAction": {"question": "shapes"},
-      "pgorm.NotMatchedAction": {"question": "shapes"},
       "pgorm.EntityInsertMany": {"question": "shapes"},
       "pipeline.Pipeline.all": {"question": "shapes"},
       "pipeline.Pipeline.one": {"question": "shapes"},
@@ -418,13 +427,11 @@
     },
     "gaps": {},
     "undecided": {
-      "pgorm.MergeAction": {"question": "shapes"},
       "pgorm.cube": {"question": "shapes"},
       "pgorm.groupingSet": {"question": "shapes"},
       "pgorm.groupingSets": {"question": "shapes"},
       "pgorm.rollup": {"question": "shapes"},
       "pgorm.tableFunction": {"question": "shapes"},
-      "pgorm.Conflict.on": {"question": "shapes"},
       "pgorm.EntityInsert.returningUpserts": {"question": "shapes"}
     }
   }

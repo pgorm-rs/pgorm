@@ -5,8 +5,8 @@
 // the error and value classes it rejects with and builds values from, and is
 // what an application imports.
 // [spec:pgorm:def:bindings.api]
-// [spec:pgorm:req:bindings.surface+1]
-// [spec:pgorm:req:napi.naming+3]
+// [spec:pgorm:req:bindings.surface+2]
+// [spec:pgorm:req:napi.naming+4]
 // [spec:pgorm:def:napi.api+1]
 // [spec:pgorm:req:napi.typing+1]
 

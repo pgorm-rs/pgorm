@@ -144,7 +144,7 @@ fn select_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 // [spec:pgorm:req:bindings.write-sources/test]
 // [spec:pgorm:req:bindings.conflict-arbiters/test]
 // [spec:pgorm:req:bindings.write-ctes/test]
@@ -156,7 +156,7 @@ fn writes_family_matches_its_golden_file() {
     );
 }
 
-// [spec:pgorm:req:bindings.merge+1/test]
+// [spec:pgorm:req:bindings.merge+2/test]
 // [spec:pgorm:req:bindings.merge-sources/test]
 #[test]
 fn merge_family_matches_its_golden_file() {

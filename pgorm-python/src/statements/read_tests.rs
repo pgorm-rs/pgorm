@@ -80,7 +80,7 @@ fn subqueries_are_from_items_and_join_lateral() -> PyResult<()> {
         parity(
             py,
             &globals,
-            "p.merge(u, l, l.col('user_id') == u.col('id')).when_matched(p.MergeUpdate('name', l.col('total')))",
+            "p.merge(u, l, l.col('user_id') == u.col('id')).when_matched(p.MergeAction.update('name', l.col('total')))",
             Query::merge(
                 users,
                 FromItem::SubQuery(latest_order(), n("l")),

@@ -127,14 +127,14 @@ const all = new Set([...live.names, ...[...live.members].flatMap(([key, found]) 
 const { expected, gaps, classes } = declared();
 const own = ownNames();
 
-// [spec:pgorm:req:bindings.surface+1/test]
-// [spec:pgorm:req:napi.naming+3/test]
+// [spec:pgorm:req:bindings.surface+2/test]
+// [spec:pgorm:req:napi.naming+4/test]
 test("the module offers every shared name, or the surface lists it as a gap with its plan node", () => {
   const missing = [...expected].filter(([key]) => !all.has(key)).map(([, path]) => path).sort();
   assert.deepStrictEqual(missing, []);
 });
 
-// [spec:pgorm:req:bindings.surface+1/test]
+// [spec:pgorm:req:bindings.surface+2/test]
 test("the module offers nothing the surface does not declare as shared or as JavaScript's own", () => {
   const extra = [...all].filter((key) => {
     if (expected.has(key) || own.has(key)) return false;
@@ -146,19 +146,19 @@ test("the module offers nothing the surface does not declare as shared or as Jav
   assert.deepStrictEqual(extra.sort(), []);
 });
 
-// [spec:pgorm:req:bindings.surface+1/test]
+// [spec:pgorm:req:bindings.surface+2/test]
 test("a gap that lands leaves the gap list", () => {
   const closed = [...gaps].filter(([key]) => all.has(key) && !expected.has(key)).map(([, path]) => path);
   assert.deepStrictEqual(closed.sort(), []);
 });
 
-// [spec:pgorm:req:bindings.surface+1/test]
+// [spec:pgorm:req:bindings.surface+2/test]
 test("every name the surface declares as JavaScript's own is still offered", () => {
   const stale = [...own].filter(([key]) => !all.has(key)).map(([, path]) => path);
   assert.deepStrictEqual(stale.sort(), []);
 });
 
-// [spec:pgorm:req:bindings.surface+1/test]
+// [spec:pgorm:req:bindings.surface+2/test]
 test("every gap names a plan node and every undecided name a question", () => {
   const shared = new Set(Object.entries(surface.modules).flatMap(([module, entries]) =>
     Object.entries(entries).flatMap(([name, methods]) => [
@@ -226,7 +226,7 @@ function assertDeclared(owner: string, descriptions: readonly unknown[]) {
   assert.deepStrictEqual(unreached.sort(), [], "declared keys no live description reached");
 }
 
-// [spec:pgorm:req:bindings.surface+1/test]
+// [spec:pgorm:req:bindings.surface+2/test]
 // [spec:pgorm:req:bindings.models+4/test]
 test("a model's describe() reports exactly the keys the surface declares", () => {
   const declared = pgorm.model("accounts", {
@@ -239,10 +239,27 @@ test("a model's describe() reports exactly the keys the surface declares", () =>
   assertDeclared("pgorm.Model", [declared.describe(), declared.as("a").describe()]);
 });
 
-// [spec:pgorm:req:bindings.surface+1/test]
+// [spec:pgorm:req:bindings.surface+2/test]
 // [spec:pgorm:req:bindings.entities+3/test]
 test("a registered entity's describe() reports exactly the keys the surface declares", {
   skip: pgorm.entities().length === 0 && "the module registers no entity; checks/entities.js runs this against an application's",
 }, () => {
   assertDeclared("pgorm.Entity", pgorm.entities().map((name) => pgorm.entity(name).describe()));
+});
+
+// [spec:pgorm:req:bindings.surface+2/test]
+// [spec:pgorm:req:bindings.entity-graphs+3/test]
+test("a registered graph's describe() reports exactly the keys the surface declares", {
+  skip: pgorm.graphs().length === 0 && "the module registers no graph; checks/entities.js runs this against an application's",
+}, () => {
+  assertDeclared("pgorm.EntityGraph", pgorm.graphs().map((name) => pgorm.graph(name).describe()));
+});
+
+// [spec:pgorm:req:bindings.surface+2/test]
+// [spec:pgorm:req:bindings.pipeline-sources+3/test]
+test("a source tuple's describe() reports exactly the keys the surface declares", {
+  skip: pgorm.pipeline.sourceTuples().length === 0 &&
+    "the module registers no source tuple; checks/entities.js runs this against an application's",
+}, () => {
+  assertDeclared("pipeline.SourceSelection", pgorm.pipeline.sourceTuples().map((name) => pgorm.pipeline.sources(name).describe()));
 });

@@ -3,27 +3,29 @@
 //! A model is JavaScript data lowered into the statement builders, as
 //! pgorm-python's are Python data over its native builders; what it needs
 //! from Rust is small and lives here: one spelling of a value's kind, which
-//! a declared column and a decoded result column are compared by; the bounded
-//! composition of a prefixed result-column name pgorm's own graph writer
-//! mints, so a model graph's aliases are the ones pgorm writes; and the
-//! statement pgorm's paginator counts a query's rows with.
+//! a declared column and a decoded result column are compared by; the value
+//! a created multirange's text, the form a model projects one in, spells;
+//! the bounded composition of a prefixed result-column name pgorm's own
+//! graph writer mints, so a model graph's aliases are the ones pgorm writes;
+//! and the statement pgorm's paginator counts a query's rows with.
 
 #[cfg(test)]
 mod parity;
 
 use neon::prelude::*;
-use pgorm::pgorm_query::{Asterisk, Expr, Func, Name, Query, SelectStatement};
+use pgorm::pgorm_query::{Asterisk, Expr, Func, Name, Query, SelectStatement, Value};
 
 use crate::{
     codec::Codec,
     errors::{Failure, throw},
     statements::{self, Node},
-    values::{Tag, TypeName, read},
+    values::{Tag, Tagged, TypeName, read, write},
 };
 
 pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
     cx.export_function("modelKindKey", kind_key_of_kind)?;
     cx.export_function("modelValueKey", kind_key_of_value)?;
+    cx.export_function("modelReadText", read_text)?;
     cx.export_function("modelResultName", result_name)?;
     cx.export_function("modelCount", count)?;
     Ok(())
@@ -33,7 +35,7 @@ pub(crate) fn export(cx: &mut ModuleContext) -> NeonResult<()> {
 /// a scalar kind's name (`i32`, `tstzrange`), an enum's type as SQL quotes
 /// it, a created range's type and subtype, and an array's element followed
 /// by `[]`.
-// [spec:pgorm:req:bindings.model-records]
+// [spec:pgorm:req:bindings.model-records+1]
 pub(crate) fn kind_key(tag: &Tag) -> Result<String, Failure> {
     Ok(match tag {
         Tag::Scalar(kind) => kind.kind_name().to_owned(),
@@ -90,6 +92,30 @@ fn kind_key_of_value(mut cx: FunctionContext) -> JsResult<JsString> {
         }
         None => read::refuse(&mut cx, "null declares no kind"),
     }
+}
+
+/// `modelReadText(kind, text)`: the value `text` spells as a created
+/// multirange `kind`. The driver reports a created multirange with no
+/// subtype to read its binary form by, so a model projects such a column
+/// cast to `text`, as pgorm's `ColumnTrait::select_as` reads an entity's,
+/// and its record reads the text through the declared subtype, as a decoded
+/// created range's is read: text the subtype does not read is a
+/// `DecodeError`, never a value of another type.
+// [spec:pgorm:req:bindings.model-records+1]
+// [spec:pgorm:req:bindings.created-ranges]
+fn read_text(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let kind = cx.argument::<JsValue>(0)?;
+    let text = cx.argument::<JsString>(1)?.value(&mut cx);
+    let codec = Codec::get(&mut cx)?;
+    let tag = read::kind(&mut cx, codec, kind)?;
+    if !matches!(&tag, Tag::Created(kind) if kind.multirange) {
+        return cx.throw_type_error("only a created multirange is read from its text");
+    }
+    let tagged = Tagged {
+        datum: Value::String(Some(Box::new(text))),
+        tag,
+    };
+    write::plain(&mut cx, codec, &tagged)
 }
 
 /// `modelResultName(prefix, column)`: the result-set name of `column` under

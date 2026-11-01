@@ -20,7 +20,7 @@ Database: TypeAlias = "Connection | Pool | Transaction"
 Row: TypeAlias = "ModelRecord | tuple[ModelRecord | None, ...]"
 
 
-# [spec:pgorm:req:bindings.model-records]
+# [spec:pgorm:req:bindings.model-records+1]
 # [spec:pgorm:req:python.records]
 @dataclass(frozen=True, eq=False, slots=True, init=False)
 class ModelRecord(Mapping[str, Any]):

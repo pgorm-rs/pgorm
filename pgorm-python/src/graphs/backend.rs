@@ -20,15 +20,15 @@ pub(crate) struct Info {
 }
 
 impl Info {
+    /// The graph as `describe()` reports it: its name, the Rust shape, and
+    /// each source's entity and slot kind.
+    // [spec:pgorm:req:bindings.entity-graphs+3]
     pub(crate) fn describe(&self) -> serde_json::Value {
         serde_json::json!({"name": self.name, "rust_shape": self.rust_shape,
             "sources": self.bindings.sources.iter().enumerate().map(|(index, source)| {
                 serde_json::json!({"index":index, "entity":source.entity.name,
                     "slot": if index == 0 { "root" } else if source.optional { "Opt" } else { "Req" }})
-            }).collect::<Vec<_>>(),
-            "terminals": ["all", "optional", "cursor.all"],
-            "aliases": "joined sources at find time; root name is fixed by EntityTrait",
-            "cursor": {"source": 0, "order_columns": 1, "bounds": ["before", "after", "before_with", "after_with"], "windows": ["first", "last"], "inspect": false}})
+            }).collect::<Vec<_>>()})
     }
 }
 

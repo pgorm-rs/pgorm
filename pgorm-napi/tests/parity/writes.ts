@@ -1,6 +1,6 @@
 // The INSERT, UPDATE and DELETE family's parity cases, held to `writes.json`
 // as `select.ts`'s are to theirs.
-// [spec:pgorm:req:bindings.writes+1/test]
+// [spec:pgorm:req:bindings.writes+2/test]
 // [spec:pgorm:req:bindings.write-sources/test]
 // [spec:pgorm:req:bindings.conflict-arbiters/test]
 // [spec:pgorm:req:bindings.write-ctes/test]

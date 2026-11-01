@@ -177,7 +177,7 @@ async def _active(model, method, connection):
 
 
 def _conflict(conflict, update):
-    target = p.ConflictTarget(*conflict)
+    target = p.Conflict.on(*conflict)
     return target.update(*update) if update else target.do_nothing()
 
 
@@ -732,7 +732,7 @@ class Emitter:
                 return call(var(i["query"]), "default_values", [])
             case "insert.conflict":
                 keys = ", ".join(literal(key) for key in d["keys"])
-                target = "p.ConflictTarget(" + keys + ")"
+                target = "p.Conflict.on(" + keys + ")"
                 if d["action"] == "nothing":
                     action = call(target, "do_nothing", [])
                 elif "columns" in d:

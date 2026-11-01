@@ -4,7 +4,7 @@
 // pipeline's last stage projects — `pipeline.selectSources(sources(name))` —
 // and whose rows Rust decodes into each entity's model through its absence
 // witness, every position optional, as pgorm's `select_sources` does.
-// [spec:pgorm:req:bindings.pipeline-sources+2]
+// [spec:pgorm:req:bindings.pipeline-sources+3]
 
 import { arg } from "./builder.js";
 import { runJob } from "./connections.js";

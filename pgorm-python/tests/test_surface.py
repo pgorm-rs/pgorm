@@ -8,6 +8,7 @@ from pathlib import Path
 import unittest
 
 import pgorm as p
+import pgorm.pipeline as pl
 
 SURFACE = json.loads(
     (Path(__file__).resolve().parents[2] / "docs" / "spec" / "bindings-surface.json").read_text()
@@ -148,13 +149,13 @@ class SurfaceTests(unittest.TestCase):
             if len(key) == 2 and SURFACE["modules"][key[0]][path.split(".")[1]] is not None
         }
 
-    # [spec:pgorm:req:bindings.surface+1/test]
-    # [spec:pgorm:req:python.naming+2/test]
+    # [spec:pgorm:req:bindings.surface+2/test]
+    # [spec:pgorm:req:python.naming+3/test]
     def test_every_shared_name_is_offered(self):
         missing = sorted(self.expected[key] for key in self.expected if key not in self.live)
         self.assertEqual(missing, [], "shared names the package lacks: add them, or list each as a gap with its plan node")
 
-    # [spec:pgorm:req:bindings.surface+1/test]
+    # [spec:pgorm:req:bindings.surface+2/test]
     def test_offers_only_declared_names(self):
         checked = self.checked_classes()
         extra = []
@@ -167,17 +168,17 @@ class SurfaceTests(unittest.TestCase):
             extra.append(".".join(key))
         self.assertEqual(extra, [], "undeclared public names: share them in bindings-surface.json, or list them as Python's own with a reason")
 
-    # [spec:pgorm:req:bindings.surface+1/test]
+    # [spec:pgorm:req:bindings.surface+2/test]
     def test_landed_gaps_leave_the_list(self):
         closed = sorted(path for key, path in self.gaps.items() if key in self.live and key not in self.expected)
         self.assertEqual(closed, [], "names offered now that the list still calls gaps: remove them from python.gaps")
 
-    # [spec:pgorm:req:bindings.surface+1/test]
+    # [spec:pgorm:req:bindings.surface+2/test]
     def test_every_declared_own_name_exists(self):
         stale = sorted(path for key, path in self.own.items() if key not in self.live)
         self.assertEqual(stale, [], "names python.only or python.undecided declares that the package no longer offers")
 
-    # [spec:pgorm:req:bindings.surface+1/test]
+    # [spec:pgorm:req:bindings.surface+2/test]
     def test_entries_name_a_node_or_question(self):
         shared = {
             f"{module}.{name}{suffix}"
@@ -209,7 +210,7 @@ class DescriptionTests(unittest.TestCase):
         unreached = sorted({owner + path for path in declared_paths(shape)} - seen)
         self.assertEqual(unreached, [], "declared keys no live description reached")
 
-    # [spec:pgorm:req:bindings.surface+1/test]
+    # [spec:pgorm:req:bindings.surface+2/test]
     # [spec:pgorm:req:bindings.models+4/test]
     def test_model_description_has_the_declared_keys(self):
         model = p.Model(
@@ -222,13 +223,29 @@ class DescriptionTests(unittest.TestCase):
         )
         self.assert_declared("pgorm.Model", [model.describe(), model.as_("a").describe()])
 
-    # [spec:pgorm:req:bindings.surface+1/test]
+    # [spec:pgorm:req:bindings.surface+2/test]
     # [spec:pgorm:req:bindings.entities+3/test]
     def test_entity_description_has_the_declared_keys(self):
         names = p.entities()
         if not names:
             self.skipTest("the module registers no entity; checks/entities.py runs this against an application's")
         self.assert_declared("pgorm.Entity", [p.entity(name).describe() for name in names])
+
+    # [spec:pgorm:req:bindings.surface+2/test]
+    # [spec:pgorm:req:bindings.entity-graphs+3/test]
+    def test_graph_description_has_the_declared_keys(self):
+        names = p.graphs()
+        if not names:
+            self.skipTest("the module registers no graph; checks/entities.py runs this against an application's")
+        self.assert_declared("pgorm.EntityGraph", [p.graph(name).describe() for name in names])
+
+    # [spec:pgorm:req:bindings.surface+2/test]
+    # [spec:pgorm:req:bindings.pipeline-sources+3/test]
+    def test_source_tuple_description_has_the_declared_keys(self):
+        names = pl.source_tuples()
+        if not names:
+            self.skipTest("the module registers no source tuple; checks/entities.py runs this against an application's")
+        self.assert_declared("pipeline.SourceSelection", [pl.sources(name).describe() for name in names])
 
 
 if __name__ == "__main__":

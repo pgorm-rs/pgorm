@@ -11,7 +11,7 @@ def quoted(name):
     return '"' + name.replace('"', '""') + '"'
 
 
-# [spec:pgorm:req:bindings.merge+1/test]
+# [spec:pgorm:req:bindings.merge+2/test]
 class MergeTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -49,10 +49,10 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
     async def test_each_row_kind_takes_its_own_arm(self):
         t, s = self.target, self.source
         query = (self.pending()
-                 .when_matched(p.MergeUpdate("name", s.col("name")).set("visits", t.col("visits") + s.col("visits")))
-                 .when_not_matched(p.MergeInsert("id", s.col("id")).set("name", s.col("name"))
+                 .when_matched(p.MergeAction.update("name", s.col("name")).set("visits", t.col("visits") + s.col("visits")))
+                 .when_not_matched(p.MergeAction.insert("id", s.col("id")).set("name", s.col("name"))
                                    .set("visits", s.col("visits")))
-                 .when_not_matched_by_source(p.MatchedAction.Delete)
+                 .when_not_matched_by_source(p.MergeAction.delete())
                  .returning_action()
                  .returning(t.col("id"), p.ReturningRow.Old.col("visits").as_("before"),
                             p.ReturningRow.New.col("visits").as_("after")))
@@ -65,10 +65,10 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         # The unconditional arm is added first and still renders last; the first
         # conditional arm whose condition holds takes the row.
         query = (self.pending()
-                 .when_matched(p.MergeUpdate("name", p.bind("fallback")))
-                 .when_matched(p.MergeUpdate("name", p.bind("big")), condition=s.col("visits") > 10)
-                 .when_matched(p.MatchedAction.Delete, condition=s.col("visits") > 1)
-                 .when_not_matched(p.NotMatchedAction.DoNothing)
+                 .when_matched(p.MergeAction.update("name", p.bind("fallback")))
+                 .when_matched(p.MergeAction.update("name", p.bind("big")), condition=s.col("visits") > 10)
+                 .when_matched(p.MergeAction.delete(), condition=s.col("visits") > 1)
+                 .when_not_matched(p.MergeAction.do_nothing())
                  .returning_action().returning(t.col("id"), t.col("name")))
         sql = query.inspect().sql
         self.assertLess(sql.index("WHEN MATCHED AND"), sql.index("WHEN MATCHED THEN"))
@@ -78,18 +78,18 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
     async def test_last_unconditional_arm_wins(self):
         t, s = self.target, self.source
         query = (self.pending()
-                 .when_matched(p.MatchedAction.Delete)
-                 .when_matched(p.MatchedAction.DoNothing)
-                 .when_not_matched(p.NotMatchedAction.InsertDefaultValues)
+                 .when_matched(p.MergeAction.delete())
+                 .when_matched(p.MergeAction.do_nothing())
+                 .when_not_matched(p.MergeAction.insert_defaults())
                  .returning_action().returning(t.col("name")))
         with self.assertRaises(p.DatabaseError) as caught:
             # The default row has no id: the target's primary key refuses it.
             await self.connection.query(query)
         self.assertEqual(caught.exception.sqlstate, "23502")
         query = (self.pending()
-                 .when_matched(p.MatchedAction.Delete)
-                 .when_matched(p.MatchedAction.DoNothing)
-                 .when_not_matched(p.MergeInsert("id", s.col("id")))
+                 .when_matched(p.MergeAction.delete())
+                 .when_matched(p.MergeAction.do_nothing())
+                 .when_not_matched(p.MergeAction.insert("id", s.col("id")))
                  .returning_action().returning(t.col("id"), t.col("name")))
         self.assertEqual(await self.rows(query), [("INSERT", 4, "none")])
 
@@ -97,7 +97,7 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         t, s = self.target, self.source
         hostile = "x'); DROP TABLE accounts; --"
         query = (self.pending()
-                 .when_matched(p.MergeUpdate("name", hostile), condition=t.col("name") != hostile)
+                 .when_matched(p.MergeAction.update("name", hostile), condition=t.col("name") != hostile)
                  .returning(t.col("name")))
         self.assertEqual(await self.rows(query), [(hostile,), (hostile,)])
         self.assertNotIn("DROP", query.inspect().sql)
@@ -107,7 +107,7 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         staged = p.Select(p.col("id"), p.col("visits")).from_(p.Table(self.source_name)).where(p.col("visits") > 10)
         s = p.Table("staged")
         query = (p.merge(t, s, t.col("id") == s.col("id"))
-                 .when_matched(p.MergeUpdate("visits", s.col("visits")))
+                 .when_matched(p.MergeAction.update("visits", s.col("visits")))
                  .with_(p.With("staged", staged))
                  .returning_action().returning(t.col("id")))
         written = p.Table("written")
@@ -123,7 +123,7 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         staged = (p.Select(p.col("id"), p.col("name")).from_(p.Table(self.source_name))
                   .where(p.col("visits") > 10).as_("s"))
         query = (p.merge(t, staged, t.col("id") == staged.col("id"))
-                 .when_matched(p.MergeUpdate("name", staged.col("name")))
+                 .when_matched(p.MergeAction.update("name", staged.col("name")))
                  .returning_action().returning(t.col("id")))
         self.assertEqual(await self.rows(query), [("UPDATE", 2)])
         self.assertEqual(await self.final(), [(1, "one", 10), (2, "dos", 20), (3, "three", 30)])
@@ -132,7 +132,7 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_renamed_versions_answer_only_to_their_names(self):
         t, s = self.target, self.source
-        base = self.pending().when_matched(p.MergeUpdate("visits", s.col("visits")))
+        base = self.pending().when_matched(p.MergeAction.update("visits", s.col("visits")))
         query = base.returning(p.col("visits", table="before").as_("was"), p.col("visits", table="after").as_("is"),
                                old_as="before", new_as="after")
         self.assertEqual(await self.rows(query), [(10, 5), (20, 50)])
@@ -150,7 +150,7 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         await self.connection.execute(p.Insert(p.Table(child)).columns("id", "visits").values(1, 0))
         target = p.Table(parent).as_("t")
         s = self.source
-        query = p.merge(target, s, target.col("id") == s.col("id")).when_matched(p.MergeUpdate("visits", 99))
+        query = p.merge(target, s, target.col("id") == s.col("id")).when_matched(p.MergeAction.update("visits", 99))
         self.assertEqual(await self.connection.execute(query.only()), 0)
         self.assertEqual(await self.connection.execute(query), 1)
 
@@ -159,7 +159,7 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         await self.connection.execute(p.RawSQL(
             f"CREATE TEMP TABLE {quoted(name)} (id integer GENERATED ALWAYS AS IDENTITY, n integer)"))
         target, s = p.Table(name).as_("t"), self.source
-        insert = p.MergeInsert("id", s.col("id")).set("n", s.col("visits"))
+        insert = p.MergeAction.insert("id", s.col("id")).set("n", s.col("visits"))
         query = p.merge(target, s, target.col("id") == s.col("id"))
         with self.assertRaises(p.DatabaseError) as caught:
             await self.connection.execute(query.when_not_matched(insert))
@@ -167,23 +167,30 @@ class MergeTests(unittest.IsolatedAsyncioTestCase):
         written = query.when_not_matched(insert.overriding(p.Overriding.SystemValue)).returning(target.col("id"))
         self.assertEqual(await self.rows(written), [(1,), (2,), (4,)])
 
-    async def test_actions_are_typed_by_their_row(self):
-        pending = self.pending()
-        with self.assertRaises(TypeError):
-            pending.when_matched(p.MergeInsert("id", 1))
-        with self.assertRaises(TypeError):
-            pending.when_not_matched_by_source(p.NotMatchedAction.DoNothing)
-        with self.assertRaises(TypeError):
-            pending.when_not_matched(p.MergeUpdate("id", 1))
-        with self.assertRaises(TypeError):
-            pending.when_not_matched(p.MatchedAction.Delete)
+    # [spec:pgorm:req:bindings.argument-errors+1/test]
+    async def test_actions_are_checked_against_their_row(self):
+        pending, update, insert = self.pending(), p.MergeAction.update("id", 1), p.MergeAction.insert("id", 1)
+        wrong = [(pending.when_matched, insert), (pending.when_matched, p.MergeAction.insert_defaults()),
+                 (pending.when_not_matched_by_source, insert),
+                 (pending.when_not_matched_by_source, p.MergeAction.insert_defaults()),
+                 (pending.when_not_matched, update), (pending.when_not_matched, p.MergeAction.delete())]
+        for arm, action in wrong:
+            with self.subTest(arm=arm.__name__, action=repr(action)):
+                with self.assertRaisesRegex(p.ConstructionError, "not an? "):
+                    arm(action)
+        for arm in [pending.when_matched, pending.when_not_matched, pending.when_not_matched_by_source]:
+            with self.assertRaises(TypeError):
+                arm("delete")
+            arm(p.MergeAction.do_nothing())
+        for build in [p.MergeAction, p.MergeUpdate, p.MergeInsert]:
+            with self.assertRaises(TypeError):
+                build("id", 1)
         with self.assertRaises(p.ConstructionError):
             await self.connection.execute(pending)
         self.assertFalse(hasattr(pending, "inspect"))
 
-
-# [spec:pgorm:req:bindings.writes+1/test]
-# [spec:pgorm:req:bindings.merge+1/test]
+# [spec:pgorm:req:bindings.writes+2/test]
+# [spec:pgorm:req:bindings.merge+2/test]
 class ReturningVersionTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.pool = p.Pool(os.environ["PGORM_TEST_DSN"], max_size=1)
@@ -210,7 +217,7 @@ class ReturningVersionTests(unittest.IsolatedAsyncioTestCase):
     async def test_upsert_says_which_rows_it_inserted(self):
         old = p.ReturningRow.Old
         upsert = (p.Insert(self.table).columns("id", "visits").values(1, 1).values(2, 2)
-                  .on_conflict(p.ConflictTarget("id").set("visits", p.col("visits", table="excluded")))
+                  .on_conflict(p.Conflict.on("id").set("visits", p.col("visits", table="excluded")))
                   .returning(p.col("id"), old.col("id").is_null().as_("inserted")))
         rows = sorted(tuple(row.values()) for row in await self.connection.query(upsert))
         self.assertEqual(rows, [(1, False), (2, True)])

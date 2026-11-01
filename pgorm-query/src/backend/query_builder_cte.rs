@@ -6,7 +6,7 @@ impl QueryBuilder {
     /// `WITH ` and the clause's common table expressions, comma-separated.
     /// `prepare_with_clause` writes a plain clause through this, and a `MERGE`,
     /// which takes no recursive clause, calls it directly.
-    // [spec:pgorm:req:sql.render.cte+4]
+    // [spec:pgorm:req:sql.render.cte+5]
     pub(super) fn prepare_plain_with_clause(&self, with: &WithClause, sql: &mut dyn SqlWriter) {
         write!(sql, "WITH ").unwrap();
         for (i, cte) in with.ctes().enumerate() {

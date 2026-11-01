@@ -64,7 +64,7 @@ option.
 > time MUST NOT invoke rustc, Cargo, a packaging tool or a code-generation
 > build.
 
-> [spec:pgorm:req:bindings.surface+1]
+> [spec:pgorm:req:bindings.surface+2]
 > The two bindings MUST offer the same public operations, each spelled by its
 > binding's naming rule. `docs/spec/bindings-surface.json` declares the shared
 > surface once, in neutral spelling: each module's functions, classes and
@@ -82,13 +82,17 @@ option.
 > listed as a gap, or when a name listed as a gap is present.
 >
 > The file also declares, under `descriptions`, the keys of the data a
-> model's and a registered entity's `describe()` report (`bindings.models`,
-> `bindings.entities`), nested objects and the items of lists included, in
-> the same neutral spelling. Each binding's surface test MUST compare a live
-> `describe()` of each with that declaration, recursively, and fail on a key
-> missing, a key the declaration does not list, or a declared key no live
-> description reached. A class's other data fields are outside this check;
-> the rules that state them are tested by each binding's own suites.
+> model's, a registered entity's, a registered graph's and a source tuple's
+> `describe()` report (`bindings.models`, `bindings.entities`,
+> `bindings.entity-graphs`, `bindings.pipeline-sources`), nested objects and
+> the items of lists included, in the same neutral spelling. Each binding's
+> surface test MUST compare a live `describe()` of each with that
+> declaration, recursively, and fail on a key missing, a key the declaration
+> does not list, or a declared key no live description reached; a module
+> that registers no entity, graph or source tuple is held to it by the
+> application module its checks build. A class's other data fields are
+> outside this check; the rules that state them are tested by each binding's
+> own suites.
 
 ## Runtime and errors
 
@@ -657,22 +661,30 @@ the same terminals that run raw SQL.
 > and each, with a RETURNING list, MUST be a common table expression's body,
 > whose rows are those its RETURNING list yields.
 
-> [spec:pgorm:req:bindings.writes+1]
+> [spec:pgorm:req:bindings.writes+2]
 > `insert`, `update` and `delete` MUST build pgorm-query's INSERT, UPDATE and
-> DELETE. An INSERT names its distinct columns before any row. Each `values`
-> call adds one row of exactly as many operands, by pgorm-query's arity check,
-> and `default_values` writes one row of defaults, mixed with neither.
+> DELETE. An INSERT names its distinct columns once, before any row, a second
+> `columns` call being a `ConstructionError`. Each `values` call adds one row
+> of exactly as many operands, by pgorm-query's arity check, and
+> `default_values` writes one row of defaults, mixed with neither.
 >
-> `on_conflict` takes only a completed action: do nothing, answering any
-> conflict; or an arbiter — a non-empty list of columns, with an optional
-> partial-index predicate — followed by do nothing or a non-empty update of
-> columns taken from EXCLUDED or set to expressions, with an optional
-> condition.
+> `on_conflict` takes only a completed action, which `Conflict`'s factories
+> begin: `Conflict.do_nothing()`, answering any conflict; or an arbiter,
+> `Conflict.on(columns..)`, a non-empty list of columns with an optional
+> partial-index predicate, `where`, followed by `do_nothing()` or a non-empty
+> update. An update is begun and extended by `update(columns..)`, one column
+> or more taken from EXCLUDED, and `set(column, value)`, a column set to an
+> expression, and takes an optional condition, `where`; an empty list of
+> targets or of columns is a `ConstructionError`. `Conflict`,
+> `ConflictTarget` and `ConflictUpdate` are exported for annotations and
+> `isinstance` (`instanceof`) and cannot be called, a call being a
+> `TypeError`.
 >
 > An UPDATE has at least one assignment, each column once. An INSERT with no
 > row, an UPDATE with no assignment, and an UPDATE or DELETE with neither a
 > WHERE nor an explicit `all_rows()` MUST be refused with a
-> `ConstructionError` when it is inspected or run. `returning` gives the
+> `ConstructionError` when it is inspected or run, or read into a WITH clause
+> (`bindings.write-ctes`). `returning` gives the
 > RETURNING list, every column when it is empty, and reads a written row's old
 > and new versions through `ReturningRow`'s old and new rows, renamed with
 > the `old_as` and `new_as` options.
@@ -691,23 +703,28 @@ the same terminals that run raw SQL.
 > instead name a constraint, `on_constraint(name)`, which takes no predicate:
 > a predicate given one is a `ConstructionError`.
 
-> [spec:pgorm:req:bindings.merge+1]
+> [spec:pgorm:req:bindings.merge+2]
 > `merge(target, source, on)` MUST follow pgorm-query's MERGE typestate. Its
 > source is a table. It gives a `PendingMerge`, which has no `inspect()` and
 > which every terminal refuses with a `ConstructionError`, because PostgreSQL
 > refuses a MERGE with no WHEN arm; its first arm gives the `Merge`
-> statement. `when_matched` and `when_not_matched_by_source` take an
-> action on a target row — an update, which takes its first assignment and so
-> is never empty, a delete, or do nothing — and `when_not_matched` an action
-> on a source row — an insert, likewise never empty and taking OVERRIDING,
-> an insert of default values, or do nothing. Any other pairing MUST be a
-> `ConstructionError`. Each arm takes an optional condition. Within a kind of
-> row the unconditional arm renders after the conditional ones, and a later
-> one replaces it, as pgorm-query orders them. `returning` reads a row's
-> versions as a write's does; `returning_action()` puts `merge_action()`
-> first in the list, its only form; and `only()` writes `ONLY` before the
-> target. A MERGE reads a common table expression and, with a RETURNING list,
-> is a common table expression's body (`bindings.with`).
+> statement. `MergeAction`'s factories make an arm's action. `when_matched`
+> and `when_not_matched_by_source` take an action on a target row —
+> `MergeAction.update(column, value)`, `delete()` or `do_nothing()` — and
+> `when_not_matched` an action on a source row —
+> `MergeAction.insert(column, value)`, `insert_defaults()` or `do_nothing()`.
+> An update and an insert take their first column with its value, so neither
+> is ever empty, and `set(column, value)` adds another; an insert takes
+> OVERRIDING. An action given to an arm whose row it cannot take MUST be a
+> `ConstructionError`. `MergeAction`, `MergeUpdate` and `MergeInsert` are
+> exported for annotations and `isinstance` (`instanceof`) and cannot be
+> called, a call being a `TypeError`. Each arm takes an optional condition.
+> Within a kind of row the unconditional arm renders after the conditional
+> ones, and a later one replaces it, as pgorm-query orders them. `returning`
+> reads a row's versions as a write's does; `returning_action()` puts
+> `merge_action()` first in the list, its only form; and `only()` writes
+> `ONLY` before the target. A MERGE reads a common table expression and, with
+> a RETURNING list, is a common table expression's body (`bindings.with`).
 
 > [spec:pgorm:req:bindings.merge-sources]
 > A MERGE's source MUST be, beside a table, any FROM item: a subquery
@@ -994,7 +1011,7 @@ pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 > (`bindings.models`), and a registered column's through its registration's
 > (`bindings.entities`).
 
-> [spec:pgorm:req:bindings.model-records]
+> [spec:pgorm:req:bindings.model-records+1]
 > A model's terminals MUST decode each row into a record keyed by field, in
 > declaration order, its values those `bindings.values` declares. Each field
 > MUST be found by the result column its statement projected it under, and the
@@ -1005,6 +1022,13 @@ pages follow pgorm's own `RelationDef`, `SelectGraph`, `Cursor` and
 > another schema's enum, is a `DecodeError` rather than a value of the wrong
 > type. A NULL in a field that is not nullable, and a label an enum field does
 > not list, MUST be a `DecodeError`, never a value.
+>
+> A created multirange's field is read from its text, since the driver
+> reports a column of one with no subtype (`bindings.created-ranges`): every
+> statement a model builds MUST project it cast to `text`, as pgorm's
+> `ColumnTrait::select_as` reads an entity's, its result column is held to
+> `text`, and its text MUST be read as a `Multirange` of the declared
+> subtype, text that subtype does not read being a `DecodeError`.
 
 > [spec:pgorm:req:bindings.model-reads]
 > `find()` MUST select every field, `select(fields)` the fields it names, and
@@ -1225,7 +1249,7 @@ Rust generic at run time, only use the ones compiled in.
 > `all_rows()` before it runs, a `ConstructionError` otherwise, as a
 > statement's UPDATE does (`bindings.writes`).
 
-> [spec:pgorm:req:bindings.entity-graphs+2]
+> [spec:pgorm:req:bindings.entity-graphs+3]
 > `graph(name).find(aliases)` MUST build the registered `SelectGraph` with the
 > application's factory, its declared entity tuple, join slot kinds and
 > decoding terminals, each joined slot under the alias given for it, `g1`,
@@ -1246,8 +1270,15 @@ Rust generic at run time, only use the ones compiled in.
 > key — the column, the root's other key columns, then each slot's — each
 > value converted to its column's declared kind and any other count refused.
 > `first`, `last`, `asc` and `desc` are the cursor's own.
+>
+> `describe()` MUST report a registered graph as data, under these keys and
+> no other, each spelled by the binding's naming rule: its `name`;
+> `rust_shape`, the Rust `SelectGraph` type its factory builds; and
+> `sources`, the root and then each slot in order, each with its `index`, the
+> `entity` it decodes as and its `slot`, `root` or the slot's kind, `Req` or
+> `Opt`.
 
-> [spec:pgorm:req:bindings.pipeline-sources+2]
+> [spec:pgorm:req:bindings.pipeline-sources+3]
 > A registered entity MUST be a pipeline source wherever a relation is, read
 > through its own `IntoSource`, so its table and schema are the ones its Rust
 > declaration names, and `pipeline.col(table, entity.col(name))` MUST lower
@@ -1265,6 +1296,11 @@ Rust generic at run time, only use the ones compiled in.
 > witness, a source a row does not carry being null. A pipeline reshaped
 > before the selection is the `ConstructionError` pgorm's refusal names,
 > before anything is sent.
+>
+> A source tuple's `describe()` MUST report it as data, under these keys and
+> no other, each spelled by the binding's naming rule: its `name`;
+> `rust_shape`, the Rust tuple of entity types it registers; and `entities`,
+> the name of each source's entity registration, in order.
 
 > [spec:pgorm:req:bindings.codegen]
 > Each binding MUST offer a documented workflow that generates, from a

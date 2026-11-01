@@ -200,7 +200,7 @@ class ModelGraphs(unittest.IsolatedAsyncioTestCase):
             bool(Post.graph())
 
     # [spec:pgorm:req:bindings.graphs/test]
-    # [spec:pgorm:req:bindings.model-records/test]
+    # [spec:pgorm:req:bindings.model-records+1/test]
     async def test_undecodable_present_slot_is_decode_error(self):
         await self.pool.execute(p.RawSQL(f"UPDATE {SCHEMA}.account SET mood = 'wild' WHERE id = 1"))
         with self.assertRaisesRegex(p.DecodeError, "'wild' is not one of the column's values"):
@@ -318,17 +318,17 @@ class ModelGraphs(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(all(isinstance(change, Change) for change in changes))
         one = await Account.update({"name": "Ann2"}).where(Account.col("id").eq(1)).returning_change(self.pool)
         self.assertEqual((one.old["name"], one.new["name"]), ("Ann", "Ann2"))
-        upsert = Account.insert({"id": 1, "name": "Zed"}).on_conflict(p.ConflictTarget("id").update("name"))
+        upsert = Account.insert({"id": 1, "name": "Zed"}).on_conflict(p.Conflict.on("id").update("name"))
         updated = await upsert.returning_upsert(self.pool)
         self.assertIsInstance(updated, Updated)
         self.assertEqual((updated.change.old["name"], updated.change.new["name"]), ("Ann2", "Zed"))
         inserted = await Account.insert({"id": 7, "name": "New"}).returning_upsert(self.pool)
         self.assertIsInstance(inserted, Inserted)
         self.assertEqual(inserted.model["name"], "New")
-        held = Account.insert({"id": 7, "name": "Again"}).on_conflict(p.ConflictTarget("id").do_nothing())
+        held = Account.insert({"id": 7, "name": "Again"}).on_conflict(p.Conflict.on("id").do_nothing())
         self.assertIsNone(await held.returning_upsert(self.pool))
         batch = Account.insert_many([{"id": 7, "name": "x"}, {"id": 8, "name": "y"}]).on_conflict(
-            p.ConflictTarget("id").do_nothing()
+            p.Conflict.on("id").do_nothing()
         )
         self.assertEqual([row.model["name"] for row in await batch.returning_upserts(self.pool)], ["y"])
         empty = Account.insert_many([])

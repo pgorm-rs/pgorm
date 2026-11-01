@@ -567,7 +567,10 @@ const pages = Account.find().orderBy(Account.col("id").asc()).paginate(50);
   result's columns are exactly the ones selected, each of its declared kind —
   an `int8` read into an `i32` field, or another schema's enum, is a
   `DecodeError` — with no NULL where the field is not nullable and no label an
-  enum field does not list.
+  enum field does not list. The driver reports a `CreatedMultirange` column
+  with no subtype to read its binary form by, so a model projects one cast to
+  `text`, as pgorm's entities read it, and reads that text as a `Multirange`
+  of the declared subtype: text the subtype does not read is a `DecodeError`.
 - **Reads**: `find()`, `select(..fields)`, `findByKey(key)`; `where`,
   `orderBy`, `limit`, `offset`, and `join(relation)` to filter on a related
   row; `all`, `one`, `optional`, `count` on a pool, connection or

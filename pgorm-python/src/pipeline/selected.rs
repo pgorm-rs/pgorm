@@ -17,7 +17,7 @@ use std::{marker::PhantomData, sync::Arc};
 impl Registry {
     /// Register a concrete tuple of one to six entity types for select_sources.
     /// Register each entity first; Python cannot invent Rust source types.
-    // [spec:pgorm:req:bindings.pipeline-sources+2]
+    // [spec:pgorm:req:bindings.pipeline-sources+3]
     pub fn sources<T: SourceTypes>(&mut self, name: &str) -> PyResult<&mut Self>
     where
         <T::Selection as SourceList>::Row: Send,

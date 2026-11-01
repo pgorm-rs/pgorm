@@ -15010,6 +15010,14 @@ children (
                 kind @note
                 text "Spec split 2026-11-01: bindings.writes+1 keeps values / default_values, a column arbiter with its partial-index predicate, the assignment and guard refusals and RETURNING; bindings.merge+1 keeps a table source; bindings.with+1 keeps named CTEs in call order with Select and MERGE bodies, on SELECT and MERGE. The parts Python lacked are five rules of their own: bindings.write-sources (INSERT .. SELECT, OVERRIDING, UPDATE .. FROM, DELETE .. USING), bindings.conflict-arbiters (index expressions beside columns, on_constraint(name) taking no predicate), bindings.merge-sources (any FROM item as a MERGE's source), bindings.write-ctes (WITH on INSERT, UPDATE and DELETE, and a write with RETURNING as a CTE body) and bindings.cte-options (column lists, MATERIALIZED, WITH RECURSIVE with SEARCH and CYCLE, a second CTE in a recursive clause and a recursive clause before a MERGE refused). Python claims the five here; JavaScript's side (pgorm-napi src/statements write.rs, conflict.rs, merge.rs, with.rs, lib writes/conflicts/merge/select and their tests and parity files) is claimed by binding-spec-consolidation. Python spells SEARCH and CYCLE as Search(order, by, set) and Cycle(by, set, using) with the closed choice SearchOrder, the values of With.recursive's search= and cycle= options, where JavaScript passes options objects; the three are python.only in bindings-surface.json."
             }
+
+            {
+                at 2026-11-01T12:27:12.115382Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Re-read after bindings.writes and bindings.merge moved to +2 (python-conflict-merge-shapes, 938680a4): conflict targets are now named with Conflict.on and MERGE actions with MergeAction's factories, a write a WITH clause reads is refused as it could not run, and columns are named once; Python's write sources, write CTEs and merge sources this node built are unchanged by it, and every reference is pinned at the current version."
+                after_done true
+            }
         )
     }
 
@@ -15621,12 +15629,27 @@ children (
         id python-conflict-merge-shapes
         title "Python names conflict targets with Conflict.on and MERGE actions with MergeAction, as JavaScript does"
         kind @refactor
+        sealed true
         log (
             {
                 at 2026-11-01T02:30:55.365373Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Decisions (D) and (E) of the operator's 2026-11-01 answer (binding-spec-consolidation). (D) In pgorm-python: Conflict.on(*targets) names an inference target of columns and index expressions, as pgorm-napi's Conflict.on does; ConflictTarget stays exported for annotations but is not constructible; ConflictUpdate.update(*columns) takes several, as JavaScript's update(...columns). (E) MergeAction.update(column, value), .insert(column, value), .delete(), .do_nothing() and .insert_defaults() as pgorm-napi's MergeAction factories; MatchedAction and NotMatchedAction deleted; MergeUpdate and MergeInsert not constructible; an action given to the wrong kind of arm is a ConstructionError, as bindings.merge requires (Python raises TypeError today, breaking it); the stubs keep the matched and not-matched arms' types apart so mypy still refuses a wrong pairing. Update python.naming (it still says ConflictTarget(columns)), the shared rules, bindings-surface.json's shapes entries, docs, typing cases and the generative campaign."
+            }
+
+            {
+                at 2026-11-01T11:20:16.633915Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Delivered (D): Conflict.on(*targets) makes an inference target of columns and index expressions; ConflictTarget has no constructor (stub __init__ takes Never); ConflictUpdate.update(*columns) takes one or more, none a ConstructionError as on a ConflictTarget. (E): MergeAction.update/insert/delete/do_nothing/insert_defaults make every MERGE action; MatchedAction and NotMatchedAction are deleted; MergeUpdate and MergeInsert have no constructor; an action on the wrong kind of arm is a ConstructionError, a non-action still a TypeError. Choices: MergeUpdate and MergeInsert are not runtime subclasses of MergeAction (JavaScript's are), since a subclass would show the five factories as their members to the surface test; the stubs make MergeAction generic in a contravariant phantom row type, delete() a MergeAction[Literal[\"target\"]], insert_defaults() a MergeAction[Literal[\"source\"]] and do_nothing() a MergeAction[Literal[\"target\", \"source\"]], as CopyFrom's format is, so mypy refuses every wrong pairing (rejection cases added). Rules bumped: bindings.writes+2 (Conflict's factories, the three classes not callable, columns named once, an unrunnable write refused as a WITH clause reads it), bindings.merge+2 (MergeAction's factories, the three classes not callable), python.naming+3 (the exceptions gone; a class a shared rule makes by a factory alone is not called), python.typing+2 (the row type parameter), napi.naming+4 (the exceptions gone); every annotation in both bindings re-pinned. Capability keys conflict.target became conflict.on and merge.update/merge.insert became merge_action.update/insert/delete/do_nothing/insert_defaults. bindings-surface.json shares Conflict.on and MergeAction and the shapes question no longer lists conflict arbiters or MERGE actions. JavaScript gained tests that its conflict and MERGE action classes cannot be called. The campaign's emitters and dispatchers write p.Conflict.on(..)."
+            }
+
+            {
+                at 2026-11-01T12:27:44.044976Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -15635,12 +15658,34 @@ children (
         id binding-statement-defects
         title "A JavaScript write read into a WITH clause is checked as it would be run, pgorm-query writes AS MATERIALIZED with one space, and Python's Insert.columns refuses a second call as JavaScript's does"
         kind @fix
+        sealed true
         log (
             {
                 at 2026-11-01T02:30:55.565366Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-select-gaps / python-statement-gaps (merged 4896da7e). (1) pgorm-napi's src/statements/with.rs takes an INSERT, UPDATE or DELETE body without that write's built() checks, so a write that could not run (no rows, nothing set, no where / all_rows) sits in a CTE and fails only at the server, against bindings.statements; Python refuses it as the clause reads it. (2) pgorm-query renders a CTE's materialization as `AS  MATERIALIZED` with two spaces; fix the renderer and its goldens. (3) pgorm-python's Insert.columns called twice appends to the Rust column list, where pgorm-napi refuses a second call; refuse it in Python as a ConstructionError, as JavaScript does, with a test in each."
+            }
+
+            {
+                at 2026-11-01T03:07:24.696175Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-11-01T11:14:14.05758Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Fixed all three. (1) pgorm-napi's write.rs gives Insert, Update and Delete each a check() that built() and with.rs's expression() both read, so a WITH clause refuses a write that could not run with the ConstructionError inspecting it gives (test \"a write that could not run is refused as a WITH clause reads it\" in tests/writes.test.ts). (2) pgorm-query writes `MATERIALIZED ` / `NOT MATERIALIZED ` after `AS `; sql.render.cte moved to +5, whose text spelled the leading space, with a golden in tests/postgres/query.rs and the two-space strings in pgorm-napi/tests/parity/select.json and pgorm-python/tests/test_cte_options.py fixed. (3) Python's Insert.columns refuses a second call as JavaScript's does, tested in both. No shared rule's text changed for (1) or (3): bindings.statements already requires a method to refuse an argument it cannot use."
+            }
+
+            {
+                at 2026-11-01T12:27:44.145896Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -15649,12 +15694,27 @@ children (
         id binding-graph-describe-shapes
         title "A registered graph's and a source tuple's describe() report the same keys in both bindings, held by the surface test"
         kind @refactor
+        sealed true
         log (
             {
                 at 2026-11-01T02:30:55.824297Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by binding-describe-shapes (merged 61f70c15), which settled a model's and an entity's describe() keys: a registered graph's describe() and a source tuple's still differ between the bindings, Python's carrying keys JavaScript's lack (terminals, aliases, cursor, result). Settle one key set each under decision (6), change the side that differs, state them in bindings.entity-graphs and bindings.pipeline-sources, and declare them under bindings-surface.json's descriptions so each surface test holds them, run against the application modules as the entity descriptions are."
+            }
+
+            {
+                at 2026-11-01T10:48:43.544049Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Settled under decision (6), JavaScript's sets, spelled by each binding's naming rule. Registered graph: {name, rust_shape, sources: [{index, entity, slot}]}, slot root, Req or Opt. Source tuple: {name, rust_shape, entities}. Python dropped its constants: a graph's terminals [\"all\", \"optional\", \"cursor.all\"], aliases (a fixed sentence) and cursor (a fixed object), and a source tuple's terminals [\"all\", \"one\", \"optional\"] and result (a fixed sentence); JavaScript unchanged. Neither the generative campaign nor Python's codegen read those keys (codegen embeds the described registrations in _COMPATIBILITY and compares them at load, so a module generated before this change refuses to load until regenerated). bindings.entity-graphs+3 and bindings.pipeline-sources+3 state the shapes; bindings.surface+2 extends descriptions to both; bindings-surface.json declares pgorm.EntityGraph and pipeline.SourceSelection; each surface test compares every registered graph's and source tuple's describe() with them, skipped in the standalone modules and run against the application modules by checks/entities.py and checks/entities.js. Bite proof: renaming EntityGraph's rust_shape to rust_type made Python's test fail ('rust_shape: undeclared', 'rust_type: missing') and JavaScript's fail in Node and Deno ('rustShape: undeclared', 'rust_type: missing'); restored, both pass."
+            }
+
+            {
+                at 2026-11-01T12:27:44.245853Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -15663,12 +15723,34 @@ children (
         id napi-model-created-multirange
         title "JavaScript's declared models decode a created multirange column, as Python's now do"
         kind @feat
+        sealed true
         log (
             {
                 at 2026-11-01T02:30:56.040028Z
                 author "brendan@necessary.nu"
                 kind @note
                 text "Found by python-model-created-multirange (scalar-kinds-shared branch): the filing note was wrong that JavaScript's models decode a created multirange. A probe shows an insert succeeds but returning().one() and find().all() throw DecodeError \"the type is not supported\". Give pgorm-napi's model decode what Python's got: project the column cast to text as ColumnTrait::select_as does, read it back as a Multirange of the declared subtype (DecodeError for text it cannot parse), with live tests of insert-returning, NULL, a filter, find_by_key, a change terminal and a graph read."
+            }
+
+            {
+                at 2026-11-01T03:07:25.737224Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Todo → Doing (nplan start)"
+            }
+
+            {
+                at 2026-11-01T09:30:18.336131Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Built: pgorm-napi's model statements project a CreatedMultirange field cast to text (model-shape.js projected(), used by the SELECT, RETURNING, the update/upsert version lists and model graphs), model-decode.js holds that column to text and reads it through a new native modelReadText(kind, text) (src/models/mod.rs), which reads the text as a Multirange of the declared subtype through write::plain, text the subtype does not read a DecodeError. bindings.model-records+1 states the text read for both bindings (Python's python-model-created-multirange did the same without a rule); annotations re-pinned in both. Live test in tests/models.test.ts: insert-returning, NULL, a filter (through a Value: a model column's comparison types take no bare Range or Multirange, a typing gap left as it was), find_by_key, the i64-subtype DecodeError, returningChange and a graph read."
+            }
+
+            {
+                at 2026-11-01T12:27:44.342793Z
+                author "brendan@necessary.nu"
+                kind @status
+                text "Doing → Done (nplan complete)"
             }
         )
     }
@@ -15775,6 +15857,20 @@ children (
                         text "Doing → Done (nplan complete)"
                     }
                 )
+            }
+        )
+    }
+
+    {
+        id napi-model-range-operands
+        title "JavaScript's model and registered column comparisons accept a Range or Multirange value in their types, as their runtime does"
+        kind @fix
+        log (
+            {
+                at 2026-11-01T12:27:53.759868Z
+                author "brendan@necessary.nu"
+                kind @note
+                text "Found by napi-model-created-multirange (merged 98fd2ce5): a JavaScript model column's comparison types accept no bare Range or Multirange, so a test filtering a created-multirange column had to wrap the value in new Value(hours, kind). The runtime converts a Range or Multirange through the column's declared kind; the declarations in pgorm-napi/lib/models.d.ts and entities.d.ts should accept the value types each range and multirange kind takes, with deno check cases proving a range column takes one and a scalar column refuses it. Check whether Python's stubs have the same gap."
             }
         )
     }

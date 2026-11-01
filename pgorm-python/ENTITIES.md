@@ -156,7 +156,7 @@ change = await Account.update(model.into_active().set("note", "x")).returning_ch
 print(change.old["note"], change.new["note"])
 changes = await (Account.update_many().set("note", "bulk")
                  .where(Account.col("id") >= 2).returning_changes(connection))
-renamed = p.ConflictTarget("id").update("display name")
+renamed = p.Conflict.on("id").update("display name")
 match await Account.insert(active).on_conflict(renamed).returning_upsert(connection):
     case p.Upserted.Inserted(model): ...
     case p.Upserted.Updated(change): ...
@@ -265,4 +265,4 @@ use checked Rust-value-to-Python conversion. Their custom Rust decoders retain
 their own behavior. The additional PostgreSQL wire exactness policies for
 dynamic `Record` results are scoped to that result form; they do not replace an
 application's typed decoder. `capabilities()` records this distinction and
-lists each registration's types and supported terminals.
+lists each registration as its `describe()` reports it.

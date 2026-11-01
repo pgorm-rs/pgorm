@@ -34,9 +34,7 @@ pub use grouping::PyGroupingElement;
 pub use insert::PyInsert;
 pub use lock::{PyLockStrength, PyLockWait};
 pub use merge::{PyMerge, PyPendingMerge};
-pub use merge_action::{
-    PyMatchedAction, PyMergeInsert, PyMergeUpdate, PyNotMatchedAction, PyOverriding,
-};
+pub use merge_action::{PyMergeAction, PyMergeInsert, PyMergeUpdate, PyOverriding};
 use pyo3::{exceptions::PyTypeError, prelude::*};
 pub use raw::RawSQL;
 pub use select::{Join, PySelect};
@@ -122,10 +120,9 @@ pub(crate) fn register(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<RawSQL>()?;
     module.add_class::<PyPendingMerge>()?;
     module.add_class::<PyMerge>()?;
+    module.add_class::<PyMergeAction>()?;
     module.add_class::<PyMergeUpdate>()?;
     module.add_class::<PyMergeInsert>()?;
-    module.add_class::<PyMatchedAction>()?;
-    module.add_class::<PyNotMatchedAction>()?;
     module.add_class::<PyOverriding>()?;
     module.add_class::<PyWith>()?;
     module.add_class::<PySearchOrder>()?;

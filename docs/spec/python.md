@@ -26,7 +26,7 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > compiled Rust entity and graph types reach it through the extension's
 > registration mechanism.
 
-> [spec:pgorm:req:python.naming+2]
+> [spec:pgorm:req:python.naming+3]
 > Python MUST spell a shared rule's neutral name as written: functions,
 > methods and keyword arguments in snake_case, classes in PascalCase, and an
 > option as a keyword argument. A name that is a Python keyword takes a
@@ -34,8 +34,10 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > closed choice is a class whose members are PascalCase class attributes
 > (`Join.Inner`, `Direction.Asc`, `FrameType.Rows`, `ReturningRow.Old`). A
 > class is constructed by calling it, where JavaScript calls a factory
-> function (`napi.naming`); `select`, `insert`, `update` and `delete` are
-> the classes `Select`, `Insert`, `Update` and `Delete` under those names.
+> function (`napi.naming`), unless a shared rule makes it by a factory alone
+> (`bindings.writes`, `bindings.merge`, `bindings.schema-api`); `select`,
+> `insert`, `update` and `delete` are the classes `Select`, `Insert`,
+> `Update` and `Delete` under those names.
 >
 > Python's own operators spell the expression operators: `==`, `!=`, `<`,
 > `<=`, `>` and `>=` beside `eq` .. `gte`; `+`, `-`, `*`, `/` and `%` for
@@ -43,12 +45,9 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > for `and`, `or` and `not`; and unary `-` for a pipeline's negation.
 >
 > `any_` and `all_` take an underscore, and `tuple_expr` its suffix, so as not
-> to shadow Python's builtins. These differ from the shared shape by choice
-> and wait on the operator (`bindings.surface`): the grouping elements as
-> `GroupingElement.set`, `.empty`, `.rollup`, `.cube` and `.sets`;
-> `ConflictTarget(columns)` for a conflict arbiter; and `MergeUpdate(column,
-> value)` and `MergeInsert(column, value)` for MERGE's actions, and
-> `MatchedAction` and `NotMatchedAction` for the fixed ones.
+> to shadow Python's builtins. The grouping elements differ from the shared
+> shape by choice and wait on the operator (`bindings.surface`):
+> `GroupingElement.set`, `.empty`, `.rollup`, `.cube` and `.sets`.
 
 > [spec:pgorm:req:python.package]
 > The package MUST declare its Rust crate, Python distribution, import module,
@@ -251,12 +250,17 @@ HTTP adapter, an external sqlmap scan or `sqlmap.acceptance`.
 > Rust entity's column definition: a domain over an integer is an `int` bound
 > as `i32`, one over an enum the enum's `str`, one over an array a `list`.
 
-> [spec:pgorm:req:python.typing+1]
+> [spec:pgorm:req:python.typing+2]
 > Public Python APIs MUST ship typing information and py.typed, with callable
 > signatures, awaitable/iterator results, optional values and error behavior
 > documented. A COPY statement's format is a type parameter,
 > `CopyFrom[Literal["binary"]]` or `CopyTo[Literal["binary"]]` for the row
-> COPY. Static-checker examples and runtime signature tests MUST agree with
+> COPY. So is the kind of row a MERGE action takes: `MergeAction.delete()` is
+> a `MergeAction[Literal["target"]]`, `insert_defaults()` a
+> `MergeAction[Literal["source"]]` and `do_nothing()` both, and an arm on a
+> target row takes a `MergeUpdate` or the first, one on a source row a
+> `MergeInsert` or the second, so a checker refuses an action an arm cannot
+> take (`bindings.merge`). Static-checker examples and runtime signature tests MUST agree with
 > the installed extension. Documentation MUST show an ordinary schema, CRUD,
 > joins, a transaction, a pipeline, streaming and the optional compiled
 > entity workflow, without requiring the security harness.

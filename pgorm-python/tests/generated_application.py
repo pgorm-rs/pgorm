@@ -70,7 +70,7 @@ class GeneratedApplication(unittest.IsolatedAsyncioTestCase):
         def active(identity, name):
             return app.Account.active().set_id(identity).set_display_name(name).set_note(None)
 
-        renamed = p.ConflictTarget("id").update("display name")
+        renamed = p.Conflict.on("id").update("display name")
         async with self.pool.connection() as connection:
             first = await app.Account.insert(active(1, "One")).returning_upsert(connection)
             self.assertIsInstance(first, Inserted)
@@ -295,7 +295,7 @@ class GeneratedDomains(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(refused.exception.sqlstate, "23514")
 
 
-    # [spec:pgorm:req:bindings.pipeline-sources+2/test]    a registered column a pipeline reads compares
+    # [spec:pgorm:req:bindings.pipeline-sources+3/test]    a registered column a pipeline reads compares
     # as the enum its domain is over, under its table and under a source's name, where the
     # column named by text is refused with 42883
     async def test_pipeline_compares_registered_domain_as_enum(self):

@@ -20,10 +20,12 @@ pub(crate) struct Info {
 }
 
 impl Info {
+    /// The source tuple as `describe()` reports it: its name, the Rust
+    /// shape, and each source's entity.
+    // [spec:pgorm:req:bindings.pipeline-sources+3]
     pub(crate) fn describe(&self) -> serde_json::Value {
         serde_json::json!({"name": self.name, "rust_shape": self.rust_shape,
-            "entities": self.bindings.entities.iter().map(|e| &e.name).collect::<Vec<_>>(),
-            "terminals": ["all", "one", "optional"], "result": "tuple of optional models in source order"})
+            "entities": self.bindings.entities.iter().map(|e| &e.name).collect::<Vec<_>>()})
     }
 }
 
@@ -115,7 +117,7 @@ impl<T: SourceTypes> SourceQuery<T> {
     }
 }
 
-// [spec:pgorm:req:bindings.pipeline-sources+2]
+// [spec:pgorm:req:bindings.pipeline-sources+3]
 impl<T: SourceTypes> QueryBackend for SourceQuery<T>
 where
     <T::Selection as SourceList>::Row: Send,

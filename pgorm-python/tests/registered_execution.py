@@ -152,7 +152,7 @@ async def versions(db):
     account = p.entity("app.Account")
     first = await active(1, "Native").insert(db)
     await active(2, "Other").insert(db)
-    renamed = p.ConflictTarget("id").update("display name")
+    renamed = p.Conflict.on("id").update("display name")
     updated = await account.update(
         first.into_active().set("note", "change 雪")
     ).returning_change(db)
@@ -172,7 +172,7 @@ async def versions(db):
     )
     skipped = await (
         account.insert(active(1, "skipped"))
-        .on_conflict(p.ConflictTarget("id").do_nothing())
+        .on_conflict(p.Conflict.on("id").do_nothing())
         .returning_upsert(db)
     )
     return {

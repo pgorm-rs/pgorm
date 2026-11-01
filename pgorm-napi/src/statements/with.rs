@@ -21,10 +21,12 @@ pub(super) const EXPORTS: &[(&str, super::Build)] = &[
 
 /// The common table expression at `index`: its name, its body — whose rows
 /// are a `Select`'s, or a write's RETURNING rows — its column names and its
-/// materialization.
+/// materialization. A body is final once read, so a `Select`'s tie limit and
+/// windows, and a write that could not run, are refused here.
 // [spec:pgorm:req:bindings.with+1]
 // [spec:pgorm:req:bindings.write-ctes]
 // [spec:pgorm:req:bindings.cte-options]
+// [spec:pgorm:req:bindings.statements]
 fn expression<'cx>(
     cx: &mut FunctionContext<'cx>,
     index: usize,
@@ -35,9 +37,18 @@ fn expression<'cx>(
         Some(Node::Select(select)) => {
             CommonTableExpression::new(table, super::args::embedded(cx, select)?)
         }
-        Some(Node::Insert(insert)) => CommonTableExpression::new(table, insert.inner),
-        Some(Node::Update(update)) => CommonTableExpression::new(table, update.inner),
-        Some(Node::Delete(delete)) => CommonTableExpression::new(table, delete.inner),
+        Some(Node::Insert(insert)) => {
+            insert.check().or_else(|reason| refuse(cx, reason))?;
+            CommonTableExpression::new(table, insert.inner)
+        }
+        Some(Node::Update(update)) => {
+            update.check().or_else(|reason| refuse(cx, reason))?;
+            CommonTableExpression::new(table, update.inner)
+        }
+        Some(Node::Delete(delete)) => {
+            delete.check().or_else(|reason| refuse(cx, reason))?;
+            CommonTableExpression::new(table, delete.inner)
+        }
         Some(Node::Merge(merge)) => CommonTableExpression::new(table, *merge),
         Some(other) => {
             let what = other.describe();
